@@ -150,6 +150,99 @@ QStatusBar {
     color: #475569;
     font-size: 12px;
 }
+
+/* Shared Enterprise Buttons */
+QPushButton#PrimaryButton {
+    background-color: #1668DC;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+QPushButton#PrimaryButton:hover {
+    background-color: #1357BA;
+}
+
+QPushButton#SecondaryButton {
+    background-color: #FFFFFF;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+    border-radius: 7px;
+    padding: 8px 16px;
+    font-weight: 500;
+}
+
+QPushButton#SecondaryButton:hover {
+    background-color: #F8FAFC;
+    border-color: #94A3B8;
+}
+
+QPushButton#DangerButton {
+    background-color: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+QPushButton#DangerButton:hover {
+    background-color: #B91C1C;
+}
+
+/* Shared Inputs & Enterprise Table */
+QLineEdit#SearchInput,
+QComboBox#FilterCombo {
+    background-color: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 7px;
+    padding: 6px 10px;
+    color: #0F172A;
+    min-height: 20px;
+}
+
+QLineEdit#SearchInput:focus,
+QComboBox#FilterCombo:focus {
+    border-color: #1668DC;
+}
+
+QTableView#EnterpriseTableView {
+    background-color: #FFFFFF;
+    alternate-background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    selection-background-color: #EBF3FF;
+    selection-color: #0F172A;
+    gridline-color: #E2E8F0;
+    outline: none;
+}
+
+QTableView#EnterpriseTableView::item {
+    padding: 6px 10px;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+QHeaderView::section {
+    background-color: #F8FAFC;
+    color: #334155;
+    font-weight: 600;
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+/* Confirmation Dialog */
+QDialog#ConfirmDialog {
+    background-color: #FFFFFF;
+}
+
+QLabel#DialogTitle {
+    color: #0F172A;
+    font-size: 16px;
+    font-weight: 700;
+}
 """
 
 _NAV_SVGS: dict[str, str] = {

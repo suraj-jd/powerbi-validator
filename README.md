@@ -4,14 +4,14 @@ Local-first Windows desktop application for automating Power BI report and seman
 
 ## Current Stage
 
-**Stage 0 — Base PySide6 Desktop Shell**
+**Stage 1 — Architecture & Shared Components**
 
-- Runnable PySide6 Windows desktop application
-- Dark navy sidebar navigation (`Home`, `Settings`, `History`, `About`)
-- Light enterprise theme with resizable layout and placeholder pages
-- Application title, version, and window icon placeholder
-- Basic logging and clean exit flow
-- No Power BI credentials, network calls, or local database yet
+- Layered module structure (`app/core/`, `app/ui/models/`, `app/ui/widgets/`, `app/ui/dialogs/`, `app/bootstrap.py`)
+- Validated central configuration using Pydantic (`%LOCALAPPDATA%\PowerBIValidationTool\config.json`, no secrets stored)
+- Rotating local log files with automatic secret/token redaction
+- Application-wide uncaught exception hooks for main and worker threads
+- Reusable UI components: `NotificationBanner`, Qt Model/View `DataTableWidget`, and `ConfirmDialog`
+- Updated `About` page with runtime diagnostics, log folder shortcut, and live component preview
 
 ## Setup & Run (Windows PowerShell)
 

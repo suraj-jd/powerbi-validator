@@ -1,5 +1,6 @@
-# Stage 0 dependencies
+# Core runtime dependencies (Stage 0–1)
 PySide6>=6.8.0,<6.11.0
+pydantic>=2.10.0,<3.0.0
 
 # Development & testing
 pytest>=8.3.0

@@ -1,4 +1,4 @@
-"""Main desktop window shell for Stage 0."""
+"""Main desktop window shell with sidebar navigation and shared notification area."""
 
 from __future__ import annotations
 
@@ -21,11 +21,14 @@ from PySide6.QtWidgets import (
 )
 
 from app import APP_NAME, APP_VERSION
+from app.core.config import AppConfig
+from app.core.status import NotificationLevel
 from app.ui.pages.about_page import AboutPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.home_page import HomePage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import make_nav_icon
+from app.ui.widgets.notification_banner import NotificationBanner
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +37,21 @@ APP_ICON_PATH = PROJECT_ROOT / "assets" / "app_icon.svg"
 
 
 class MainWindow(QMainWindow):
-    """Primary desktop window with dark navy sidebar and page stack."""
+    """Primary desktop window with dark navy sidebar, notification bar, and page stack."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        config: AppConfig | None = None,
+        logs_dir: Path | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        self._config = config or AppConfig()
+        self._logs_dir = logs_dir
+
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
-        self.resize(1180, 760)
+        self.resize(self._config.window_width, self._config.window_height)
         self.setMinimumSize(900, 600)
 
         self._load_window_icon()
@@ -72,18 +84,47 @@ class MainWindow(QMainWindow):
         sidebar = self._build_sidebar()
         root_layout.addWidget(sidebar)
 
+        # Right-hand workspace column with shared top notification banner + page stack
+        workspace_col = QVBoxLayout()
+        workspace_col.setContentsMargins(0, 0, 0, 0)
+        workspace_col.setSpacing(0)
+
+        banner_wrapper = QWidget(central)
+        banner_layout = QVBoxLayout(banner_wrapper)
+        banner_layout.setContentsMargins(20, 12, 20, 0)
+        self.notification_banner = NotificationBanner(banner_wrapper)
+        banner_layout.addWidget(self.notification_banner)
+        banner_wrapper.setVisible(False)
+        self._banner_wrapper = banner_wrapper
+
+        self.notification_banner.message_requested.connect(self._show_banner_wrapper)
+        self.notification_banner.dismissed.connect(self._hide_banner_wrapper)
+        workspace_col.addWidget(banner_wrapper)
+
         self._stack = QStackedWidget(central)
-        root_layout.addWidget(self._stack, stretch=1)
+        workspace_col.addWidget(self._stack, stretch=1)
+
+        root_layout.addLayout(workspace_col, stretch=1)
 
         self._register_page("home", "Home", HomePage(self))
         self._register_page("settings", "Settings", SettingsPage(self))
         self._register_page("history", "History", HistoryPage(self))
-        self._register_page("about", "About", AboutPage(self))
+        self._register_page(
+            "about",
+            "About",
+            AboutPage(config=self._config, logs_dir=self._logs_dir, parent=self),
+        )
 
         self.setCentralWidget(central)
 
         status_bar = QStatusBar(self)
         self.setStatusBar(status_bar)
+
+    def _show_banner_wrapper(self, *_args: object) -> None:
+        self._banner_wrapper.setVisible(True)
+
+    def _hide_banner_wrapper(self) -> None:
+        self._banner_wrapper.setVisible(False)
 
     def _build_sidebar(self) -> QFrame:
         sidebar = QFrame(self)
@@ -94,7 +135,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(14, 18, 14, 16)
         layout.setSpacing(6)
 
-        # Compact brand header inside sidebar
         brand_title = QLabel("Power BI Validator")
         brand_title.setObjectName("SidebarBrandTitle")
         layout.addWidget(brand_title)
@@ -109,7 +149,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(top_divider)
         layout.addSpacing(8)
 
-        # Navigation buttons container
         self._nav_layout = QVBoxLayout()
         self._nav_layout.setSpacing(6)
         layout.addLayout(self._nav_layout)
@@ -121,7 +160,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(bottom_divider)
         layout.addSpacing(8)
 
-        footer_note = QLabel("Not signed in (Stage 0)")
+        footer_note = QLabel("Not signed in")
         footer_note.setObjectName("SidebarFooterNote")
         footer_note.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(footer_note)
@@ -157,6 +196,25 @@ class MainWindow(QMainWindow):
     def current_page_key(self) -> str:
         """Return the key of the currently displayed page."""
         return self._current_page_key
+
+    def show_notification(
+        self,
+        message: str,
+        level: NotificationLevel = NotificationLevel.INFO,
+        title: str | None = None,
+    ) -> None:
+        """Show a message in the top-level notification banner."""
+        self._banner_wrapper.setVisible(True)
+        self.notification_banner.show_message(message, level=level, title=title)
+
+    def post_notification(
+        self,
+        message: str,
+        level: NotificationLevel = NotificationLevel.INFO,
+        title: str | None = None,
+    ) -> None:
+        """Thread-safe method to display a notification banner from any thread."""
+        self.notification_banner.post_message(message, level=level, title=title)
 
     def navigate_to(self, page_key: str) -> None:
         """Switch the main stack and sidebar highlight to the requested page."""
