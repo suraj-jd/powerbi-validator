@@ -2,4 +2,4 @@
 
 APP_NAME = "Power BI Validation Tool"
 APP_VERSION = "0.1.0"
-APP_STAGE = "Stage 2 — Local SQLite Foundation"
+APP_STAGE = "Stage 3 — Microsoft Authentication"

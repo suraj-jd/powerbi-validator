@@ -38,7 +38,8 @@ htmlcov/
 .env
 .env.*
 *.token
-*token_cache*
+msal_token_cache*
+*.bin
 *.db
 *.sqlite
 *.sqlite3

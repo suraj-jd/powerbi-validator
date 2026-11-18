@@ -10,17 +10,20 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from app import APP_NAME, APP_VERSION
+from app.auth.msal_auth import AuthConfig, MsalAuthClient
 from app.core.config import (
     AppConfig,
     get_app_data_dir,
     get_database_path,
     get_logs_dir,
+    get_token_cache_path,
     load_config,
 )
 from app.core.exceptions import ConfigurationError, install_exception_hooks
 from app.core.logging_config import setup_logging
 from app.core.status import NotificationLevel
 from app.database.db import DatabaseManager
+from app.services.auth_service import AuthService
 from app.ui.main_window import MainWindow
 from app.ui.theme import APP_STYLESHEET
 
@@ -35,10 +38,12 @@ class AppContext:
     window: MainWindow
     config: AppConfig
     db: DatabaseManager
+    auth_service: AuthService
     data_dir: Path
     logs_dir: Path
     log_file: Path
     db_path: Path
+    token_cache_path: Path
 
 
 def create_application(argv: list[str] | None = None) -> QApplication:
@@ -61,11 +66,13 @@ def bootstrap_application(
     *,
     data_dir: Path | None = None,
     install_hooks: bool = True,
+    auto_restore_auth: bool = True,
 ) -> AppContext:
-    """Initialize config, rotating secret-safe logging, exception hooks, and MainWindow."""
+    """Initialize config, rotating secret-safe logging, SQLite, auth, exception hooks, and UI."""
     resolved_data_dir = get_app_data_dir(data_dir)
     resolved_logs_dir = get_logs_dir(resolved_data_dir)
     resolved_db_path = get_database_path(resolved_data_dir)
+    resolved_token_cache_path = get_token_cache_path(resolved_data_dir)
 
     config_warning: str | None = None
     try:
@@ -83,10 +90,26 @@ def bootstrap_application(
     db.run_migrations()
 
     qt_app = create_application(argv)
+
+    auth_client = MsalAuthClient(
+        config=AuthConfig(
+            client_id=config.effective_client_id(),
+            tenant_id=config.effective_tenant_id(),
+        ),
+        cache_path=resolved_token_cache_path,
+    )
+    auth_service = AuthService(
+        auth_client=auth_client,
+        app_config=config,
+        data_dir=resolved_data_dir,
+    )
+
     window = MainWindow(
         config=config,
         logs_dir=resolved_logs_dir,
         db_path=resolved_db_path,
+        token_cache_path=resolved_token_cache_path,
+        auth_service=auth_service,
     )
 
     if config_warning:
@@ -105,7 +128,11 @@ def bootstrap_application(
             )
         )
 
+    if auto_restore_auth:
+        auth_service.restore_session_async()
+
     def _on_quit() -> None:
+        auth_service.shutdown()
         db.dispose()
         logger.info("%s exited cleanly.", APP_NAME)
 
@@ -116,8 +143,10 @@ def bootstrap_application(
         window=window,
         config=config,
         db=db,
+        auth_service=auth_service,
         data_dir=resolved_data_dir,
         logs_dir=resolved_logs_dir,
         log_file=log_file,
         db_path=resolved_db_path,
+        token_cache_path=resolved_token_cache_path,
     )

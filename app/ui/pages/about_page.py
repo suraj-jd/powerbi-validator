@@ -83,12 +83,14 @@ class AboutPage(QWidget):
         config: AppConfig | None = None,
         logs_dir: Path | None = None,
         db_path: Path | None = None,
+        token_cache_path: Path | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._config = config or AppConfig()
         self._logs_dir = logs_dir
         self._db_path = db_path
+        self._token_cache_path = token_cache_path
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -155,6 +157,10 @@ class AboutPage(QWidget):
             ("Log Level:", self._config.log_level),
             ("Log Directory:", str(self._logs_dir) if self._logs_dir else "Not configured"),
             ("Local Database:", str(self._db_path) if self._db_path else "Not configured"),
+            (
+                "Protected Token Cache:",
+                str(self._token_cache_path) if self._token_cache_path else "Not configured",
+            ),
         ]
 
         for row_idx, (label_text, value_text) in enumerate(details):

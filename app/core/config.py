@@ -13,6 +13,8 @@ from app.core.exceptions import ConfigurationError
 
 APP_DIR_NAME = "PowerBIValidationTool"
 DATA_DIR_ENV_VAR = "PBI_VALIDATOR_DATA_DIR"
+CLIENT_ID_ENV_VAR = "PBI_VALIDATOR_CLIENT_ID"
+TENANT_ID_ENV_VAR = "PBI_VALIDATOR_TENANT_ID"
 
 LogLevelName = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -32,6 +34,18 @@ class AppConfig(BaseModel):
     window_width: int = Field(default=1180, ge=900, le=3840)
     window_height: int = Field(default=760, ge=600, le=2160)
     history_retention_days: int = Field(default=90, ge=7, le=3650)
+    # Public OAuth client identifiers (non-secret; desktop apps use PKCE with no client secret)
+    auth_client_id: str = Field(default="")
+    auth_tenant_id: str = Field(default="organizations")
+
+    def effective_client_id(self) -> str:
+        """Return the Entra Client ID from env override or saved config."""
+        return os.environ.get(CLIENT_ID_ENV_VAR, self.auth_client_id).strip()
+
+    def effective_tenant_id(self) -> str:
+        """Return the Entra Tenant ID / authority segment from env override or saved config."""
+        value = os.environ.get(TENANT_ID_ENV_VAR, self.auth_tenant_id).strip()
+        return value or "organizations"
 
 
 def get_app_data_dir(override_dir: Path | None = None) -> Path:
@@ -63,6 +77,13 @@ def get_database_path(data_dir: Path | None = None) -> Path:
     db_dir = get_app_data_dir(data_dir) / "data"
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "validation_tool.db"
+
+
+def get_token_cache_path(data_dir: Path | None = None) -> Path:
+    """Return the path to the Windows DPAPI-protected MSAL token cache file."""
+    auth_dir = get_app_data_dir(data_dir) / "auth"
+    auth_dir.mkdir(parents=True, exist_ok=True)
+    return auth_dir / "msal_token_cache.bin"
 
 
 def get_config_file_path(data_dir: Path | None = None) -> Path:

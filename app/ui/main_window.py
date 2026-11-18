@@ -1,14 +1,16 @@
-"""Main desktop window shell with sidebar navigation and shared notification area."""
+"""Main desktop window shell with sidebar navigation, account panel, and notification bar."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -21,14 +23,20 @@ from PySide6.QtWidgets import (
 )
 
 from app import APP_NAME, APP_VERSION
+from app.auth.msal_auth import AuthStateSnapshot, AuthStatus
 from app.core.config import AppConfig
 from app.core.status import NotificationLevel
+from app.ui.dialogs.confirm_dialog import ConfirmDialog
+from app.ui.dialogs.entra_config_dialog import EntraConfigDialog
 from app.ui.pages.about_page import AboutPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.home_page import HomePage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import make_nav_icon
 from app.ui.widgets.notification_banner import NotificationBanner
+
+if TYPE_CHECKING:
+    from app.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +53,16 @@ class MainWindow(QMainWindow):
         config: AppConfig | None = None,
         logs_dir: Path | None = None,
         db_path: Path | None = None,
+        token_cache_path: Path | None = None,
+        auth_service: AuthService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._config = config or AppConfig()
         self._logs_dir = logs_dir
         self._db_path = db_path
+        self._token_cache_path = token_cache_path
+        self._auth_service = auth_service
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(self._config.window_width, self._config.window_height)
@@ -65,6 +77,7 @@ class MainWindow(QMainWindow):
         self._current_page_key: str = ""
 
         self._build_ui()
+        self._connect_auth_service()
         self.navigate_to("home")
 
         logger.info("MainWindow initialized (%s v%s)", APP_NAME, APP_VERSION)
@@ -86,7 +99,6 @@ class MainWindow(QMainWindow):
         sidebar = self._build_sidebar()
         root_layout.addWidget(sidebar)
 
-        # Right-hand workspace column with shared top notification banner + page stack
         workspace_col = QVBoxLayout()
         workspace_col.setContentsMargins(0, 0, 0, 0)
         workspace_col.setSpacing(0)
@@ -108,19 +120,21 @@ class MainWindow(QMainWindow):
 
         root_layout.addLayout(workspace_col, stretch=1)
 
-        self._register_page("home", "Home", HomePage(self))
-        self._register_page("settings", "Settings", SettingsPage(self))
-        self._register_page("history", "History", HistoryPage(self))
-        self._register_page(
-            "about",
-            "About",
-            AboutPage(
-                config=self._config,
-                logs_dir=self._logs_dir,
-                db_path=self._db_path,
-                parent=self,
-            ),
+        self.home_page = HomePage(self)
+        self.settings_page = SettingsPage(self)
+        self.history_page = HistoryPage(self)
+        self.about_page = AboutPage(
+            config=self._config,
+            logs_dir=self._logs_dir,
+            db_path=self._db_path,
+            token_cache_path=self._token_cache_path,
+            parent=self,
         )
+
+        self._register_page("home", "Home", self.home_page)
+        self._register_page("settings", "Settings", self.settings_page)
+        self._register_page("history", "History", self.history_page)
+        self._register_page("about", "About", self.about_page)
 
         self.setCentralWidget(central)
 
@@ -136,7 +150,7 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self) -> QFrame:
         sidebar = QFrame(self)
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(190)
+        sidebar.setFixedWidth(205)
 
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(14, 18, 14, 16)
@@ -165,13 +179,43 @@ class MainWindow(QMainWindow):
         bottom_divider = QFrame()
         bottom_divider.setObjectName("SidebarDivider")
         layout.addWidget(bottom_divider)
+        layout.addSpacing(10)
+
+        # Signed-in account profile summary (matching mockup bottom-left area)
+        account_row = QHBoxLayout()
+        account_row.setSpacing(10)
+
+        self._avatar_label = QLabel("--")
+        self._avatar_label.setFixedSize(34, 34)
+        self._avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._avatar_label.setStyleSheet(
+            "background-color: #243E66; color: #FFFFFF; border-radius: 17px; "
+            "font-weight: 700; font-size: 12px;"
+        )
+        account_row.addWidget(self._avatar_label)
+
+        account_text_col = QVBoxLayout()
+        account_text_col.setSpacing(1)
+        self._sidebar_user_name = QLabel("Not signed in")
+        self._sidebar_user_name.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: 600;")
+        account_text_col.addWidget(self._sidebar_user_name)
+
+        self._sidebar_user_email = QLabel("Microsoft Entra ID")
+        self._sidebar_user_email.setStyleSheet("color: #94A3B8; font-size: 10px;")
+        account_text_col.addWidget(self._sidebar_user_email)
+
+        account_row.addLayout(account_text_col, stretch=1)
+        layout.addLayout(account_row)
         layout.addSpacing(8)
 
-        footer_note = QLabel("Not signed in")
-        footer_note.setObjectName("SidebarFooterNote")
-        footer_note.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(footer_note)
-        layout.addSpacing(4)
+        self._sign_out_button = QPushButton("  Sign Out")
+        self._sign_out_button.setObjectName("ExitButton")
+        self._sign_out_button.setIcon(make_nav_icon("exit", color="#CBD5E1"))
+        self._sign_out_button.setIconSize(QSize(16, 16))
+        self._sign_out_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._sign_out_button.clicked.connect(self._handle_sign_out_requested)
+        self._sign_out_button.setVisible(False)
+        layout.addWidget(self._sign_out_button)
 
         self._exit_button = QPushButton("  Exit")
         self._exit_button.setObjectName("ExitButton")
@@ -182,6 +226,100 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._exit_button)
 
         return sidebar
+
+    def _connect_auth_service(self) -> None:
+        banner = self.home_page.auth_banner
+        banner.configure_requested.connect(self._open_entra_config_dialog)
+        banner.sign_in_requested.connect(self._handle_sign_in_requested)
+        banner.switch_account_requested.connect(self._handle_switch_account_requested)
+        banner.sign_out_requested.connect(self._handle_sign_out_requested)
+
+        if self._auth_service is not None:
+            self._auth_service.state_changed.connect(self.apply_auth_state)
+            self._auth_service.error_occurred.connect(
+                lambda msg: self.show_notification(
+                    msg,
+                    level=NotificationLevel.ERROR,
+                    title="Authentication",
+                )
+            )
+            self.apply_auth_state(self._auth_service.state)
+        else:
+            self.apply_auth_state(
+                AuthStateSnapshot(
+                    status=AuthStatus.NOT_CONFIGURED,
+                    status_message="Configure a Microsoft Entra Client ID to enable sign-in.",
+                )
+            )
+
+    def apply_auth_state(self, state: AuthStateSnapshot) -> None:
+        """Synchronize the sidebar profile panel and Home auth banner with auth state."""
+        self.home_page.auth_banner.apply_state(state)
+
+        if state.status == AuthStatus.AUTHENTICATED and state.account is not None:
+            acct = state.account
+            self._avatar_label.setText(acct.initials)
+            self._avatar_label.setStyleSheet(
+                "background-color: #1668DC; color: #FFFFFF; border-radius: 17px; "
+                "font-weight: 700; font-size: 12px;"
+            )
+            self._sidebar_user_name.setText(acct.display_name)
+            self._sidebar_user_email.setText(acct.username or "Signed in")
+            self._sign_out_button.setVisible(True)
+        else:
+            self._avatar_label.setText("--")
+            self._avatar_label.setStyleSheet(
+                "background-color: #243E66; color: #FFFFFF; border-radius: 17px; "
+                "font-weight: 700; font-size: 12px;"
+            )
+            self._sidebar_user_name.setText(
+                "Session expired" if state.status == AuthStatus.EXPIRED else "Not signed in"
+            )
+            self._sidebar_user_email.setText(
+                state.account.username if state.account else "Microsoft Entra ID"
+            )
+            self._sign_out_button.setVisible(False)
+
+    def _open_entra_config_dialog(self) -> None:
+        dialog = EntraConfigDialog(
+            client_id=self._config.effective_client_id(),
+            tenant_id=self._config.effective_tenant_id(),
+            parent=self,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted and self._auth_service is not None:
+            self._auth_service.configure_entra_app(dialog.client_id, dialog.tenant_id)
+            self.show_notification(
+                "Microsoft Entra public-client settings saved.",
+                level=NotificationLevel.SUCCESS,
+                title="Authentication",
+            )
+
+    def _handle_sign_in_requested(self) -> None:
+        if self._auth_service is not None:
+            self._auth_service.sign_in_async()
+
+    def _handle_switch_account_requested(self) -> None:
+        if self._auth_service is not None:
+            self._auth_service.switch_account_async()
+
+    def _handle_sign_out_requested(self) -> None:
+        if self._auth_service is None:
+            return
+        confirmed = ConfirmDialog.ask(
+            self,
+            title="Sign Out of Microsoft",
+            message="Sign out and clear the locally cached authentication session?",
+            detail="Your saved workspace registrations, validation rules, and history will be kept.",
+            confirm_text="Sign Out",
+            cancel_text="Cancel",
+        )
+        if confirmed:
+            self._auth_service.sign_out()
+            self.show_notification(
+                "Signed out and cleared the protected local token cache.",
+                level=NotificationLevel.INFO,
+                title="Signed Out",
+            )
 
     def _register_page(self, key: str, label: str, widget: QWidget) -> None:
         self._pages[key] = widget

@@ -4,13 +4,14 @@ Local-first Windows desktop application for automating Power BI report and seman
 
 ## Current Stage
 
-**Stage 2 — Local SQLite Foundation**
+**Stage 3 — Microsoft Authentication**
 
-- Local SQLite database (`%LOCALAPPDATA%\PowerBIValidationTool\data\validation_tool.db`) created and migrated automatically on startup via SQLAlchemy 2.0 + Alembic
-- Core tables: `app_settings`, `workspace_registrations`, `validation_rules`, `validation_runs`, `validation_results`, `refresh_records`
-- Repository layer (`app/database/repositories/`) for CRUD operations, duplicate-registration protection, immutable run history, and secret-key rejection in `app_settings`
-- Backup & restore design notes documented in `docs/database_backup_restore.md`
-- Layered architecture, Pydantic config, rotating secret-redacting logs, global exception hooks, and reusable UI components (Stages 0–1)
+- Microsoft Entra ID public-client sign-in via MSAL OAuth 2.0 + PKCE (system browser interactive login, no passwords or client secrets)
+- Windows DPAPI (`CryptProtectData` / `CryptUnprotectData`) encrypted MSAL token cache stored at `%LOCALAPPDATA%\PowerBIValidationTool\auth\msal_token_cache.bin` (never stored in SQLite)
+- Silent session restoration on startup, expired/revoked session detection, **Switch Account**, and **Sign Out** (clears local token cache)
+- Non-blocking `AuthService` background worker, Home `AuthBanner`, sidebar account profile panel, and `Configure Entra App` dialog
+- Entra App Registration setup guide in [docs/entra_app_registration.md](docs/entra_app_registration.md)
+- Local SQLite persistence via SQLAlchemy + Alembic, rotating secret-redacting logs, and reusable UI components (Stages 0–2)
 
 ## Setup & Run (Windows PowerShell)
 
