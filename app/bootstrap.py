@@ -29,6 +29,7 @@ from app.services.auth_service import AuthService
 from app.services.metadata_service import MetadataService
 from app.services.powerbi_service import PowerBIService
 from app.services.registry_service import RegistryService
+from app.services.rule_service import RuleService
 from app.ui.main_window import MainWindow
 from app.ui.theme import APP_STYLESHEET
 
@@ -47,6 +48,7 @@ class AppContext:
     powerbi_service: PowerBIService
     registry_service: RegistryService
     metadata_service: MetadataService
+    rule_service: RuleService
     data_dir: Path
     logs_dir: Path
     log_file: Path
@@ -114,6 +116,7 @@ def bootstrap_application(
     )
     powerbi_service = PowerBIService(auth_service=auth_service)
     registry_service = RegistryService(db=db)
+    rule_service = RuleService(db=db)
     metadata_client = MetadataClient(powerbi_service.rest_client)
     metadata_service = MetadataService(metadata_client=metadata_client)
 
@@ -126,6 +129,7 @@ def bootstrap_application(
         powerbi_service=powerbi_service,
         registry_service=registry_service,
         metadata_service=metadata_service,
+        rule_service=rule_service,
     )
 
     if config_warning:
@@ -165,6 +169,7 @@ def bootstrap_application(
         powerbi_service=powerbi_service,
         registry_service=registry_service,
         metadata_service=metadata_service,
+        rule_service=rule_service,
         data_dir=resolved_data_dir,
         logs_dir=resolved_logs_dir,
         log_file=log_file,

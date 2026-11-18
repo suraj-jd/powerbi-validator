@@ -30,11 +30,13 @@ from app.ui.models.dict_table_model import ColumnSpec
 from app.ui.widgets.data_table import DataTableWidget
 from app.ui.widgets.metadata_selector_widget import MetadataSelectorWidget
 from app.ui.widgets.notification_banner import NotificationBanner
+from app.ui.widgets.rules_table_widget import ValidationRulesTableWidget
 from app.ui.widgets.searchable_combo import SearchableComboBox
 
 if TYPE_CHECKING:
     from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
+    from app.services.rule_service import RuleService
 
 _REGISTRY_COLUMNS: list[ColumnSpec] = [
     ColumnSpec(key="active", header="Active", alignment=Qt.AlignmentFlag.AlignCenter),
@@ -59,12 +61,17 @@ class SettingsPage(QWidget):
         registry_service: RegistryService | None = None,
         metadata_service: MetadataService | None = None,
         powerbi_service: PowerBIService | None = None,
+        rule_service: RuleService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._registry = registry_service
         self._metadata_service = metadata_service
         self._powerbi_service = powerbi_service
+        if rule_service is None and registry_service is not None and getattr(registry_service, "_db", None) is not None:
+            from app.services.rule_service import RuleService as _RuleSvc
+            rule_service = _RuleSvc(registry_service._db)
+        self._rule_service = rule_service
         self._records: dict[int, RegistrationRecord] = {}
         self._access_status_by_id: dict[int, str] = {}
         self._build_ui()
@@ -100,7 +107,7 @@ class SettingsPage(QWidget):
         title_col.addWidget(subtitle)
         header_row.addLayout(title_col, stretch=1)
 
-        badge = QLabel("Stage 6 — Metadata Active")
+        badge = QLabel("Stage 7 — Rule Configuration Active")
         badge.setObjectName("StageBadge")
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header_row)
@@ -235,25 +242,33 @@ class SettingsPage(QWidget):
 
         layout.addWidget(metadata_card)
 
-        # Section 3: Validation Checks Configuration (Upcoming Stage 7)
+        # Section 3: Validation Checks Configuration (Stage 7)
         rules_card = QFrame()
         rules_card.setObjectName("Card")
         rules_layout = QVBoxLayout(rules_card)
         rules_layout.setContentsMargins(22, 20, 22, 20)
-        rules_layout.setSpacing(10)
+        rules_layout.setSpacing(12)
 
+        sec3_header = QHBoxLayout()
         sec3_title = QLabel("3. Validation Rules Configuration")
         sec3_title.setObjectName("SectionTitle")
-        rules_layout.addWidget(sec3_title)
+        sec3_header.addWidget(sec3_title, stretch=1)
+        rules_layout.addLayout(sec3_header)
 
         sec3_note = QLabel(
-            "The row-based validation rule configuration table with per-rule Advanced Settings "
-            "(Null, Duplicate, Latest Date, Row Count, DAX Measure, Anomaly, Refresh) will connect "
-            "to this metadata discovery engine in Stage 7."
+            "Configure row-based validation rules (Null, Duplicate, Latest Date, Row Count, "
+            "DAX Measure, Anomaly, Refresh) for the selected semantic model. Click '⚙ Config' to edit row-level thresholds."
         )
         sec3_note.setObjectName("InfoBanner")
         sec3_note.setWordWrap(True)
         rules_layout.addWidget(sec3_note)
+
+        self.rules_table = ValidationRulesTableWidget(
+            rule_service=self._rule_service,
+            metadata_service=self._metadata_service,
+            parent=rules_card,
+        )
+        rules_layout.addWidget(self.rules_table)
 
         layout.addWidget(rules_card)
         layout.addStretch(1)
@@ -297,21 +312,19 @@ class SettingsPage(QWidget):
         if not records:
             self.dataset_selector_combo.addItem("-- No registered datasets --", None)
             self.metadata_selector.set_active_dataset("", "")
+            if hasattr(self, "rules_table"):
+                self.rules_table.set_registration(None, "")
         else:
             self.dataset_selector_combo.addItem("-- Select registered model --", None)
             for r in records:
                 label = f"{r.dataset_name or r.report_name}  •  {r.workspace_name} ({r.dataset_id[:8]}...)"
-                self.dataset_selector_combo.addItem(label, (r.workspace_id, r.dataset_id))
+                self.dataset_selector_combo.addItem(
+                    label,
+                    (r.workspace_id, r.dataset_id, r.id, f"{r.dataset_name or r.report_name}"),
+                )
             active_idx = next((i + 1 for i, r in enumerate(records) if r.is_active), 1 if records else 0)
             self.dataset_selector_combo.setCurrentIndex(active_idx)
-            selected_data = self.dataset_selector_combo.itemData(active_idx)
-            if isinstance(selected_data, tuple) and len(selected_data) == 2:
-                ws_id, ds_id = selected_data
-                self.metadata_selector.set_active_dataset(ws_id, ds_id)
-                if self._metadata_service is not None:
-                    cached = self._metadata_service.get_cached_metadata(ws_id, ds_id)
-                    if cached is not None:
-                        self.metadata_selector.apply_metadata(cached)
+            self._apply_dataset_selection(self.dataset_selector_combo.itemData(active_idx))
         self.dataset_selector_combo.blockSignals(False)
 
     def _connect_metadata_service(self) -> None:
@@ -326,6 +339,8 @@ class SettingsPage(QWidget):
             and self.metadata_selector._dataset_id.lower() == metadata.dataset_id.lower()
         ):
             self.metadata_selector.apply_metadata(metadata)
+            if hasattr(self, "rules_table"):
+                self.rules_table._cached_metadata = metadata
 
     def _on_metadata_failed(self, dataset_id: str, error_message: str) -> None:
         if (
@@ -343,13 +358,26 @@ class SettingsPage(QWidget):
 
     def _handle_dataset_selection_changed(self, index: int) -> None:
         data = self.dataset_selector_combo.itemData(index)
-        if isinstance(data, tuple) and len(data) == 2:
-            ws_id, ds_id = data
+        self._apply_dataset_selection(data)
+
+    def _apply_dataset_selection(self, data: Any) -> None:
+        if isinstance(data, tuple) and len(data) >= 2:
+            ws_id = data[0]
+            ds_id = data[1]
+            reg_id = data[2] if len(data) > 2 else None
+            disp_name = data[3] if len(data) > 3 else f"{ds_id[:8]}..."
+
             self.metadata_selector.set_active_dataset(ws_id, ds_id)
+            cached = None
             if self._metadata_service is not None:
                 cached = self._metadata_service.get_cached_metadata(ws_id, ds_id)
                 if cached is not None:
                     self.metadata_selector.apply_metadata(cached)
+
+            if hasattr(self, "rules_table"):
+                self.rules_table.set_registration(reg_id, disp_name, cached)
+        elif not data and hasattr(self, "rules_table"):
+            self.rules_table.set_registration(None, "")
 
     def _handle_discovery_requested(self, workspace_id: str, dataset_id: str) -> None:
         if self._metadata_service is not None:

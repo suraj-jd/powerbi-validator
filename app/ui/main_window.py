@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
     from app.services.registry_service import RegistryService
+    from app.services.rule_service import RuleService
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class MainWindow(QMainWindow):
         powerbi_service: PowerBIService | None = None,
         registry_service: RegistryService | None = None,
         metadata_service: MetadataService | None = None,
+        rule_service: RuleService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -74,6 +76,7 @@ class MainWindow(QMainWindow):
         self._powerbi_service = powerbi_service
         self._registry_service = registry_service
         self._metadata_service = metadata_service
+        self._rule_service = rule_service
         self._pending_verify_reg_id: int | None = None
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
@@ -138,6 +141,7 @@ class MainWindow(QMainWindow):
             registry_service=self._registry_service,
             metadata_service=self._metadata_service,
             powerbi_service=self._powerbi_service,
+            rule_service=self._rule_service,
             parent=self,
         )
         self.history_page = HistoryPage(self)
