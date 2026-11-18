@@ -39,6 +39,7 @@ from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
     from app.services.auth_service import AuthService
+    from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
     from app.services.registry_service import RegistryService
 
@@ -61,6 +62,7 @@ class MainWindow(QMainWindow):
         auth_service: AuthService | None = None,
         powerbi_service: PowerBIService | None = None,
         registry_service: RegistryService | None = None,
+        metadata_service: MetadataService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -71,6 +73,7 @@ class MainWindow(QMainWindow):
         self._auth_service = auth_service
         self._powerbi_service = powerbi_service
         self._registry_service = registry_service
+        self._metadata_service = metadata_service
         self._pending_verify_reg_id: int | None = None
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
@@ -133,6 +136,7 @@ class MainWindow(QMainWindow):
         self.home_page = HomePage(self)
         self.settings_page = SettingsPage(
             registry_service=self._registry_service,
+            metadata_service=self._metadata_service,
             parent=self,
         )
         self.history_page = HistoryPage(self)

@@ -24,7 +24,9 @@ from app.core.exceptions import ConfigurationError, install_exception_hooks
 from app.core.logging_config import setup_logging
 from app.core.status import NotificationLevel
 from app.database.db import DatabaseManager
+from app.integrations.powerbi.metadata_client import MetadataClient
 from app.services.auth_service import AuthService
+from app.services.metadata_service import MetadataService
 from app.services.powerbi_service import PowerBIService
 from app.services.registry_service import RegistryService
 from app.ui.main_window import MainWindow
@@ -44,6 +46,7 @@ class AppContext:
     auth_service: AuthService
     powerbi_service: PowerBIService
     registry_service: RegistryService
+    metadata_service: MetadataService
     data_dir: Path
     logs_dir: Path
     log_file: Path
@@ -111,6 +114,8 @@ def bootstrap_application(
     )
     powerbi_service = PowerBIService(auth_service=auth_service)
     registry_service = RegistryService(db=db)
+    metadata_client = MetadataClient(powerbi_service.rest_client)
+    metadata_service = MetadataService(metadata_client=metadata_client)
 
     window = MainWindow(
         config=config,
@@ -120,6 +125,7 @@ def bootstrap_application(
         auth_service=auth_service,
         powerbi_service=powerbi_service,
         registry_service=registry_service,
+        metadata_service=metadata_service,
     )
 
     if config_warning:
@@ -142,6 +148,7 @@ def bootstrap_application(
         auth_service.restore_session_async()
 
     def _on_quit() -> None:
+        metadata_service.shutdown()
         powerbi_service.shutdown()
         auth_service.shutdown()
         db.dispose()
@@ -157,6 +164,7 @@ def bootstrap_application(
         auth_service=auth_service,
         powerbi_service=powerbi_service,
         registry_service=registry_service,
+        metadata_service=metadata_service,
         data_dir=resolved_data_dir,
         logs_dir=resolved_logs_dir,
         log_file=log_file,

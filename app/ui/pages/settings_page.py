@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -19,14 +20,19 @@ from PySide6.QtWidgets import (
 
 from app.core.exceptions import PersistenceError, ValidationConfigError
 from app.core.status import NotificationLevel
-from app.integrations.powerbi.models import AccessVerificationResult
+from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata
 from app.services.registry_service import RegistrationRecord, RegistryService
 from app.ui.dialogs.confirm_dialog import ConfirmDialog
 from app.ui.dialogs.import_registrations_dialog import ImportRegistrationsDialog
 from app.ui.dialogs.registration_dialog import RegistrationDialog
 from app.ui.models.dict_table_model import ColumnSpec
 from app.ui.widgets.data_table import DataTableWidget
+from app.ui.widgets.metadata_selector_widget import MetadataSelectorWidget
 from app.ui.widgets.notification_banner import NotificationBanner
+from app.ui.widgets.searchable_combo import SearchableComboBox
+
+if TYPE_CHECKING:
+    from app.services.metadata_service import MetadataService
 
 _REGISTRY_COLUMNS: list[ColumnSpec] = [
     ColumnSpec(key="active", header="Active", alignment=Qt.AlignmentFlag.AlignCenter),
@@ -49,13 +55,16 @@ class SettingsPage(QWidget):
         self,
         *,
         registry_service: RegistryService | None = None,
+        metadata_service: MetadataService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._registry = registry_service
+        self._metadata_service = metadata_service
         self._records: dict[int, RegistrationRecord] = {}
         self._access_status_by_id: dict[int, str] = {}
         self._build_ui()
+        self._connect_metadata_service()
         self.refresh_registrations()
 
     def _build_ui(self) -> None:
@@ -87,7 +96,7 @@ class SettingsPage(QWidget):
         title_col.addWidget(subtitle)
         header_row.addLayout(title_col, stretch=1)
 
-        badge = QLabel("Stage 5 — Registry Active")
+        badge = QLabel("Stage 6 — Metadata Active")
         badge.setObjectName("StageBadge")
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header_row)
@@ -182,24 +191,56 @@ class SettingsPage(QWidget):
         reg_layout.addLayout(row_actions)
         layout.addWidget(registry_card)
 
-        # Section 2: Validation Checks Configuration (Placeholder until Stage 7)
+        # Section 2: Semantic Model Metadata Discovery (Stage 6)
+        metadata_card = QFrame()
+        metadata_card.setObjectName("Card")
+        meta_layout = QVBoxLayout(metadata_card)
+        meta_layout.setContentsMargins(22, 20, 22, 20)
+        meta_layout.setSpacing(12)
+
+        meta_header = QHBoxLayout()
+        sec2_title = QLabel("2. Semantic Model Metadata Discovery")
+        sec2_title.setObjectName("SectionTitle")
+        meta_header.addWidget(sec2_title, stretch=1)
+        meta_layout.addLayout(meta_header)
+
+        # Target dataset selector row
+        target_select_row = QHBoxLayout()
+        target_select_row.setSpacing(10)
+        target_label = QLabel("Select Target Model:")
+        target_label.setStyleSheet("color: #E2E8F0; font-weight: 600; font-size: 12px;")
+        target_select_row.addWidget(target_label)
+
+        self.dataset_selector_combo = SearchableComboBox()
+        self.dataset_selector_combo.currentIndexChanged.connect(self._handle_dataset_selection_changed)
+        target_select_row.addWidget(self.dataset_selector_combo, stretch=1)
+        meta_layout.addLayout(target_select_row)
+
+        self.metadata_selector = MetadataSelectorWidget()
+        self.metadata_selector.discovery_requested.connect(self._handle_discovery_requested)
+        meta_layout.addWidget(self.metadata_selector)
+
+        layout.addWidget(metadata_card)
+
+        # Section 3: Validation Checks Configuration (Upcoming Stage 7)
         rules_card = QFrame()
         rules_card.setObjectName("Card")
         rules_layout = QVBoxLayout(rules_card)
         rules_layout.setContentsMargins(22, 20, 22, 20)
         rules_layout.setSpacing(10)
 
-        sec2_title = QLabel("2. Validation Checks Configuration")
-        sec2_title.setObjectName("SectionTitle")
-        rules_layout.addWidget(sec2_title)
+        sec3_title = QLabel("3. Validation Rules Configuration")
+        sec3_title.setObjectName("SectionTitle")
+        rules_layout.addWidget(sec3_title)
 
-        sec2_note = QLabel(
-            "Semantic model metadata discovery (Stage 6) and the row-based validation rule editor "
-            "with independent per-rule Advanced Settings (Stage 7) will appear here next."
+        sec3_note = QLabel(
+            "The row-based validation rule configuration table with per-rule Advanced Settings "
+            "(Null, Duplicate, Latest Date, Row Count, DAX Measure, Anomaly, Refresh) will connect "
+            "to this metadata discovery engine in Stage 7."
         )
-        sec2_note.setObjectName("InfoBanner")
-        sec2_note.setWordWrap(True)
-        rules_layout.addWidget(sec2_note)
+        sec3_note.setObjectName("InfoBanner")
+        sec3_note.setWordWrap(True)
+        rules_layout.addWidget(sec3_note)
 
         layout.addWidget(rules_card)
         layout.addStretch(1)
@@ -236,6 +277,83 @@ class SettingsPage(QWidget):
         self.count_label.setText(
             f"{len(records)} registration(s) ({active_count} active)"
         )
+
+        # Update dataset selector combo for metadata discovery
+        self.dataset_selector_combo.blockSignals(True)
+        self.dataset_selector_combo.clear()
+        if not records:
+            self.dataset_selector_combo.addItem("-- No registered datasets --", None)
+            self.metadata_selector.set_active_dataset("", "")
+        else:
+            self.dataset_selector_combo.addItem("-- Select registered model --", None)
+            for r in records:
+                label = f"{r.dataset_name or r.report_name}  •  {r.workspace_name} ({r.dataset_id[:8]}...)"
+                self.dataset_selector_combo.addItem(label, (r.workspace_id, r.dataset_id))
+            active_idx = next((i + 1 for i, r in enumerate(records) if r.is_active), 1 if records else 0)
+            self.dataset_selector_combo.setCurrentIndex(active_idx)
+            selected_data = self.dataset_selector_combo.itemData(active_idx)
+            if isinstance(selected_data, tuple) and len(selected_data) == 2:
+                ws_id, ds_id = selected_data
+                self.metadata_selector.set_active_dataset(ws_id, ds_id)
+                if self._metadata_service is not None:
+                    cached = self._metadata_service.get_cached_metadata(ws_id, ds_id)
+                    if cached is not None:
+                        self.metadata_selector.apply_metadata(cached)
+        self.dataset_selector_combo.blockSignals(False)
+
+    def _connect_metadata_service(self) -> None:
+        if self._metadata_service is not None:
+            self._metadata_service.metadata_loaded.connect(self._on_metadata_loaded)
+            self._metadata_service.metadata_failed.connect(self._on_metadata_failed)
+            self._metadata_service.busy_changed.connect(self.metadata_selector.set_busy)
+
+    def _on_metadata_loaded(self, metadata: DatasetMetadata) -> None:
+        if (
+            self.metadata_selector._dataset_id
+            and self.metadata_selector._dataset_id.lower() == metadata.dataset_id.lower()
+        ):
+            self.metadata_selector.apply_metadata(metadata)
+
+    def _on_metadata_failed(self, dataset_id: str, error_message: str) -> None:
+        if (
+            self.metadata_selector._dataset_id
+            and self.metadata_selector._dataset_id.lower() == dataset_id.lower()
+        ):
+            self.metadata_selector.apply_metadata(
+                DatasetMetadata(
+                    dataset_id=dataset_id,
+                    workspace_id=self.metadata_selector._workspace_id,
+                    is_supported=False,
+                    error_message=error_message,
+                )
+            )
+
+    def _handle_dataset_selection_changed(self, index: int) -> None:
+        data = self.dataset_selector_combo.itemData(index)
+        if isinstance(data, tuple) and len(data) == 2:
+            ws_id, ds_id = data
+            self.metadata_selector.set_active_dataset(ws_id, ds_id)
+            if self._metadata_service is not None:
+                cached = self._metadata_service.get_cached_metadata(ws_id, ds_id)
+                if cached is not None:
+                    self.metadata_selector.apply_metadata(cached)
+
+    def _handle_discovery_requested(self, workspace_id: str, dataset_id: str) -> None:
+        if self._metadata_service is not None:
+            self._metadata_service.fetch_metadata_async(
+                workspace_id=workspace_id,
+                dataset_id=dataset_id,
+                force_refresh=True,
+            )
+        else:
+            self.metadata_selector.apply_metadata(
+                DatasetMetadata(
+                    dataset_id=dataset_id,
+                    workspace_id=workspace_id,
+                    is_supported=False,
+                    error_message="Metadata service is not connected.",
+                )
+            )
 
     def selected_registration(self) -> RegistrationRecord | None:
         """Return the currently selected registration record, or None."""
