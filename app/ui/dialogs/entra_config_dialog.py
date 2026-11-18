@@ -25,12 +25,13 @@ class EntraConfigDialog(QDialog):
         *,
         client_id: str = "",
         tenant_id: str = "organizations",
+        save_button_text: str = "Save Settings",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Configure Microsoft Entra App")
         self.setModal(True)
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(500)
         self.setObjectName("ConfirmDialog")
 
         layout = QVBoxLayout(self)
@@ -43,11 +44,12 @@ class EntraConfigDialog(QDialog):
 
         note = QLabel(
             "Enter the Application (Client) ID and Directory (Tenant) ID from your "
-            "Microsoft Entra desktop app registration (redirect URI: http://localhost). "
-            "No client secret or password is required."
+            'Microsoft Entra desktop app registration (<a href="https://entra.microsoft.com">entra.microsoft.com</a>, '
+            "redirect URI: <code>http://localhost</code>). No client secret or password is required."
         )
         note.setObjectName("InfoBanner")
         note.setWordWrap(True)
+        note.setOpenExternalLinks(True)
         layout.addWidget(note)
 
         form = QFormLayout()
@@ -81,7 +83,7 @@ class EntraConfigDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
         buttons.addWidget(self.cancel_button)
 
-        self.save_button = QPushButton("Save Settings")
+        self.save_button = QPushButton(save_button_text)
         self.save_button.setObjectName("PrimaryButton")
         self.save_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.save_button.setDefault(True)

@@ -4,13 +4,12 @@ Local-first Windows desktop application for automating Power BI report and seman
 
 ## Current Stage
 
-**Stage 4 — Power BI Connectivity & Permission Verification**
+**Stage 5 — Workspace, Report & Dataset Registry UI**
 
-- Authenticated Power BI Service REST client (`app/integrations/powerbi/rest_client.py`) using `httpx` with timeouts, `Retry-After` throttling retries (HTTP 429), and clear `401`/`403`/`404`/`5xx` error handling
-- Typed Pydantic Power BI models and clients (`WorkspaceClient`, `DatasetClient`) for listing accessible workspaces, datasets, reports, and verifying workspace/dataset/report permissions using the signed-in user's identity
-- Honest permission reporting grounded strictly in Microsoft API responses (never infers workspace ownership from sign-in alone)
-- Non-blocking `PowerBIService` background worker and interactive Home access verification panel
-- Microsoft Entra ID MSAL auth + Windows DPAPI token cache, SQLite/Alembic persistence, and reusable UI components (Stages 0–3)
+- Settings page **Workspace & Dataset Configuration** table loaded automatically from SQLite at startup
+- Manual Add, Edit, Toggle Active/Inactive, Delete (with confirmation), GUID format validation, duplicate detection, and live **Verify Access** against Power BI REST APIs
+- CSV and XLSX import workflow with row-by-row validation preview, explicit row-level error reporting (never silently discarding invalid rows), and blank CSV/XLSX template export
+- Power BI REST connectivity & permission verification, Microsoft Entra ID MSAL auth + Windows DPAPI token cache, SQLite/Alembic persistence, and reusable UI components (Stages 0–4)
 
 ## Setup & Run (Windows PowerShell)
 

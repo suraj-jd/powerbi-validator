@@ -2,4 +2,4 @@
 
 APP_NAME = "Power BI Validation Tool"
 APP_VERSION = "0.1.0"
-APP_STAGE = "Stage 4 — Power BI Connectivity & Access Verification"
+APP_STAGE = "Stage 5 — Workspace & Dataset Registry"

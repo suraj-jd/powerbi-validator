@@ -181,3 +181,41 @@ def test_invalid_guid_rejected_before_network_call() -> None:
         assert called["count"] == 0
     finally:
         rest.close()
+
+
+def test_my_workspace_lists_datasets_reports_and_verifies_access() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/groups"):
+            return httpx.Response(200, json={"value": []})
+        if path.endswith("/datasets"):
+            return httpx.Response(200, json={"value": [{"id": DS_ID, "name": "Personal Model"}]})
+        if path.endswith("/reports"):
+            return httpx.Response(
+                200,
+                json={"value": [{"id": RPT_ID, "name": "Personal Report", "datasetId": DS_ID}]},
+            )
+        if path.endswith(f"/datasets/{DS_ID}"):
+            return httpx.Response(200, json={"id": DS_ID, "name": "Personal Model"})
+        if path.endswith(f"/reports/{RPT_ID}"):
+            return httpx.Response(200, json={"id": RPT_ID, "name": "Personal Report", "datasetId": DS_ID})
+        return httpx.Response(404)
+
+    rest, ws_client, ds_client = _make_clients(handler)
+    try:
+        workspaces = ws_client.list_workspaces()
+        assert len(workspaces) == 1
+        assert workspaces[0].id == "me"
+        assert "My Workspace" in workspaces[0].name
+
+        datasets = ds_client.list_datasets("me")
+        assert len(datasets) == 1 and datasets[0].name == "Personal Model"
+
+        reports = ws_client.list_reports("me")
+        assert len(reports) == 1 and reports[0].name == "Personal Report"
+
+        res = ds_client.verify_access(workspace_id="me", dataset_id=DS_ID, report_id=RPT_ID)
+        assert res.is_verified is True
+        assert res.effective_access_level == "Personal Workspace"
+    finally:
+        rest.close()

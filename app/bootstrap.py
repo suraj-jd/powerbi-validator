@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from app import APP_NAME, APP_VERSION
+from app.auth.azure_cli_auth import AzureCliAuthClient
 from app.auth.msal_auth import AuthConfig, MsalAuthClient
 from app.core.config import (
     AppConfig,
@@ -25,6 +26,7 @@ from app.core.status import NotificationLevel
 from app.database.db import DatabaseManager
 from app.services.auth_service import AuthService
 from app.services.powerbi_service import PowerBIService
+from app.services.registry_service import RegistryService
 from app.ui.main_window import MainWindow
 from app.ui.theme import APP_STYLESHEET
 
@@ -41,6 +43,7 @@ class AppContext:
     db: DatabaseManager
     auth_service: AuthService
     powerbi_service: PowerBIService
+    registry_service: RegistryService
     data_dir: Path
     logs_dir: Path
     log_file: Path
@@ -102,10 +105,12 @@ def bootstrap_application(
     )
     auth_service = AuthService(
         auth_client=auth_client,
+        azure_cli_client=AzureCliAuthClient(),
         app_config=config,
         data_dir=resolved_data_dir,
     )
     powerbi_service = PowerBIService(auth_service=auth_service)
+    registry_service = RegistryService(db=db)
 
     window = MainWindow(
         config=config,
@@ -114,6 +119,7 @@ def bootstrap_application(
         token_cache_path=resolved_token_cache_path,
         auth_service=auth_service,
         powerbi_service=powerbi_service,
+        registry_service=registry_service,
     )
 
     if config_warning:
@@ -150,6 +156,7 @@ def bootstrap_application(
         db=db,
         auth_service=auth_service,
         powerbi_service=powerbi_service,
+        registry_service=registry_service,
         data_dir=resolved_data_dir,
         logs_dir=resolved_logs_dir,
         log_file=log_file,

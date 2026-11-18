@@ -21,7 +21,7 @@ def test_auth_banner_states_and_never_claims_false_ownership(qtbot) -> None:
     qtbot.addWidget(banner)
     banner.show()
 
-    # Not configured: Configure button visible, Sign In disabled
+    # Not configured: Configure button visible, Sign In stays clickable to guide setup
     banner.apply_state(
         AuthStateSnapshot(
             status=AuthStatus.NOT_CONFIGURED,
@@ -30,7 +30,7 @@ def test_auth_banner_states_and_never_claims_false_ownership(qtbot) -> None:
         )
     )
     assert banner.configure_button.isVisible()
-    assert not banner.sign_in_button.isEnabled()
+    assert banner.sign_in_button.isEnabled()
     assert not banner.switch_account_button.isVisible()
 
     # Authenticated organizational user: never falsely labelled "Workspace Owner"
@@ -131,3 +131,138 @@ def test_main_window_syncs_sidebar_account_and_persists_entra_config(qtbot, tmp_
     assert window._sidebar_user_name.text() == "John Doe"
     assert window._sidebar_user_email.text() == "john.doe@contoso.com"
     assert window._sign_out_button.isVisible()
+
+
+def test_sign_in_click_when_unconfigured_prompts_entra_config_then_signs_in(
+    qtbot,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app_config = AppConfig()
+    auth_client = MsalAuthClient(
+        config=AuthConfig(client_id="", tenant_id="organizations"),
+        cache_path=tmp_path / "auth" / "cache.bin",
+    )
+    auth_service = AuthService(
+        auth_client=auth_client,
+        app_config=app_config,
+        data_dir=tmp_path,
+    )
+    sign_in_called = {"count": 0}
+    monkeypatch.setattr(auth_service, "sign_in_async", lambda: sign_in_called.__setitem__("count", 1))
+
+    window = MainWindow(config=app_config, auth_service=auth_service)
+    qtbot.addWidget(window)
+    window.show()
+
+    prompted_button_text: list[str] = []
+
+    def fake_open_dialog(*, save_button_text: str = "Save Settings") -> bool:
+        prompted_button_text.append(save_button_text)
+        auth_service.configure_entra_app(VALID_CLIENT_ID, "organizations")
+        return True
+
+    monkeypatch.setattr(window, "_open_entra_config_dialog", fake_open_dialog)
+
+    qtbot.mouseClick(window.home_page.auth_banner.sign_in_button, Qt.MouseButton.LeftButton)
+
+    assert prompted_button_text == ["Save & Sign In"]
+    assert sign_in_called["count"] == 1
+
+
+def test_sign_in_click_uses_one_click_azure_cli_when_available(
+    qtbot,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from app.auth.azure_cli_auth import AzureCliAuthClient
+
+    app_config = AppConfig()
+    msal_client = MsalAuthClient(
+        config=AuthConfig(client_id="", tenant_id="organizations"),
+        cache_path=tmp_path / "auth" / "cache.bin",
+    )
+    az_client = AzureCliAuthClient(az_finder=lambda: "az.cmd")
+    auth_service = AuthService(
+        auth_client=msal_client,
+        azure_cli_client=az_client,
+        app_config=app_config,
+        data_dir=tmp_path,
+    )
+    sign_in_called = {"count": 0}
+    monkeypatch.setattr(auth_service, "sign_in_async", lambda: sign_in_called.__setitem__("count", 1))
+
+    window = MainWindow(config=app_config, auth_service=auth_service)
+    qtbot.addWidget(window)
+    window.show()
+
+    qtbot.mouseClick(window.home_page.auth_banner.sign_in_button, Qt.MouseButton.LeftButton)
+    assert sign_in_called["count"] == 1
+
+
+def test_interactive_login_completion_brings_window_to_front(
+    qtbot,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app_config = AppConfig()
+    auth_client = MsalAuthClient(
+        config=AuthConfig(client_id=VALID_CLIENT_ID, tenant_id="organizations"),
+        cache_path=tmp_path / "auth" / "cache.bin",
+    )
+    auth_service = AuthService(
+        auth_client=auth_client,
+        app_config=app_config,
+        data_dir=tmp_path,
+    )
+    window = MainWindow(config=app_config, auth_service=auth_service)
+    qtbot.addWidget(window)
+    window.show()
+
+    bring_to_front_called = {"count": 0}
+    monkeypatch.setattr(window, "bring_to_front", lambda: bring_to_front_called.__setitem__("count", bring_to_front_called["count"] + 1))
+
+    # Emitting interactive_login_completed signal triggers window bring_to_front
+    auth_service.interactive_login_completed.emit(True)
+    assert bring_to_front_called["count"] >= 1
+
+
+def test_silent_restore_does_not_trigger_interactive_completion_signal(
+    qtbot,
+    tmp_path: Path,
+) -> None:
+    app_config = AppConfig()
+    auth_client = MsalAuthClient(
+        config=AuthConfig(client_id="", tenant_id="organizations"),
+        cache_path=tmp_path / "auth" / "cache.bin",
+    )
+    auth_service = AuthService(
+        auth_client=auth_client,
+        app_config=app_config,
+        data_dir=tmp_path,
+    )
+
+    interactive_events: list[bool] = []
+    auth_service.interactive_login_completed.connect(interactive_events.append)
+
+    # Silent session restore must not emit interactive completion signal
+    auth_service.restore_session_async()
+    assert len(interactive_events) == 0
+
+
+def test_bring_to_front_executes_cleanly_when_normal_or_minimized(
+    qtbot,
+    tmp_path: Path,
+) -> None:
+    app_config = AppConfig()
+    window = MainWindow(config=app_config)
+    qtbot.addWidget(window)
+    window.show()
+
+    # Normal window
+    window.bring_to_front()
+
+    # Minimized window
+    window.showMinimized()
+    window.bring_to_front()
+    assert not window.isMinimized()

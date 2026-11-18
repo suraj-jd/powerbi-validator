@@ -191,9 +191,16 @@ class AuthBanner(QFrame):
         self.configure_button.setEnabled(not is_busy)
 
         self.sign_in_button.setVisible(not is_authenticated)
-        self.sign_in_button.setEnabled(is_configured and not is_busy)
+        self.sign_in_button.setEnabled(not is_busy)
+        self.sign_in_button.setToolTip(
+            ""
+            if is_configured
+            else "Click to configure your Microsoft Entra Client ID and sign in."
+        )
         self.sign_in_button.setText(
-            "Signing In..." if is_busy else ("Sign In Again" if state.status == AuthStatus.EXPIRED else "Sign In with Microsoft")
+            "Signing In..."
+            if is_busy
+            else ("Sign In Again" if state.status == AuthStatus.EXPIRED else "Sign In with Microsoft")
         )
 
         self.switch_account_button.setVisible(is_authenticated)

@@ -17,6 +17,7 @@ CLIENT_ID_ENV_VAR = "PBI_VALIDATOR_CLIENT_ID"
 TENANT_ID_ENV_VAR = "PBI_VALIDATOR_TENANT_ID"
 
 LogLevelName = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+AuthModeName = Literal["auto", "azure_cli", "entra_msal"]
 
 
 class AppConfig(BaseModel):
@@ -34,6 +35,8 @@ class AppConfig(BaseModel):
     window_width: int = Field(default=1180, ge=900, le=3840)
     window_height: int = Field(default=760, ge=600, le=2160)
     history_retention_days: int = Field(default=90, ge=7, le=3650)
+    # Authentication mode: "auto" uses Entra MSAL if a Client ID is configured, else Azure CLI
+    auth_mode: AuthModeName = Field(default="auto")
     # Public OAuth client identifiers (non-secret; desktop apps use PKCE with no client secret)
     auth_client_id: str = Field(default="")
     auth_tenant_id: str = Field(default="organizations")

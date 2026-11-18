@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -38,6 +40,7 @@ from app.ui.widgets.notification_banner import NotificationBanner
 if TYPE_CHECKING:
     from app.services.auth_service import AuthService
     from app.services.powerbi_service import PowerBIService
+    from app.services.registry_service import RegistryService
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,7 @@ class MainWindow(QMainWindow):
         token_cache_path: Path | None = None,
         auth_service: AuthService | None = None,
         powerbi_service: PowerBIService | None = None,
+        registry_service: RegistryService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -66,6 +70,8 @@ class MainWindow(QMainWindow):
         self._token_cache_path = token_cache_path
         self._auth_service = auth_service
         self._powerbi_service = powerbi_service
+        self._registry_service = registry_service
+        self._pending_verify_reg_id: int | None = None
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(self._config.window_width, self._config.window_height)
@@ -125,7 +131,10 @@ class MainWindow(QMainWindow):
         root_layout.addLayout(workspace_col, stretch=1)
 
         self.home_page = HomePage(self)
-        self.settings_page = SettingsPage(self)
+        self.settings_page = SettingsPage(
+            registry_service=self._registry_service,
+            parent=self,
+        )
         self.history_page = HistoryPage(self)
         self.about_page = AboutPage(
             config=self._config,
@@ -240,6 +249,9 @@ class MainWindow(QMainWindow):
 
         if self._auth_service is not None:
             self._auth_service.state_changed.connect(self.apply_auth_state)
+            self._auth_service.interactive_login_completed.connect(
+                self._handle_interactive_login_completed
+            )
             self._auth_service.error_occurred.connect(
                 lambda msg: self.show_notification(
                     msg,
@@ -267,6 +279,9 @@ class MainWindow(QMainWindow):
             self._powerbi_service.list_workspace_assets_async
         )
         self.home_page.verify_access_requested.connect(self._handle_verify_access_requested)
+        self.settings_page.verify_registration_requested.connect(
+            self._handle_verify_registration_requested
+        )
 
         self._powerbi_service.busy_changed.connect(self.home_page.set_connectivity_busy)
         self._powerbi_service.workspaces_loaded.connect(self.home_page.set_workspaces)
@@ -288,6 +303,23 @@ class MainWindow(QMainWindow):
     ) -> None:
         if self._powerbi_service is None:
             return
+        self._pending_verify_reg_id = None
+        self._powerbi_service.verify_access_async(
+            workspace_id=workspace_id,
+            dataset_id=dataset_id,
+            report_id=report_id or None,
+        )
+
+    def _handle_verify_registration_requested(
+        self,
+        registration_id: int,
+        workspace_id: str,
+        dataset_id: str,
+        report_id: str,
+    ) -> None:
+        if self._powerbi_service is None:
+            return
+        self._pending_verify_reg_id = registration_id
         self._powerbi_service.verify_access_async(
             workspace_id=workspace_id,
             dataset_id=dataset_id,
@@ -296,6 +328,12 @@ class MainWindow(QMainWindow):
 
     def _handle_access_verified(self, result: object) -> None:
         self.home_page.display_verification_result(result)  # type: ignore[arg-type]
+        if self._pending_verify_reg_id is not None:
+            self.settings_page.set_verification_result(
+                self._pending_verify_reg_id,
+                result,  # type: ignore[arg-type]
+            )
+            self._pending_verify_reg_id = None
         if self._auth_service is not None:
             self.home_page.auth_banner.apply_state(self._auth_service.state)
 
@@ -327,10 +365,11 @@ class MainWindow(QMainWindow):
             )
             self._sign_out_button.setVisible(False)
 
-    def _open_entra_config_dialog(self) -> None:
+    def _open_entra_config_dialog(self, *, save_button_text: str = "Save Settings") -> bool:
         dialog = EntraConfigDialog(
             client_id=self._config.effective_client_id(),
             tenant_id=self._config.effective_tenant_id(),
+            save_button_text=save_button_text,
             parent=self,
         )
         if dialog.exec() == QDialog.DialogCode.Accepted and self._auth_service is not None:
@@ -340,10 +379,17 @@ class MainWindow(QMainWindow):
                 level=NotificationLevel.SUCCESS,
                 title="Authentication",
             )
+            return True
+        return False
 
     def _handle_sign_in_requested(self) -> None:
-        if self._auth_service is not None:
-            self._auth_service.sign_in_async()
+        if self._auth_service is None:
+            return
+        if not self._auth_service.is_ready_for_one_click_signin:
+            configured = self._open_entra_config_dialog(save_button_text="Save & Sign In")
+            if not configured:
+                return
+        self._auth_service.sign_in_async()
 
     def _handle_switch_account_requested(self) -> None:
         if self._auth_service is not None:
@@ -420,6 +466,72 @@ class MainWindow(QMainWindow):
         page_label = self._nav_buttons[page_key].text().strip()
         self.statusBar().showMessage(f"Ready  |  View: {page_label}")
         logger.debug("Navigated to page: %s", page_key)
+
+    def _handle_interactive_login_completed(self, success: bool) -> None:
+        """Bring application back to the foreground once browser authentication completes."""
+        self.bring_to_front()
+        # Schedule a follow-up activation pulse to overcome any OS delay while browser processes exit
+        QTimer.singleShot(150, self.bring_to_front)
+        if success:
+            logger.info("Interactive login completed; application brought to foreground.")
+
+    def bring_to_front(self) -> None:
+        """Restore, raise, and activate the window, bringing it to the foreground on Windows."""
+        try:
+            if self.isMinimized():
+                self.showNormal()
+            self.show()
+            self.raise_()
+            self.activateWindow()
+
+            if sys.platform == "win32":
+                self._bring_to_front_win32()
+        except Exception:
+            logger.debug("bring_to_front encountered an issue", exc_info=True)
+
+    def _bring_to_front_win32(self) -> None:
+        """Use Win32 APIs to bypass Windows foreground lock timeout and activate the window."""
+        try:
+            hwnd = int(self.winId())
+            if not hwnd:
+                return
+
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+
+            # 1. Restore window state if minimized
+            if user32.IsIconic(hwnd):
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            else:
+                user32.ShowWindow(hwnd, 5)  # SW_SHOW
+
+            # 2. Attach thread input to bypass Windows foreground lock timeout
+            foreground_hwnd = user32.GetForegroundWindow()
+            if foreground_hwnd and foreground_hwnd != hwnd:
+                fg_thread_id = user32.GetWindowThreadProcessId(foreground_hwnd, None)
+                cur_thread_id = kernel32.GetCurrentThreadId()
+                if fg_thread_id != cur_thread_id:
+                    user32.AttachThreadInput(fg_thread_id, cur_thread_id, True)
+                    user32.SetForegroundWindow(hwnd)
+                    user32.SetFocus(hwnd)
+                    user32.AttachThreadInput(fg_thread_id, cur_thread_id, False)
+                else:
+                    user32.SetForegroundWindow(hwnd)
+                    user32.SetFocus(hwnd)
+            else:
+                user32.SetForegroundWindow(hwnd)
+
+            # 3. Pulse HWND_TOPMOST / HWND_NOTOPMOST to ensure z-order priority over browser
+            HWND_TOPMOST = -1
+            HWND_NOTOPMOST = -2
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_SHOWWINDOW = 0x0040
+            user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+            user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+            user32.BringWindowToTop(hwnd)
+        except Exception:
+            logger.debug("Win32 foreground activation nudge failed", exc_info=True)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle clean window shutdown."""

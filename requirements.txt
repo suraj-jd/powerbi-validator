@@ -1,10 +1,11 @@
-# Core runtime dependencies (Stages 0–4)
+# Core runtime dependencies (Stages 0–5)
 PySide6>=6.8.0,<6.11.0
 pydantic>=2.10.0,<3.0.0
 SQLAlchemy>=2.0.36,<3.0.0
 alembic>=1.14.0,<2.0.0
 msal>=1.31.0,<2.0.0
 httpx>=0.28.0,<1.0.0
+openpyxl>=3.1.5,<4.0.0
 
 # Development & testing
 pytest>=8.3.0

@@ -115,7 +115,12 @@ def test_about_page_shared_component_demo(qtbot, tmp_path: Path) -> None:
 
 
 def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_path: Path) -> None:
-    ctx = bootstrap_application(argv=[], data_dir=tmp_path, install_hooks=False)
+    ctx = bootstrap_application(
+        argv=[],
+        data_dir=tmp_path,
+        install_hooks=False,
+        auto_restore_auth=False,
+    )
     try:
         qtbot.addWidget(ctx.window)
         ctx.window.show()

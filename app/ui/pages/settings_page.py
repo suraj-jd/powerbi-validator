@@ -1,28 +1,453 @@
-"""Settings placeholder page (Stage 0)."""
+"""Settings page managing workspace/dataset registrations (Stage 5) and upcoming rule editor."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QWidget
+from pathlib import Path
 
-from app.ui.pages.placeholder_page import PlaceholderPage
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
+from app.core.exceptions import PersistenceError, ValidationConfigError
+from app.core.status import NotificationLevel
+from app.integrations.powerbi.models import AccessVerificationResult
+from app.services.registry_service import RegistrationRecord, RegistryService
+from app.ui.dialogs.confirm_dialog import ConfirmDialog
+from app.ui.dialogs.import_registrations_dialog import ImportRegistrationsDialog
+from app.ui.dialogs.registration_dialog import RegistrationDialog
+from app.ui.models.dict_table_model import ColumnSpec
+from app.ui.widgets.data_table import DataTableWidget
+from app.ui.widgets.notification_banner import NotificationBanner
+
+_REGISTRY_COLUMNS: list[ColumnSpec] = [
+    ColumnSpec(key="active", header="Active", alignment=Qt.AlignmentFlag.AlignCenter),
+    ColumnSpec(key="workspace_name", header="Workspace Name"),
+    ColumnSpec(key="workspace_id", header="Workspace ID"),
+    ColumnSpec(key="report_name", header="Report Name"),
+    ColumnSpec(key="dataset_name", header="Dataset Name"),
+    ColumnSpec(key="dataset_id", header="Dataset ID"),
+    ColumnSpec(key="access_status", header="Access Status"),
+]
 
 
-class SettingsPage(PlaceholderPage):
-    """Validation settings placeholder for Stage 0."""
+class SettingsPage(QWidget):
+    """Validation Settings page with Workspace & Dataset Registry (Stage 5)."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(
-            title="Validation Settings",
-            subtitle="Configure workspace registrations, validation rules, and per-rule conditions.",
-            planned_items=[
-                "Workspace, Report, and Semantic Model registry with manual entry and CSV/XLSX import (Stage 5)",
-                "Semantic model table, column, and measure discovery (Stage 6)",
-                "Row-based validation rule editor with independent per-rule Advanced Settings (Stage 7)",
-                "Local SQLite persistence for registrations and rules (Stages 2, 5 & 7)",
-            ],
-            stage_note=(
-                "Configuration persistence and Power BI verification will be added incrementally "
-                "in Stages 2 through 7."
-            ),
-            parent=parent,
+    verify_registration_requested = Signal(int, str, str, str)
+    registrations_changed = Signal()
+
+    def __init__(
+        self,
+        *,
+        registry_service: RegistryService | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._registry = registry_service
+        self._records: dict[int, RegistrationRecord] = {}
+        self._access_status_by_id: dict[int, str] = {}
+        self._build_ui()
+        self.refresh_registrations()
+
+    def _build_ui(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        scroll_area = QScrollArea(self)
+        scroll_area.setObjectName("PageScrollArea")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        container = QWidget()
+        container.setObjectName("PageContainer")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(18)
+
+        # Page Header (matching mockup right screen)
+        header_row = QHBoxLayout()
+        title_col = QVBoxLayout()
+        title_col.setSpacing(4)
+
+        title = QLabel("Validation Settings")
+        title.setObjectName("PageTitle")
+        title_col.addWidget(title)
+
+        subtitle = QLabel("Configure workspace registrations, semantic models, and validation rules.")
+        subtitle.setObjectName("PageSubtitle")
+        title_col.addWidget(subtitle)
+        header_row.addLayout(title_col, stretch=1)
+
+        badge = QLabel("Stage 5 — Registry Active")
+        badge.setObjectName("StageBadge")
+        header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
+        layout.addLayout(header_row)
+
+        # Section 1: Workspace & Dataset Configuration
+        registry_card = QFrame()
+        registry_card.setObjectName("Card")
+        reg_layout = QVBoxLayout(registry_card)
+        reg_layout.setContentsMargins(22, 20, 22, 20)
+        reg_layout.setSpacing(12)
+
+        sec1_header = QHBoxLayout()
+        sec1_title = QLabel("1. Workspace & Dataset Configuration")
+        sec1_title.setObjectName("SectionTitle")
+        sec1_header.addWidget(sec1_title, stretch=1)
+
+        self.export_template_button = QPushButton("Export Template")
+        self.export_template_button.setObjectName("SecondaryButton")
+        self.export_template_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_template_button.clicked.connect(self._handle_export_template)
+        sec1_header.addWidget(self.export_template_button)
+
+        self.import_button = QPushButton("Import from CSV/Excel")
+        self.import_button.setObjectName("SecondaryButton")
+        self.import_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.import_button.clicked.connect(self._handle_import_clicked)
+        sec1_header.addWidget(self.import_button)
+
+        self.add_button = QPushButton("Add More +")
+        self.add_button.setObjectName("PrimaryButton")
+        self.add_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_button.clicked.connect(self._handle_add_clicked)
+        sec1_header.addWidget(self.add_button)
+
+        reg_layout.addLayout(sec1_header)
+
+        self.registry_banner = NotificationBanner(registry_card)
+        reg_layout.addWidget(self.registry_banner)
+
+        self.registry_table = DataTableWidget(
+            columns=_REGISTRY_COLUMNS,
+            rows=[],
+            show_search=True,
+            filter_column_key="active",
+            filter_options=["Active", "Inactive"],
+            parent=registry_card,
         )
+        self.registry_table.setMinimumHeight(230)
+        self.registry_table.table_view.setColumnWidth(0, 72)
+        self.registry_table.table_view.setColumnWidth(1, 150)
+        self.registry_table.table_view.setColumnWidth(2, 185)
+        self.registry_table.table_view.setColumnWidth(3, 150)
+        self.registry_table.table_view.setColumnWidth(4, 140)
+        self.registry_table.table_view.setColumnWidth(5, 185)
+        self.registry_table.row_activated.connect(lambda _row: self._handle_edit_clicked())
+        reg_layout.addWidget(self.registry_table)
+
+        # Row Action Bar
+        row_actions = QHBoxLayout()
+        row_actions.setSpacing(8)
+
+        self.edit_button = QPushButton("Edit Selected")
+        self.edit_button.setObjectName("SecondaryButton")
+        self.edit_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.edit_button.clicked.connect(self._handle_edit_clicked)
+        row_actions.addWidget(self.edit_button)
+
+        self.toggle_active_button = QPushButton("Toggle Active")
+        self.toggle_active_button.setObjectName("SecondaryButton")
+        self.toggle_active_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_active_button.clicked.connect(self._handle_toggle_active)
+        row_actions.addWidget(self.toggle_active_button)
+
+        self.verify_access_button = QPushButton("Verify Access")
+        self.verify_access_button.setObjectName("SecondaryButton")
+        self.verify_access_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.verify_access_button.clicked.connect(self._handle_verify_access)
+        row_actions.addWidget(self.verify_access_button)
+
+        self.delete_button = QPushButton("Delete Selected")
+        self.delete_button.setObjectName("DangerButton")
+        self.delete_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.delete_button.clicked.connect(self._handle_delete_clicked)
+        row_actions.addWidget(self.delete_button)
+
+        row_actions.addStretch(1)
+
+        self.count_label = QLabel("0 registrations")
+        self.count_label.setObjectName("PageSubtitle")
+        row_actions.addWidget(self.count_label)
+
+        reg_layout.addLayout(row_actions)
+        layout.addWidget(registry_card)
+
+        # Section 2: Validation Checks Configuration (Placeholder until Stage 7)
+        rules_card = QFrame()
+        rules_card.setObjectName("Card")
+        rules_layout = QVBoxLayout(rules_card)
+        rules_layout.setContentsMargins(22, 20, 22, 20)
+        rules_layout.setSpacing(10)
+
+        sec2_title = QLabel("2. Validation Checks Configuration")
+        sec2_title.setObjectName("SectionTitle")
+        rules_layout.addWidget(sec2_title)
+
+        sec2_note = QLabel(
+            "Semantic model metadata discovery (Stage 6) and the row-based validation rule editor "
+            "with independent per-rule Advanced Settings (Stage 7) will appear here next."
+        )
+        sec2_note.setObjectName("InfoBanner")
+        sec2_note.setWordWrap(True)
+        rules_layout.addWidget(sec2_note)
+
+        layout.addWidget(rules_card)
+        layout.addStretch(1)
+
+        scroll_area.setWidget(container)
+        outer.addWidget(scroll_area)
+
+    def refresh_registrations(self) -> None:
+        """Reload all saved registrations from SQLite into the table."""
+        if self._registry is None:
+            self._records = {}
+            self.registry_table.set_rows([])
+            self.count_label.setText("0 registrations")
+            return
+
+        records = self._registry.list_registrations()
+        self._records = {r.id: r for r in records}
+        table_rows = [
+            {
+                "id": r.id,
+                "active": "Active" if r.is_active else "Inactive",
+                "workspace_name": r.workspace_name,
+                "workspace_id": r.workspace_id,
+                "report_name": r.report_name,
+                "dataset_name": r.dataset_name or "",
+                "dataset_id": r.dataset_id,
+                "access_status": self._access_status_by_id.get(r.id, "Not verified"),
+            }
+            for r in records
+        ]
+        self.registry_table.set_rows(table_rows)
+
+        active_count = sum(1 for r in records if r.is_active)
+        self.count_label.setText(
+            f"{len(records)} registration(s) ({active_count} active)"
+        )
+
+    def selected_registration(self) -> RegistrationRecord | None:
+        """Return the currently selected registration record, or None."""
+        selection = self.registry_table.table_view.selectionModel()
+        if selection is None:
+            return None
+        indexes = selection.selectedRows()
+        if not indexes:
+            return None
+        source_index = self.registry_table.proxy_model.mapToSource(indexes[0])
+        if not source_index.isValid():
+            return None
+        row_data = self.registry_table.source_model.row_at(source_index.row())
+        reg_id = row_data.get("id")
+        return self._records.get(int(reg_id)) if reg_id is not None else None
+
+    def set_verification_result(
+        self,
+        registration_id: int,
+        result: AccessVerificationResult,
+    ) -> None:
+        """Update the table's Access Status column and inline banner after Verify Access."""
+        if result.is_verified:
+            label = f"Verified ({result.effective_access_level})"
+            level = NotificationLevel.WARNING if result.issues else NotificationLevel.SUCCESS
+            title = "Verified with Warnings" if result.issues else "Access Verified"
+        else:
+            label = "Access Failed"
+            level = NotificationLevel.ERROR
+            title = "Verification Failed"
+
+        self._access_status_by_id[registration_id] = label
+        self.refresh_registrations()
+        self.registry_banner.show_message(result.summary, level=level, title=title)
+
+    def _handle_add_clicked(self) -> None:
+        if self._registry is None:
+            return
+        dialog = RegistrationDialog(parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.registration_input is not None:
+            try:
+                created = self._registry.create_registration(dialog.registration_input)
+            except (PersistenceError, ValidationConfigError) as exc:
+                self.registry_banner.show_message(
+                    exc.user_message,
+                    level=NotificationLevel.ERROR,
+                    title="Could Not Save",
+                )
+                return
+
+            self.refresh_registrations()
+            self.registrations_changed.emit()
+            self.registry_banner.show_message(
+                f"Added '{created.workspace_name} / {created.report_name}'.",
+                level=NotificationLevel.SUCCESS,
+                title="Saved",
+            )
+
+    def _handle_edit_clicked(self) -> None:
+        if self._registry is None:
+            return
+        record = self.selected_registration()
+        if record is None:
+            self.registry_banner.show_message(
+                "Select a registration row to edit.",
+                level=NotificationLevel.INFO,
+                title="Selection Required",
+            )
+            return
+
+        dialog = RegistrationDialog(existing=record, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.registration_input is not None:
+            try:
+                updated = self._registry.update_registration(record.id, dialog.registration_input)
+            except (PersistenceError, ValidationConfigError) as exc:
+                self.registry_banner.show_message(
+                    exc.user_message,
+                    level=NotificationLevel.ERROR,
+                    title="Update Failed",
+                )
+                return
+
+            self._access_status_by_id.pop(record.id, None)
+            self.refresh_registrations()
+            self.registrations_changed.emit()
+            self.registry_banner.show_message(
+                f"Updated '{updated.workspace_name} / {updated.report_name}'.",
+                level=NotificationLevel.SUCCESS,
+                title="Updated",
+            )
+
+    def _handle_toggle_active(self) -> None:
+        if self._registry is None:
+            return
+        record = self.selected_registration()
+        if record is None:
+            self.registry_banner.show_message(
+                "Select a registration row to toggle Active/Inactive.",
+                level=NotificationLevel.INFO,
+                title="Selection Required",
+            )
+            return
+
+        updated = self._registry.set_active(record.id, not record.is_active)
+        self.refresh_registrations()
+        self.registrations_changed.emit()
+        state_word = "Active" if updated.is_active else "Inactive"
+        self.registry_banner.show_message(
+            f"Marked '{updated.report_name}' as {state_word}.",
+            level=NotificationLevel.INFO,
+            title="Status Updated",
+        )
+
+    def _handle_verify_access(self) -> None:
+        record = self.selected_registration()
+        if record is None:
+            self.registry_banner.show_message(
+                "Select a registration row to verify Power BI access.",
+                level=NotificationLevel.INFO,
+                title="Selection Required",
+            )
+            return
+
+        self.registry_banner.show_message(
+            f"Verifying access to '{record.workspace_name} / {record.report_name}'...",
+            level=NotificationLevel.INFO,
+            title="Verifying",
+        )
+        self.verify_registration_requested.emit(
+            record.id,
+            record.workspace_id,
+            record.dataset_id,
+            record.report_id or "",
+        )
+
+    def _handle_delete_clicked(self) -> None:
+        if self._registry is None:
+            return
+        record = self.selected_registration()
+        if record is None:
+            self.registry_banner.show_message(
+                "Select a registration row to delete.",
+                level=NotificationLevel.INFO,
+                title="Selection Required",
+            )
+            return
+
+        confirmed = ConfirmDialog.ask(
+            self,
+            title="Delete Workspace Registration",
+            message=f"Delete '{record.workspace_name} / {record.report_name}'?",
+            detail="Any validation rules and history linked to this registration will also be deleted.",
+            confirm_text="Delete",
+            cancel_text="Cancel",
+            destructive=True,
+        )
+        if not confirmed:
+            return
+
+        self._registry.delete_registration(record.id)
+        self._access_status_by_id.pop(record.id, None)
+        self.refresh_registrations()
+        self.registrations_changed.emit()
+        self.registry_banner.show_message(
+            f"Deleted '{record.workspace_name} / {record.report_name}'.",
+            level=NotificationLevel.INFO,
+            title="Deleted",
+        )
+
+    def _handle_import_clicked(self) -> None:
+        if self._registry is None:
+            return
+        dialog = ImportRegistrationsDialog(self._registry, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.confirmed_rows:
+            saved_count, errors = self._registry.commit_import(dialog.confirmed_rows)
+            self.refresh_registrations()
+            self.registrations_changed.emit()
+
+            if errors:
+                self.registry_banner.show_message(
+                    f"Imported {saved_count} registration(s) with {len(errors)} error(s): {errors[0]}",
+                    level=NotificationLevel.WARNING,
+                    title="Import Completed with Warnings",
+                )
+            else:
+                self.registry_banner.show_message(
+                    f"Successfully imported {saved_count} registration(s).",
+                    level=NotificationLevel.SUCCESS,
+                    title="Import Complete",
+                )
+
+    def _handle_export_template(self) -> None:
+        if self._registry is None:
+            return
+        selected, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Blank Registration Template",
+            "powerbi_registrations_template.xlsx",
+            "Excel Workbook (*.xlsx);;CSV File (*.csv)",
+        )
+        if not selected:
+            return
+        try:
+            saved_path = self._registry.export_template(Path(selected))
+            self.registry_banner.show_message(
+                f"Exported blank template to {saved_path}",
+                level=NotificationLevel.SUCCESS,
+                title="Template Exported",
+            )
+        except ValidationConfigError as exc:
+            self.registry_banner.show_message(
+                exc.user_message,
+                level=NotificationLevel.ERROR,
+                title="Export Failed",
+            )

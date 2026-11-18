@@ -27,6 +27,98 @@ DEFAULT_POWERBI_SCOPES: tuple[str, ...] = (
     "https://analysis.windows.net/powerbi/api/Report.Read.All",
 )
 
+MSAL_SUCCESS_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Authentication Complete - Power BI Validation Tool</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0B1120;
+            color: #F8FAFC;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: #162032;
+            border: 1px solid #1E293B;
+            border-radius: 12px;
+            padding: 36px 48px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            max-width: 440px;
+        }
+        h2 { color: #38BDF8; margin-top: 0; font-size: 22px; }
+        p { color: #94A3B8; font-size: 14px; line-height: 1.5; }
+        .badge {
+            display: inline-block;
+            background: #0369A1;
+            color: #E0F2FE;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="badge">Authenticated</div>
+        <h2>Sign-In Complete</h2>
+        <p>You have signed in successfully. You are now returning to the <strong>Power BI Validation Tool</strong>.</p>
+        <p style="font-size: 12px; color: #64748B;">You can safely close this browser window or tab.</p>
+    </div>
+    <script>
+        setTimeout(function() { window.close(); }, 2500);
+    </script>
+</body>
+</html>
+"""
+
+MSAL_ERROR_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Authentication Incomplete - Power BI Validation Tool</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0B1120;
+            color: #F8FAFC;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: #162032;
+            border: 1px solid #EF4444;
+            border-radius: 12px;
+            padding: 36px 48px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            max-width: 440px;
+        }
+        h2 { color: #F87171; margin-top: 0; font-size: 22px; }
+        p { color: #94A3B8; font-size: 14px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Sign-In Incomplete</h2>
+        <p>$error: $error_description</p>
+        <p style="font-size: 12px; color: #64748B;">Please return to the Power BI Validation Tool desktop application to try again.</p>
+    </div>
+</body>
+</html>
+"""
+
 _GUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -311,7 +403,11 @@ class MsalAuthClient:
     def sign_in_interactive(self, *, force_select_account: bool = False) -> AuthStateSnapshot:
         """Launch system-browser interactive Microsoft sign-in (OAuth 2.0 + PKCE)."""
         pca = self._ensure_pca()
-        kwargs: dict[str, Any] = {"scopes": list(self._config.scopes)}
+        kwargs: dict[str, Any] = {
+            "scopes": list(self._config.scopes),
+            "success_template": MSAL_SUCCESS_TEMPLATE,
+            "error_template": MSAL_ERROR_TEMPLATE,
+        }
         if force_select_account:
             kwargs["prompt"] = "select_account"
 

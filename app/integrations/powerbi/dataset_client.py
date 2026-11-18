@@ -11,7 +11,12 @@ from app.integrations.powerbi.models import (
     PowerBIWorkspaceUser,
 )
 from app.integrations.powerbi.rest_client import PowerBIHttpError, PowerBIRestClient
-from app.integrations.powerbi.workspace_client import WorkspaceClient, _require_guid
+from app.integrations.powerbi.workspace_client import (
+    MY_WORKSPACE_ID,
+    WorkspaceClient,
+    _require_guid,
+    _require_workspace_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +30,9 @@ def _resolve_effective_access_level(
 
     Never fabricates 'Owner' or 'Admin' when the API does not confirm it.
     """
+    if workspace.id == MY_WORKSPACE_ID:
+        return "Personal Workspace"
+
     if users and signed_in_email:
         target = signed_in_email.strip().lower()
         for entry in users:
@@ -50,18 +58,24 @@ class DatasetClient:
         self._workspaces = workspace_client or WorkspaceClient(rest_client)
 
     def list_datasets(self, workspace_id: str) -> list[PowerBIDataset]:
-        """List semantic models in a workspace (`GET /groups/{id}/datasets`)."""
-        ws_guid = _require_guid(workspace_id, "Workspace ID")
-        payload = self._rest.get_json(f"/groups/{ws_guid}/datasets")
+        """List semantic models in a workspace or personal My Workspace."""
+        ws_id = _require_workspace_id(workspace_id)
+        path = "/datasets" if ws_id == MY_WORKSPACE_ID else f"/groups/{ws_id}/datasets"
+        payload = self._rest.get_json(path)
         items = payload.get("value") or []
         return [PowerBIDataset.model_validate(item) for item in items]
 
     def get_dataset(self, workspace_id: str, dataset_id: str) -> PowerBIDataset | None:
-        """Retrieve a specific semantic model in a workspace, or None if not found."""
-        ws_guid = _require_guid(workspace_id, "Workspace ID")
+        """Retrieve a specific semantic model in a workspace or My Workspace, or None if not found."""
+        ws_id = _require_workspace_id(workspace_id)
         ds_guid = _require_guid(dataset_id, "Dataset ID")
+        path = (
+            f"/datasets/{ds_guid}"
+            if ws_id == MY_WORKSPACE_ID
+            else f"/groups/{ws_id}/datasets/{ds_guid}"
+        )
         try:
-            payload = self._rest.get_json(f"/groups/{ws_guid}/datasets/{ds_guid}")
+            payload = self._rest.get_json(path)
             return PowerBIDataset.model_validate(payload)
         except PowerBIHttpError as exc:
             if exc.status_code == 404:
@@ -77,7 +91,7 @@ class DatasetClient:
         signed_in_email: str | None = None,
     ) -> AccessVerificationResult:
         """Verify that the signed-in user can access the workspace, dataset, and optional report."""
-        ws_guid = _require_guid(workspace_id, "Workspace ID")
+        ws_guid = _require_workspace_id(workspace_id)
         ds_guid = _require_guid(dataset_id, "Dataset ID")
         rpt_guid = _require_guid(report_id, "Report ID") if report_id and report_id.strip() else None
 
