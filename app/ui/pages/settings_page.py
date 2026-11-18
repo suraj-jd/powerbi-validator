@@ -123,26 +123,26 @@ class SettingsPage(QWidget):
         self.export_template_button.clicked.connect(self._handle_export_template)
         sec1_header.addWidget(self.export_template_button)
 
-        self.import_button = QPushButton("Import from CSV/Excel")
+        self.import_button = QPushButton("Import CSV / Excel")
         self.import_button.setObjectName("SecondaryButton")
         self.import_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.import_button.clicked.connect(self._handle_import_clicked)
         sec1_header.addWidget(self.import_button)
 
-        self.quick_add_button = QPushButton("✨ Quick Add from Power BI...")
+        self.add_button = QPushButton("+ Add Custom")
+        self.add_button.setObjectName("SecondaryButton")
+        self.add_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_button.clicked.connect(self._handle_add_clicked)
+        sec1_header.addWidget(self.add_button)
+
+        self.quick_add_button = QPushButton("✨ Quick Add from Power BI")
         self.quick_add_button.setObjectName("PrimaryButton")
         self.quick_add_button.setStyleSheet(
-            "background-color: #0284C7; color: #FFFFFF; font-weight: 600; padding: 6px 14px; border-radius: 6px;"
+            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 7px 16px; border-radius: 6px;"
         )
         self.quick_add_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.quick_add_button.clicked.connect(self._handle_quick_add_clicked)
         sec1_header.addWidget(self.quick_add_button)
-
-        self.add_button = QPushButton("Add Custom +")
-        self.add_button.setObjectName("PrimaryButton")
-        self.add_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.add_button.clicked.connect(self._handle_add_clicked)
-        sec1_header.addWidget(self.add_button)
 
         reg_layout.addLayout(sec1_header)
 
@@ -221,7 +221,7 @@ class SettingsPage(QWidget):
         target_select_row = QHBoxLayout()
         target_select_row.setSpacing(10)
         target_label = QLabel("Select Target Model:")
-        target_label.setStyleSheet("color: #E2E8F0; font-weight: 600; font-size: 12px;")
+        target_label.setStyleSheet("color: #0F172A; font-weight: 600; font-size: 13px;")
         target_select_row.addWidget(target_label)
 
         self.dataset_selector_combo = SearchableComboBox()

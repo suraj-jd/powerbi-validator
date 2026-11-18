@@ -60,90 +60,181 @@ class RegistrationDialog(QDialog):
         is_edit = existing is not None
         self.setWindowTitle("Edit Workspace / Dataset" if is_edit else "Add Workspace / Dataset")
         self.setModal(True)
-        self.setMinimumWidth(560)
+        self.setMinimumWidth(620)
         self.setObjectName("ConfirmDialog")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(14)
 
+        # Header Title & Description
         title = QLabel(
             "Edit Workspace & Dataset Registration"
             if is_edit
-            else "Register Workspace, Report & Semantic Model"
+            else "Register Workspace & Semantic Model"
         )
         title.setObjectName("DialogTitle")
         layout.addWidget(title)
 
         hint = QLabel(
-            "Pick from connected Power BI to auto-fill names and IDs without copying GUIDs, "
-            "or type custom values manually below."
+            "Select a workspace and semantic model to auto-fill registration details, "
+            "or expand technical details to enter custom GUIDs manually."
         )
         hint.setObjectName("InfoBanner")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
-        # Auto-Fill from Power BI Box (only shown if not editing or when workspaces available)
-        self._build_autofill_section(layout)
+        # Main Power BI Selection Card
+        card = QFrame()
+        card.setObjectName("DialogCard")
+        card.setStyleSheet(
+            "#DialogCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+            "border-radius: 8px; padding: 14px; }"
+        )
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12, 10, 12, 10)
+        card_layout.setSpacing(10)
+
+        card_header = QHBoxLayout()
+        card_title = QLabel("Power BI Asset Selection")
+        card_title.setStyleSheet("color: #0F172A; font-weight: 700; font-size: 13px;")
+        card_header.addWidget(card_title)
+        card_header.addStretch(1)
+        card_layout.addLayout(card_header)
+
+        # Dropdowns Form
+        dropdown_form = QFormLayout()
+        dropdown_form.setSpacing(8)
+        dropdown_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        ws_label = QLabel("Workspace *:")
+        ws_label.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        self.autofill_ws_combo = SearchableComboBox()
+        self.autofill_ws_combo.currentIndexChanged.connect(self._on_autofill_workspace_changed)
+        dropdown_form.addRow(ws_label, self.autofill_ws_combo)
+
+        ds_label = QLabel("Semantic Model *:")
+        ds_label.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        self.autofill_ds_combo = SearchableComboBox()
+        self.autofill_ds_combo.currentIndexChanged.connect(self._on_autofill_dataset_changed)
+        dropdown_form.addRow(ds_label, self.autofill_ds_combo)
+
+        rpt_label = QLabel("Report (Optional):")
+        rpt_label.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        self.autofill_rpt_combo = SearchableComboBox()
+        self.autofill_rpt_combo.currentIndexChanged.connect(self._on_autofill_report_changed)
+        dropdown_form.addRow(rpt_label, self.autofill_rpt_combo)
+
+        self.active_checkbox = QCheckBox("Active (include this model in automated validation runs)")
+        self.active_checkbox.setStyleSheet("color: #1E293B; font-weight: 500; font-size: 13px;")
+        self.active_checkbox.setChecked(existing.is_active if existing else True)
+        dropdown_form.addRow("", self.active_checkbox)
+
+        card_layout.addLayout(dropdown_form)
+        layout.addWidget(card)
+
+        # Collapsible Technical Details (GUIDs & Manual Entry)
+        self.details_toggle_button = QPushButton(
+            "▾ Advanced: Technical Details (GUIDs and Names)"
+            if is_edit
+            else "▸ Advanced: View / Edit Technical Details (GUIDs and Names)"
+        )
+        self.details_toggle_button.setStyleSheet(
+            "QPushButton { background: transparent; border: none; color: #1668DC; "
+            "font-size: 12px; font-weight: 600; text-align: left; padding: 4px 0px; } "
+            "QPushButton:hover { color: #1357BA; text-decoration: underline; }"
+        )
+        self.details_toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.details_toggle_button.clicked.connect(self._toggle_details)
+        layout.addWidget(self.details_toggle_button)
+
+        self.details_frame = QFrame()
+        self.details_frame.setObjectName("DetailsCard")
+        self.details_frame.setStyleSheet(
+            "#DetailsCard { background-color: #FFFFFF; border: 1px solid #CBD5E1; "
+            "border-radius: 8px; padding: 12px; }"
+        )
+        details_layout = QVBoxLayout(self.details_frame)
+        details_layout.setContentsMargins(10, 8, 10, 8)
+        details_layout.setSpacing(8)
 
         form = QFormLayout()
-        form.setSpacing(10)
+        form.setSpacing(8)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.workspace_name_input = QLineEdit(existing.workspace_name if existing else "")
         self.workspace_name_input.setObjectName("SearchInput")
         self.workspace_name_input.setPlaceholderText("e.g. My Workspace (Personal)")
-        form.addRow("Workspace Name *:", self.workspace_name_input)
+        lbl_ws_name = QLabel("Workspace Name *:")
+        lbl_ws_name.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        form.addRow(lbl_ws_name, self.workspace_name_input)
 
         self.workspace_id_input = QLineEdit(existing.workspace_id if existing else "")
         self.workspace_id_input.setObjectName("SearchInput")
         self.workspace_id_input.setPlaceholderText("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx or 'me'")
-        form.addRow("Workspace ID *:", self.workspace_id_input)
-
-        self.report_name_input = QLineEdit(existing.report_name if existing else "")
-        self.report_name_input.setObjectName("SearchInput")
-        self.report_name_input.setPlaceholderText("e.g. Sales Analysis Report")
-        form.addRow("Report Name *:", self.report_name_input)
-
-        self.report_id_input = QLineEdit(existing.report_id or "" if existing else "")
-        self.report_id_input.setObjectName("SearchInput")
-        self.report_id_input.setPlaceholderText("Recommended GUID (optional)")
-        form.addRow("Report ID:", self.report_id_input)
+        lbl_ws_id = QLabel("Workspace ID *:")
+        lbl_ws_id.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        form.addRow(lbl_ws_id, self.workspace_id_input)
 
         self.dataset_name_input = QLineEdit(existing.dataset_name or "" if existing else "")
         self.dataset_name_input.setObjectName("SearchInput")
         self.dataset_name_input.setPlaceholderText("Friendly semantic model name (optional)")
-        form.addRow("Dataset / Model Name:", self.dataset_name_input)
+        lbl_ds_name = QLabel("Model / Dataset Name:")
+        lbl_ds_name.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        form.addRow(lbl_ds_name, self.dataset_name_input)
 
         self.dataset_id_input = QLineEdit(existing.dataset_id if existing else "")
         self.dataset_id_input.setObjectName("SearchInput")
         self.dataset_id_input.setPlaceholderText("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-        form.addRow("Dataset ID *:", self.dataset_id_input)
+        lbl_ds_id = QLabel("Dataset ID *:")
+        lbl_ds_id.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        form.addRow(lbl_ds_id, self.dataset_id_input)
 
-        self.active_checkbox = QCheckBox("Active (include in validation)")
-        self.active_checkbox.setChecked(existing.is_active if existing else True)
-        form.addRow("Status:", self.active_checkbox)
+        self.report_name_input = QLineEdit(existing.report_name if existing else "")
+        self.report_name_input.setObjectName("SearchInput")
+        self.report_name_input.setPlaceholderText("e.g. Sales Analysis Report")
+        lbl_rpt_name = QLabel("Report Name *:")
+        lbl_rpt_name.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        form.addRow(lbl_rpt_name, self.report_name_input)
 
-        layout.addLayout(form)
+        self.report_id_input = QLineEdit(existing.report_id or "" if existing else "")
+        self.report_id_input.setObjectName("SearchInput")
+        self.report_id_input.setPlaceholderText("Recommended GUID (optional)")
+        lbl_rpt_id = QLabel("Report ID:")
+        lbl_rpt_id.setStyleSheet("color: #334155; font-weight: 600; font-size: 12px;")
+        form.addRow(lbl_rpt_id, self.report_id_input)
+
+        details_layout.addLayout(form)
+        layout.addWidget(self.details_frame)
+
+        # By default, keep details visible if editing, or collapsed if registering fresh
+        self.details_frame.setVisible(is_edit)
 
         # Feedback & Error Labels
         self.feedback_label = QLabel("")
-        self.feedback_label.setStyleSheet("color: #34D399; font-size: 11px; font-weight: 600;")
+        self.feedback_label.setStyleSheet(
+            "background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; "
+            "border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 600;"
+        )
         self.feedback_label.setWordWrap(True)
         self.feedback_label.hide()
         layout.addWidget(self.feedback_label)
 
         self.error_label = QLabel("")
-        self.error_label.setStyleSheet("color: #F87171; font-size: 11px; font-weight: 500;")
+        self.error_label.setStyleSheet(
+            "background-color: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; "
+            "border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 500;"
+        )
         self.error_label.setWordWrap(True)
         self.error_label.hide()
         layout.addWidget(self.error_label)
 
-        # Buttons
+        # Bottom Buttons
         buttons = QHBoxLayout()
         buttons.setSpacing(10)
 
         if not is_edit:
-            self.save_and_add_another_button = QPushButton("Save & Add Another")
+            self.save_and_add_another_button = QPushButton("Save and Add Another")
             self.save_and_add_another_button.setObjectName("SecondaryButton")
             self.save_and_add_another_button.setCursor(Qt.CursorShape.PointingHandCursor)
             self.save_and_add_another_button.clicked.connect(self._handle_save_and_add_another)
@@ -169,41 +260,12 @@ class RegistrationDialog(QDialog):
         # Populate workspaces dropdown if available
         self._populate_workspaces_combo()
 
-    def _build_autofill_section(self, parent_layout: QVBoxLayout) -> None:
-        box = QFrame()
-        box.setObjectName("Card")
-        box.setStyleSheet(
-            "#Card { background-color: #0F172A; border: 1px solid #1E293B; "
-            "border-radius: 8px; padding: 12px; }"
-        )
-        box_layout = QVBoxLayout(box)
-        box_layout.setContentsMargins(10, 8, 10, 8)
-        box_layout.setSpacing(8)
-
-        head_row = QHBoxLayout()
-        head_label = QLabel("✨ Auto-fill from Connected Power BI")
-        head_label.setStyleSheet("color: #38BDF8; font-weight: 700; font-size: 12px;")
-        head_row.addWidget(head_label)
-        head_row.addStretch(1)
-        box_layout.addLayout(head_row)
-
-        form_sub = QFormLayout()
-        form_sub.setSpacing(6)
-
-        self.autofill_ws_combo = SearchableComboBox()
-        self.autofill_ws_combo.currentIndexChanged.connect(self._on_autofill_workspace_changed)
-        form_sub.addRow("Workspace:", self.autofill_ws_combo)
-
-        self.autofill_ds_combo = SearchableComboBox()
-        self.autofill_ds_combo.currentIndexChanged.connect(self._on_autofill_dataset_changed)
-        form_sub.addRow("Semantic Model:", self.autofill_ds_combo)
-
-        self.autofill_rpt_combo = SearchableComboBox()
-        self.autofill_rpt_combo.currentIndexChanged.connect(self._on_autofill_report_changed)
-        form_sub.addRow("Report (opt):", self.autofill_rpt_combo)
-
-        box_layout.addLayout(form_sub)
-        parent_layout.addWidget(box)
+    def _toggle_details(self) -> None:
+        is_visible = not self.details_frame.isVisible()
+        self.details_frame.setVisible(is_visible)
+        arrow = "▾" if is_visible else "▸"
+        self.details_toggle_button.setText(f"{arrow} Advanced: Technical Details (GUIDs and Names)")
+        self.adjustSize()
 
     def _populate_workspaces_combo(self) -> None:
         if not self._workspaces and self._powerbi_service is not None:
@@ -217,7 +279,10 @@ class RegistrationDialog(QDialog):
         self.autofill_ws_combo.blockSignals(True)
         self.autofill_ws_combo.clear()
         if not self._workspaces:
-            self.autofill_ws_combo.addItem("-- Load workspaces from Home page or type below --", "")
+            self.autofill_ws_combo.addItem("-- No Power BI workspaces loaded (enter manually below) --", "")
+            # Auto-expand technical details since no workspaces available
+            self.details_frame.setVisible(True)
+            self.details_toggle_button.setText("▾ Advanced: Technical Details (GUIDs and Names)")
         else:
             self.autofill_ws_combo.addItem("-- Select Workspace to auto-fill --", "")
             for ws in self._workspaces:

@@ -194,6 +194,8 @@ QPushButton#DangerButton:hover {
 
 /* Shared Inputs & Enterprise Table */
 QLineEdit#SearchInput,
+QLineEdit,
+QComboBox,
 QComboBox#FilterCombo {
     background-color: #FFFFFF;
     border: 1px solid #CBD5E1;
@@ -204,11 +206,32 @@ QComboBox#FilterCombo {
 }
 
 QLineEdit#SearchInput:focus,
+QLineEdit:focus,
+QComboBox:focus,
 QComboBox#FilterCombo:focus {
     border-color: #1668DC;
 }
 
-QTableView#EnterpriseTableView {
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px;
+    border-left: none;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    selection-background-color: #EBF3FF;
+    selection-color: #0F172A;
+    color: #0F172A;
+    padding: 4px;
+}
+
+QTableView#EnterpriseTableView,
+QTableWidget#DataTable,
+QTableWidget {
     background-color: #FFFFFF;
     alternate-background-color: #F8FAFC;
     border: 1px solid #E2E8F0;
@@ -219,7 +242,8 @@ QTableView#EnterpriseTableView {
     outline: none;
 }
 
-QTableView#EnterpriseTableView::item {
+QTableView#EnterpriseTableView::item,
+QTableWidget::item {
     padding: 6px 10px;
     border-bottom: 1px solid #F1F5F9;
 }
@@ -231,6 +255,34 @@ QHeaderView::section {
     padding: 8px 10px;
     border: none;
     border-bottom: 1px solid #E2E8F0;
+}
+
+/* Tabs */
+QTabWidget::pane {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #F1F5F9;
+    color: #475569;
+    border: 1px solid #E2E8F0;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 8px 16px;
+    margin-right: 4px;
+    font-weight: 500;
+}
+
+QTabBar::tab:selected {
+    background-color: #FFFFFF;
+    color: #1668DC;
+    font-weight: 600;
+    border-color: #CBD5E1;
+    border-bottom: 1px solid #FFFFFF;
 }
 
 /* Confirmation Dialog */

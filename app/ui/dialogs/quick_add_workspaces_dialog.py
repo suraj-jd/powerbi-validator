@@ -78,7 +78,7 @@ class QuickAddWorkspacesDialog(QDialog):
         ws_row.setSpacing(10)
 
         ws_label = QLabel("Power BI Workspace:")
-        ws_label.setStyleSheet("color: #E2E8F0; font-weight: 600; font-size: 12px;")
+        ws_label.setStyleSheet("color: #0F172A; font-weight: 600; font-size: 12px;")
         ws_row.addWidget(ws_label)
 
         self.workspace_combo = SearchableComboBox()
@@ -112,6 +112,7 @@ class QuickAddWorkspacesDialog(QDialog):
             header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
             header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(36)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         layout.addWidget(self.table, stretch=1)
@@ -133,7 +134,7 @@ class QuickAddWorkspacesDialog(QDialog):
         sel_row.addWidget(self.deselect_all_btn)
 
         self.count_label = QLabel("0 models found")
-        self.count_label.setStyleSheet("color: #94A3B8; font-size: 11px;")
+        self.count_label.setStyleSheet("color: #475569; font-size: 12px; font-weight: 500;")
         sel_row.addWidget(self.count_label)
         sel_row.addStretch(1)
 
@@ -141,7 +142,10 @@ class QuickAddWorkspacesDialog(QDialog):
 
         # Status / Error Label
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #F87171; font-size: 11px; font-weight: 500;")
+        self.status_label.setStyleSheet(
+            "background-color: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; "
+            "border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 500;"
+        )
         self.status_label.setWordWrap(True)
         self.status_label.hide()
         layout.addWidget(self.status_label)
