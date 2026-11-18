@@ -129,4 +129,6 @@ def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_pat
         ctx.window.show_notification("Bootstrap check", level=NotificationLevel.SUCCESS)
         assert ctx.window.notification_banner.isVisible()
     finally:
+        ctx.powerbi_service.shutdown()
+        ctx.auth_service.shutdown()
         ctx.db.dispose()

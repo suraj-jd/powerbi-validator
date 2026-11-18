@@ -37,6 +37,7 @@ from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
     from app.services.auth_service import AuthService
+    from app.services.powerbi_service import PowerBIService
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class MainWindow(QMainWindow):
         db_path: Path | None = None,
         token_cache_path: Path | None = None,
         auth_service: AuthService | None = None,
+        powerbi_service: PowerBIService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -63,6 +65,7 @@ class MainWindow(QMainWindow):
         self._db_path = db_path
         self._token_cache_path = token_cache_path
         self._auth_service = auth_service
+        self._powerbi_service = powerbi_service
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(self._config.window_width, self._config.window_height)
@@ -78,6 +81,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._connect_auth_service()
+        self._connect_powerbi_service()
         self.navigate_to("home")
 
         logger.info("MainWindow initialized (%s v%s)", APP_NAME, APP_VERSION)
@@ -251,6 +255,49 @@ class MainWindow(QMainWindow):
                     status_message="Configure a Microsoft Entra Client ID to enable sign-in.",
                 )
             )
+
+    def _connect_powerbi_service(self) -> None:
+        if self._powerbi_service is None:
+            return
+
+        self.home_page.load_workspaces_requested.connect(
+            self._powerbi_service.list_workspaces_async
+        )
+        self.home_page.load_workspace_assets_requested.connect(
+            self._powerbi_service.list_workspace_assets_async
+        )
+        self.home_page.verify_access_requested.connect(self._handle_verify_access_requested)
+
+        self._powerbi_service.busy_changed.connect(self.home_page.set_connectivity_busy)
+        self._powerbi_service.workspaces_loaded.connect(self.home_page.set_workspaces)
+        self._powerbi_service.workspace_assets_loaded.connect(self.home_page.set_workspace_assets)
+        self._powerbi_service.access_verified.connect(self._handle_access_verified)
+        self._powerbi_service.error_occurred.connect(
+            lambda msg: self.show_notification(
+                msg,
+                level=NotificationLevel.ERROR,
+                title="Power BI Connectivity",
+            )
+        )
+
+    def _handle_verify_access_requested(
+        self,
+        workspace_id: str,
+        dataset_id: str,
+        report_id: str,
+    ) -> None:
+        if self._powerbi_service is None:
+            return
+        self._powerbi_service.verify_access_async(
+            workspace_id=workspace_id,
+            dataset_id=dataset_id,
+            report_id=report_id or None,
+        )
+
+    def _handle_access_verified(self, result: object) -> None:
+        self.home_page.display_verification_result(result)  # type: ignore[arg-type]
+        if self._auth_service is not None:
+            self.home_page.auth_banner.apply_state(self._auth_service.state)
 
     def apply_auth_state(self, state: AuthStateSnapshot) -> None:
         """Synchronize the sidebar profile panel and Home auth banner with auth state."""

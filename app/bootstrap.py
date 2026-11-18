@@ -24,6 +24,7 @@ from app.core.logging_config import setup_logging
 from app.core.status import NotificationLevel
 from app.database.db import DatabaseManager
 from app.services.auth_service import AuthService
+from app.services.powerbi_service import PowerBIService
 from app.ui.main_window import MainWindow
 from app.ui.theme import APP_STYLESHEET
 
@@ -39,6 +40,7 @@ class AppContext:
     config: AppConfig
     db: DatabaseManager
     auth_service: AuthService
+    powerbi_service: PowerBIService
     data_dir: Path
     logs_dir: Path
     log_file: Path
@@ -103,6 +105,7 @@ def bootstrap_application(
         app_config=config,
         data_dir=resolved_data_dir,
     )
+    powerbi_service = PowerBIService(auth_service=auth_service)
 
     window = MainWindow(
         config=config,
@@ -110,6 +113,7 @@ def bootstrap_application(
         db_path=resolved_db_path,
         token_cache_path=resolved_token_cache_path,
         auth_service=auth_service,
+        powerbi_service=powerbi_service,
     )
 
     if config_warning:
@@ -132,6 +136,7 @@ def bootstrap_application(
         auth_service.restore_session_async()
 
     def _on_quit() -> None:
+        powerbi_service.shutdown()
         auth_service.shutdown()
         db.dispose()
         logger.info("%s exited cleanly.", APP_NAME)
@@ -144,6 +149,7 @@ def bootstrap_application(
         config=config,
         db=db,
         auth_service=auth_service,
+        powerbi_service=powerbi_service,
         data_dir=resolved_data_dir,
         logs_dir=resolved_logs_dir,
         log_file=log_file,

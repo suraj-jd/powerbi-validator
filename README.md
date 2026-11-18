@@ -4,14 +4,13 @@ Local-first Windows desktop application for automating Power BI report and seman
 
 ## Current Stage
 
-**Stage 3 — Microsoft Authentication**
+**Stage 4 — Power BI Connectivity & Permission Verification**
 
-- Microsoft Entra ID public-client sign-in via MSAL OAuth 2.0 + PKCE (system browser interactive login, no passwords or client secrets)
-- Windows DPAPI (`CryptProtectData` / `CryptUnprotectData`) encrypted MSAL token cache stored at `%LOCALAPPDATA%\PowerBIValidationTool\auth\msal_token_cache.bin` (never stored in SQLite)
-- Silent session restoration on startup, expired/revoked session detection, **Switch Account**, and **Sign Out** (clears local token cache)
-- Non-blocking `AuthService` background worker, Home `AuthBanner`, sidebar account profile panel, and `Configure Entra App` dialog
-- Entra App Registration setup guide in [docs/entra_app_registration.md](docs/entra_app_registration.md)
-- Local SQLite persistence via SQLAlchemy + Alembic, rotating secret-redacting logs, and reusable UI components (Stages 0–2)
+- Authenticated Power BI Service REST client (`app/integrations/powerbi/rest_client.py`) using `httpx` with timeouts, `Retry-After` throttling retries (HTTP 429), and clear `401`/`403`/`404`/`5xx` error handling
+- Typed Pydantic Power BI models and clients (`WorkspaceClient`, `DatasetClient`) for listing accessible workspaces, datasets, reports, and verifying workspace/dataset/report permissions using the signed-in user's identity
+- Honest permission reporting grounded strictly in Microsoft API responses (never infers workspace ownership from sign-in alone)
+- Non-blocking `PowerBIService` background worker and interactive Home access verification panel
+- Microsoft Entra ID MSAL auth + Windows DPAPI token cache, SQLite/Alembic persistence, and reusable UI components (Stages 0–3)
 
 ## Setup & Run (Windows PowerShell)
 
