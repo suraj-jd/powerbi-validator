@@ -18,12 +18,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.exceptions import PersistenceError, ValidationConfigError
+from app.core.exceptions import PersistenceError, ValidationConfigError, format_safe_user_error
 from app.core.status import NotificationLevel
-from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata
+from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata, PowerBIWorkspace
 from app.services.registry_service import RegistrationRecord, RegistryService
 from app.ui.dialogs.confirm_dialog import ConfirmDialog
 from app.ui.dialogs.import_registrations_dialog import ImportRegistrationsDialog
+from app.ui.dialogs.quick_add_workspaces_dialog import QuickAddWorkspacesDialog
 from app.ui.dialogs.registration_dialog import RegistrationDialog
 from app.ui.models.dict_table_model import ColumnSpec
 from app.ui.widgets.data_table import DataTableWidget
@@ -33,6 +34,7 @@ from app.ui.widgets.searchable_combo import SearchableComboBox
 
 if TYPE_CHECKING:
     from app.services.metadata_service import MetadataService
+    from app.services.powerbi_service import PowerBIService
 
 _REGISTRY_COLUMNS: list[ColumnSpec] = [
     ColumnSpec(key="active", header="Active", alignment=Qt.AlignmentFlag.AlignCenter),
@@ -56,11 +58,13 @@ class SettingsPage(QWidget):
         *,
         registry_service: RegistryService | None = None,
         metadata_service: MetadataService | None = None,
+        powerbi_service: PowerBIService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._registry = registry_service
         self._metadata_service = metadata_service
+        self._powerbi_service = powerbi_service
         self._records: dict[int, RegistrationRecord] = {}
         self._access_status_by_id: dict[int, str] = {}
         self._build_ui()
@@ -125,7 +129,16 @@ class SettingsPage(QWidget):
         self.import_button.clicked.connect(self._handle_import_clicked)
         sec1_header.addWidget(self.import_button)
 
-        self.add_button = QPushButton("Add More +")
+        self.quick_add_button = QPushButton("✨ Quick Add from Power BI...")
+        self.quick_add_button.setObjectName("PrimaryButton")
+        self.quick_add_button.setStyleSheet(
+            "background-color: #0284C7; color: #FFFFFF; font-weight: 600; padding: 6px 14px; border-radius: 6px;"
+        )
+        self.quick_add_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.quick_add_button.clicked.connect(self._handle_quick_add_clicked)
+        sec1_header.addWidget(self.quick_add_button)
+
+        self.add_button = QPushButton("Add Custom +")
         self.add_button.setObjectName("PrimaryButton")
         self.add_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add_button.clicked.connect(self._handle_add_clicked)
@@ -389,10 +402,76 @@ class SettingsPage(QWidget):
         self.refresh_registrations()
         self.registry_banner.show_message(result.summary, level=level, title=title)
 
+    def _handle_quick_add_clicked(self) -> None:
+        if self._powerbi_service is None:
+            self.registry_banner.show_message(
+                "Power BI Service connection is required for quick registration.",
+                level=NotificationLevel.WARNING,
+                title="Power BI Connection",
+            )
+            return
+
+        dialog = QuickAddWorkspacesDialog(
+            powerbi_service=self._powerbi_service,
+            parent=self,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_registrations:
+            created_count = 0
+            errors: list[str] = []
+            for item in dialog.selected_registrations:
+                try:
+                    if self._registry is not None:
+                        self._registry.create_registration(item)
+                        created_count += 1
+                except Exception as exc:
+                    errors.append(f"{item.dataset_name or item.report_name}: {format_safe_user_error(exc)}")
+
+            self.refresh_registrations()
+            self.registrations_changed.emit()
+
+            if created_count > 0 and not errors:
+                self.registry_banner.show_message(
+                    f"Successfully registered {created_count} semantic model(s) from Power BI!",
+                    level=NotificationLevel.SUCCESS,
+                    title="Quick Registration",
+                )
+            elif created_count > 0 and errors:
+                self.registry_banner.show_message(
+                    f"Registered {created_count} model(s); {len(errors)} skipped: {errors[0]}",
+                    level=NotificationLevel.WARNING,
+                    title="Partial Registration",
+                )
+            elif errors:
+                self.registry_banner.show_message(
+                    f"Could not register models: {errors[0]}",
+                    level=NotificationLevel.ERROR,
+                    title="Registration Error",
+                )
+
+    def _on_save_another_registration(self, reg_input: RegistrationInput) -> bool:
+        if self._registry is None:
+            return False
+        try:
+            self._registry.create_registration(reg_input)
+            self.refresh_registrations()
+            self.registrations_changed.emit()
+            return True
+        except Exception as exc:
+            self.registry_banner.show_message(
+                format_safe_user_error(exc),
+                level=NotificationLevel.ERROR,
+                title="Could Not Save",
+            )
+            return False
+
     def _handle_add_clicked(self) -> None:
         if self._registry is None:
             return
-        dialog = RegistrationDialog(parent=self)
+        dialog = RegistrationDialog(
+            powerbi_service=self._powerbi_service,
+            on_save_another=self._on_save_another_registration,
+            parent=self,
+        )
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.registration_input is not None:
             try:
                 created = self._registry.create_registration(dialog.registration_input)
@@ -424,7 +503,11 @@ class SettingsPage(QWidget):
             )
             return
 
-        dialog = RegistrationDialog(existing=record, parent=self)
+        dialog = RegistrationDialog(
+            existing=record,
+            powerbi_service=self._powerbi_service,
+            parent=self,
+        )
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.registration_input is not None:
             try:
                 updated = self._registry.update_registration(record.id, dialog.registration_input)

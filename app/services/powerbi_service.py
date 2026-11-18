@@ -67,6 +67,9 @@ class PowerBIService(QObject):
         self._workspace_client = WorkspaceClient(self._rest_client)
         self._dataset_client = DatasetClient(self._rest_client, self._workspace_client)
         self._active_worker: _PbiWorker | None = None
+        self._cached_workspaces: list[PowerBIWorkspace] = []
+        self._cached_datasets: dict[str, list[PowerBIDataset]] = {}
+        self._cached_reports: dict[str, list[PowerBIReport]] = {}
 
     @property
     def rest_client(self) -> PowerBIRestClient:
@@ -79,6 +82,38 @@ class PowerBIService(QObject):
     @property
     def dataset_client(self) -> DatasetClient:
         return self._dataset_client
+
+    @property
+    def cached_workspaces(self) -> list[PowerBIWorkspace]:
+        return list(self._cached_workspaces)
+
+    def get_cached_datasets(self, workspace_id: str) -> list[PowerBIDataset]:
+        return list(self._cached_datasets.get(workspace_id.lower(), []))
+
+    def get_cached_reports(self, workspace_id: str) -> list[PowerBIReport]:
+        return list(self._cached_reports.get(workspace_id.lower(), []))
+
+    def list_workspaces_sync(self) -> list[PowerBIWorkspace]:
+        """Fetch or return cached workspaces synchronously."""
+        if not self._cached_workspaces:
+            workspaces = self._workspace_client.list_workspaces()
+            self._cached_workspaces = list(workspaces)
+        return list(self._cached_workspaces)
+
+    def list_workspace_assets_sync(
+        self, workspace_id: str
+    ) -> tuple[list[PowerBIDataset], list[PowerBIReport]]:
+        """Fetch or return cached datasets and reports for a workspace synchronously."""
+        key = workspace_id.lower()
+        if key not in self._cached_datasets or key not in self._cached_reports:
+            datasets = self._dataset_client.list_datasets(workspace_id)
+            reports = self._workspace_client.list_reports(workspace_id)
+            self._cached_datasets[key] = list(datasets)
+            self._cached_reports[key] = list(reports)
+        return (
+            list(self._cached_datasets.get(key, [])),
+            list(self._cached_reports.get(key, [])),
+        )
 
     @property
     def is_busy(self) -> bool:
@@ -123,6 +158,7 @@ class PowerBIService(QObject):
         self._start_worker(_verify, on_success=self._emit_access_verified)
 
     def _emit_workspaces(self, workspaces: list[PowerBIWorkspace]) -> None:
+        self._cached_workspaces = list(workspaces)
         self.workspaces_loaded.emit(workspaces)
 
     def _emit_workspace_assets(
@@ -130,6 +166,8 @@ class PowerBIService(QObject):
         payload: tuple[str, list[PowerBIDataset], list[PowerBIReport]],
     ) -> None:
         ws_id, datasets, reports = payload
+        self._cached_datasets[ws_id.lower()] = list(datasets)
+        self._cached_reports[ws_id.lower()] = list(reports)
         self.workspace_assets_loaded.emit(ws_id, datasets, reports)
 
     def _emit_access_verified(self, result: AccessVerificationResult) -> None:
