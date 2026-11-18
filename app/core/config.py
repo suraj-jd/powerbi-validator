@@ -58,6 +58,13 @@ def get_logs_dir(data_dir: Path | None = None) -> Path:
     return logs_dir
 
 
+def get_database_path(data_dir: Path | None = None) -> Path:
+    """Return the path to the local SQLite database file."""
+    db_dir = get_app_data_dir(data_dir) / "data"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return db_dir / "validation_tool.db"
+
+
 def get_config_file_path(data_dir: Path | None = None) -> Path:
     """Return the path to the local JSON configuration file."""
     return get_app_data_dir(data_dir) / "config.json"

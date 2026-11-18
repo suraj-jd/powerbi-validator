@@ -116,12 +116,17 @@ def test_about_page_shared_component_demo(qtbot, tmp_path: Path) -> None:
 
 def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_path: Path) -> None:
     ctx = bootstrap_application(argv=[], data_dir=tmp_path, install_hooks=False)
-    qtbot.addWidget(ctx.window)
-    ctx.window.show()
+    try:
+        qtbot.addWidget(ctx.window)
+        ctx.window.show()
 
-    assert (tmp_path / "config.json").exists()
-    assert ctx.log_file.exists()
-    assert ctx.window.current_page_key == "home"
+        assert (tmp_path / "config.json").exists()
+        assert ctx.log_file.exists()
+        assert ctx.db_path.exists()
+        assert ctx.db.get_current_revision() == "20261118_0001"
+        assert ctx.window.current_page_key == "home"
 
-    ctx.window.show_notification("Bootstrap check", level=NotificationLevel.SUCCESS)
-    assert ctx.window.notification_banner.isVisible()
+        ctx.window.show_notification("Bootstrap check", level=NotificationLevel.SUCCESS)
+        assert ctx.window.notification_banner.isVisible()
+    finally:
+        ctx.db.dispose()

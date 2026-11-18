@@ -4,14 +4,13 @@ Local-first Windows desktop application for automating Power BI report and seman
 
 ## Current Stage
 
-**Stage 1 — Architecture & Shared Components**
+**Stage 2 — Local SQLite Foundation**
 
-- Layered module structure (`app/core/`, `app/ui/models/`, `app/ui/widgets/`, `app/ui/dialogs/`, `app/bootstrap.py`)
-- Validated central configuration using Pydantic (`%LOCALAPPDATA%\PowerBIValidationTool\config.json`, no secrets stored)
-- Rotating local log files with automatic secret/token redaction
-- Application-wide uncaught exception hooks for main and worker threads
-- Reusable UI components: `NotificationBanner`, Qt Model/View `DataTableWidget`, and `ConfirmDialog`
-- Updated `About` page with runtime diagnostics, log folder shortcut, and live component preview
+- Local SQLite database (`%LOCALAPPDATA%\PowerBIValidationTool\data\validation_tool.db`) created and migrated automatically on startup via SQLAlchemy 2.0 + Alembic
+- Core tables: `app_settings`, `workspace_registrations`, `validation_rules`, `validation_runs`, `validation_results`, `refresh_records`
+- Repository layer (`app/database/repositories/`) for CRUD operations, duplicate-registration protection, immutable run history, and secret-key rejection in `app_settings`
+- Backup & restore design notes documented in `docs/database_backup_restore.md`
+- Layered architecture, Pydantic config, rotating secret-redacting logs, global exception hooks, and reusable UI components (Stages 0–1)
 
 ## Setup & Run (Windows PowerShell)
 

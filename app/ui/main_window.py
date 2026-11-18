@@ -44,11 +44,13 @@ class MainWindow(QMainWindow):
         *,
         config: AppConfig | None = None,
         logs_dir: Path | None = None,
+        db_path: Path | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._config = config or AppConfig()
         self._logs_dir = logs_dir
+        self._db_path = db_path
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(self._config.window_width, self._config.window_height)
@@ -112,7 +114,12 @@ class MainWindow(QMainWindow):
         self._register_page(
             "about",
             "About",
-            AboutPage(config=self._config, logs_dir=self._logs_dir, parent=self),
+            AboutPage(
+                config=self._config,
+                logs_dir=self._logs_dir,
+                db_path=self._db_path,
+                parent=self,
+            ),
         )
 
         self.setCentralWidget(central)
