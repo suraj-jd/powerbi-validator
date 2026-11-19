@@ -135,6 +135,7 @@ def bootstrap_application(
         rule_service=rule_service,
         dax_client=dax_client,
         refresh_service=refresh_service,
+        registry_service=registry_service,
     )
 
     window = MainWindow(

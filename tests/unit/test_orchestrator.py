@@ -200,3 +200,23 @@ def test_orchestrator_cancellation_support(test_db, mock_dax_client):
     # Only 1 rule should have executed before cancellation
     assert len(summary.results) == 1
     assert summary.passed_count == 1
+
+
+def test_orchestrator_run_sheet_validation(test_db, mock_dax_client):
+    reg_id, _ = _create_registration_and_rules(test_db)
+    rule_svc = RuleService(test_db)
+    orchestrator = OrchestratorService(test_db, rule_svc, mock_dax_client)
+
+    summary = orchestrator.run_sheet_validation()
+
+    assert summary is not None
+    assert summary.total_rules == 2
+    assert summary.passed_count == 2
+    assert summary.overall_status == ValidationStatus.PASS
+    assert len(summary.results) == 2
+
+    # Check get_latest_run returns this completed run
+    latest = orchestrator.get_latest_run()
+    assert latest is not None
+    assert latest.id == summary.id
+    assert latest.overall_status == ValidationStatus.PASS

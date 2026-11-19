@@ -718,34 +718,23 @@ class HomePage(QWidget):
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(12)
 
-        # Header with Model Selector and Run Validation button
+        # Header with Run Validation button
         card_header = QHBoxLayout()
         card_header.setSpacing(10)
-        section_title = QLabel("Semantic Model Validation & Health Check")
+        section_title = QLabel("Validation Report & Health Dashboard")
         section_title.setObjectName("SectionTitle")
         card_header.addWidget(section_title)
 
-        lbl_model = QLabel("Model:")
-        lbl_model.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569; margin-left: 12px;")
-        card_header.addWidget(lbl_model)
-
-        self.model_selector_combo = AnimatedComboBox()
+        # Retain hidden controls for backward-compatible API and tests
+        self.model_selector_combo = AnimatedComboBox(card)
         self.model_selector_combo.setObjectName("FilterCombo")
-        self.model_selector_combo.setMinimumWidth(260)
-        self.model_selector_combo.setMaximumWidth(420)
-        self.model_selector_combo.setToolTip("Select active Power BI semantic model to validate")
         self.model_selector_combo.currentIndexChanged.connect(self._on_model_selector_changed)
-        card_header.addWidget(self.model_selector_combo)
+        self.model_selector_combo.hide()
 
-        self.refresh_models_button = QPushButton("↻")
+        self.refresh_models_button = QPushButton("↻", card)
         self.refresh_models_button.setObjectName("SecondaryButton")
-        self.refresh_models_button.setToolTip("Reload workspaces and semantic models from Power BI")
-        self.refresh_models_button.setStyleSheet(
-            "padding: 5px 10px; font-size: 13px; font-weight: 700; border-radius: 6px;"
-        )
-        self.refresh_models_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.refresh_models_button.clicked.connect(self._handle_refresh_models_clicked)
-        card_header.addWidget(self.refresh_models_button)
+        self.refresh_models_button.hide()
 
         card_header.addStretch(1)
 
@@ -768,8 +757,8 @@ class HomePage(QWidget):
         layout.addLayout(card_header)
 
         desc = QLabel(
-            "Execute all configured deterministic checks (nulls, duplicates, freshness, row count, refresh SLA) "
-            "and historical anomaly checks against the active semantic model."
+            "Execute all configured validation checks from the Validation Sheet across your Power BI datasets "
+            "and generate a consolidated health report."
         )
         desc.setObjectName("PageSubtitle")
         desc.setWordWrap(True)
@@ -943,7 +932,7 @@ class HomePage(QWidget):
         layout.addWidget(self.results_table)
 
         self.empty_results_label = QLabel(
-            "No validation runs recorded for this dataset yet. Click 'Run Validation' above to execute checks."
+            "No validation runs recorded yet. Click 'Run Validation' above to execute checks from your Validation Sheet."
         )
         self.empty_results_label.setStyleSheet(
             "color: #64748B; font-size: 13px; font-style: italic; padding: 24px 0; qproperty-alignment: AlignCenter;"
@@ -956,17 +945,24 @@ class HomePage(QWidget):
         self.dataset_id_input.textChanged.connect(lambda _: self._update_validation_ui())
 
     def _update_validation_ui(self) -> None:
-        ws_id, ds_id, _ = self._get_active_workspace_and_dataset()
-        if not ws_id or not ds_id or self._orchestrator_service is None or self._registry_service is None:
+        if self._orchestrator_service is None:
             self._reset_validation_ui()
             return
 
-        existing = self._registry_service.find_by_workspace_and_dataset(ws_id, ds_id)
-        if existing is None:
-            self._reset_validation_ui()
-            return
+        latest_run = None
+        if hasattr(self._orchestrator_service, "get_latest_run"):
+            try:
+                latest_run = self._orchestrator_service.get_latest_run()
+            except Exception:
+                pass
 
-        latest_run = self._orchestrator_service.get_latest_run_for_registration(existing.id)
+        if latest_run is None and self._registry_service is not None:
+            ws_id, ds_id, _ = self._get_active_workspace_and_dataset()
+            if ws_id and ds_id:
+                existing = self._registry_service.find_by_workspace_and_dataset(ws_id, ds_id)
+                if existing is not None and hasattr(self._orchestrator_service, "get_latest_run_for_registration"):
+                    latest_run = self._orchestrator_service.get_latest_run_for_registration(existing.id)
+
         if latest_run is not None:
             self._display_run_summary(latest_run)
         else:
@@ -993,15 +989,6 @@ class HomePage(QWidget):
         self._current_results = []
 
     def _run_validation(self) -> None:
-        ws_id, ds_id, ds_name = self._get_active_workspace_and_dataset()
-        if not ws_id or not ds_id:
-            self.validation_banner.show_message(
-                "Please select or enter a valid Workspace ID and Dataset ID above first.",
-                level=NotificationLevel.WARNING,
-                title="Input Required",
-            )
-            return
-
         if self._orchestrator_service is None:
             self.validation_banner.show_message(
                 "Validation orchestrator service is not initialized.",
@@ -1010,17 +997,41 @@ class HomePage(QWidget):
             )
             return
 
-        reg_id = self._get_or_create_registration()
-        if reg_id is None:
-            return
+        from app.services.sheet_service import SheetService
 
-        if self._orchestrator_service.is_registration_running(reg_id):
+        has_tests = False
+        db = getattr(self._orchestrator_service, "_db", None)
+        if db is not None:
+            try:
+                sheet_svc = SheetService(
+                    db=db,
+                    registry_service=self._registry_service,
+                    rule_service=self._rule_service,
+                )
+                rows = sheet_svc.load_sheet_rows()
+                has_tests = any(r.enabled and r.workspace_id and r.dataset_id for r in rows)
+            except Exception as exc:
+                logger.debug("Error checking sheet rows: %s", exc)
+        elif self._rule_service is not None and self._registry_service is not None:
+            regs = self._registry_service.list_registrations(active_only=True)
+            for reg in regs:
+                if self._rule_service.list_rules(reg.id, enabled_only=True):
+                    has_tests = True
+                    break
+        else:
+            has_tests = True
+
+        if db is not None and not has_tests:
             self.validation_banner.show_message(
-                "A validation run is already executing for this dataset.",
+                "No enabled validation checks found in the Validation Sheet. "
+                "Please open the 'Validation Sheet' tab to add and enable your validation checks.",
                 level=NotificationLevel.WARNING,
-                title="Run In Progress",
+                title="No Checks to Run",
             )
             return
+
+        ws_id, ds_id, _ = self._get_active_workspace_and_dataset()
+        reg_id = self._get_or_create_registration()
 
         from app.services.orchestrator_service import ValidationWorker
 
@@ -1030,14 +1041,15 @@ class HomePage(QWidget):
         self.validation_progress_bar.show()
         self.validation_progress_bar.setValue(0)
         self.validation_progress_label.show()
-        self.validation_progress_label.setText("Preparing validation checks...")
+        self.validation_progress_label.setText("Preparing validation checks across Validation Sheet...")
         self.validation_banner.hide()
 
         self._validation_worker = ValidationWorker(
             self._orchestrator_service,
-            reg_id,
+            workspace_registration_id=reg_id,
             workspace_id=ws_id,
             dataset_id=ds_id,
+            run_all_sheet_rules=True,
             parent=self,
         )
         self._validation_worker.progress.connect(self._on_validation_progress)

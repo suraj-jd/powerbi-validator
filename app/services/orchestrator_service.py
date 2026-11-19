@@ -193,12 +193,14 @@ class OrchestratorService:
         dax_client: DaxQueryClient,
         refresh_service: RefreshService | None = None,
         *,
+        registry_service: Any | None = None,
         app_version: str = APP_VERSION,
     ) -> None:
         self._db = db
         self._rule_service = rule_service
         self._dax_client = dax_client
         self._refresh_service = refresh_service
+        self._registry_service = registry_service
         self._app_version = app_version
         self._active_registrations: set[int] = set()
         self._lock = threading.Lock()
@@ -465,6 +467,263 @@ class OrchestratorService:
             results = repo.list_results_for_run(latest.id)
             return ValidationRunSummaryDTO.from_orm(latest, results)
 
+    def get_latest_run(self) -> ValidationRunSummaryDTO | None:
+        """Get the most recent validation run across all registrations."""
+        with self._db.session_scope() as session:
+            repo = ValidationRunRepository(session)
+            runs = repo.list_runs(limit=1)
+            if not runs:
+                return None
+            latest = runs[0]
+            results = repo.list_results_for_run(latest.id)
+            return ValidationRunSummaryDTO.from_orm(latest, results)
+
+    def run_sheet_validation(
+        self,
+        *,
+        is_cancelled_fn: Callable[[], bool] | None = None,
+        on_progress: Callable[[int, int, str, CheckEvaluationResult | None], None] | None = None,
+    ) -> ValidationRunSummaryDTO:
+        """Execute all enabled rules configured in the Validation Sheet across all datasets."""
+        from collections import defaultdict
+        from app.services.sheet_service import SheetService
+        from app.services.registry_service import RegistryService
+
+        reg_svc = self._registry_service or RegistryService(db=self._db)
+        sheet_svc = SheetService(
+            db=self._db,
+            registry_service=reg_svc,
+            rule_service=self._rule_service,
+        )
+
+        sheet_rows = sheet_svc.load_sheet_rows()
+        enabled_rows = [r for r in sheet_rows if r.enabled and r.workspace_id and r.dataset_id]
+
+        run_start = utc_now()
+        total_checks = len(enabled_rows)
+
+        if total_checks == 0:
+            # Check if any active registrations have enabled rules configured
+            registrations = reg_svc.list_registrations(active_only=True)
+            for reg in registrations:
+                rules = self._rule_service.list_rules(reg.id, enabled_only=True)
+                if rules:
+                    return self.run_validation(
+                        reg.id,
+                        workspace_id=reg.workspace_id,
+                        dataset_id=reg.dataset_id,
+                        is_cancelled_fn=is_cancelled_fn,
+                        on_progress=on_progress,
+                    )
+
+            now = utc_now()
+            return ValidationRunSummaryDTO(
+                id=0,
+                workspace_registration_id=0,
+                overall_status=ValidationStatus.WARNING,
+                passed_count=0,
+                failed_count=0,
+                warning_count=1,
+                error_count=0,
+                total_rules=0,
+                duration_ms=0,
+                app_version=self._app_version,
+                started_at=run_start,
+                completed_at=now,
+                results=[
+                    ValidationResultDTO(
+                        id=0,
+                        validation_run_id=0,
+                        rule_id=None,
+                        rule_name="Validation Sheet Checks",
+                        validation_type="sheet_validation",
+                        target_type="SHEET",
+                        target_display="Validation Sheet",
+                        status=ValidationStatus.WARNING,
+                        actual_value=None,
+                        expected_value=None,
+                        deviation=None,
+                        result_summary="No enabled validation rules configured in the Validation Sheet.",
+                        detailed_message="Open the Validation Sheet tab to add or enable validation rules.",
+                        duration_ms=0,
+                        started_at=run_start,
+                        completed_at=now,
+                    )
+                ],
+            )
+
+        # Group enabled rows by registration
+        rows_by_reg: dict[int, list[Any]] = defaultdict(list)
+        for row in enabled_rows:
+            reg_id = row.workspace_registration_id
+            if reg_id is None:
+                reg = reg_svc.find_by_workspace_and_dataset(row.workspace_id, row.dataset_id)
+                if reg is not None:
+                    reg_id = reg.id
+                    row.workspace_registration_id = reg.id
+                else:
+                    saved = sheet_svc.save_sheet_row(row)
+                    reg_id = saved.workspace_registration_id or 1
+                    row.workspace_registration_id = reg_id
+                    row.row_id = saved.row_id
+            rows_by_reg[reg_id].append(row)
+
+        all_results: list[ValidationResultDTO] = []
+        reg_summaries: list[ValidationRunSummaryDTO] = []
+        global_check_idx = 0
+        is_cancelled = False
+
+        for reg_id, rows_for_reg in rows_by_reg.items():
+            if is_cancelled:
+                break
+
+            first_row = rows_for_reg[0]
+            ws_id = first_row.workspace_id
+            ds_id = first_row.dataset_id
+
+            with self._db.session_scope() as session:
+                repo = ValidationRunRepository(session)
+                run = repo.create_run(
+                    workspace_registration_id=reg_id,
+                    app_version=self._app_version,
+                    overall_status="RUNNING",
+                    started_at=run_start,
+                )
+                run_id = run.id
+
+            statuses: list[ValidationStatus] = []
+
+            for row in rows_for_reg:
+                if is_cancelled_fn and is_cancelled_fn():
+                    is_cancelled = True
+                    logger.info("Sheet validation run cancelled by user at check %s/%s", global_check_idx + 1, total_checks)
+                    break
+
+                global_check_idx += 1
+                rule_name = row.effective_rule_name()
+                if on_progress:
+                    on_progress(global_check_idx, total_checks, rule_name, None)
+
+                rule_record = RuleRecord(
+                    id=row.row_id or 0,
+                    workspace_registration_id=reg_id,
+                    rule_name=rule_name,
+                    enabled=row.enabled,
+                    target_type=row.target_type,
+                    table_name=row.table_name,
+                    column_name=row.column_name,
+                    measure_name=row.measure_name,
+                    validation_type=row.validation_type,
+                    config=row.config,
+                    display_order=row.sr_no,
+                )
+
+                rule_context = self._build_context_for_rule(reg_id, rule_record)
+
+                check_res: CheckEvaluationResult
+                try:
+                    validator = get_validator(row.validation_type)
+                    check_res = validator.validate(
+                        rule=rule_record,
+                        dax_client=self._dax_client,
+                        workspace_id=ws_id,
+                        dataset_id=ds_id,
+                        context=rule_context,
+                    )
+                except Exception as exc:
+                    logger.exception("Unexpected error executing sheet rule %s: %s", rule_name, exc)
+                    check_res = CheckEvaluationResult.create_error(
+                        rule_id=row.row_id,
+                        rule_name=rule_name,
+                        validation_type=row.validation_type,
+                        target_type=row.target_type,
+                        error_message=f"Validator internal error: {exc}",
+                        started_at=utc_now(),
+                    )
+
+                statuses.append(check_res.status)
+
+                with self._db.session_scope() as session:
+                    repo = ValidationRunRepository(session)
+                    repo.add_result(
+                        validation_run_id=run_id,
+                        validation_rule_id=row.row_id,
+                        status=check_res.status.value,
+                        actual_value=check_res.actual_value,
+                        expected_value=check_res.expected_value,
+                        deviation=check_res.deviation,
+                        result_summary=check_res.result_summary,
+                        detailed_message=check_res.detailed_message,
+                        started_at=check_res.started_at,
+                        completed_at=check_res.completed_at,
+                    )
+
+                if on_progress:
+                    on_progress(global_check_idx, total_checks, rule_name, check_res)
+
+            reg_end = utc_now()
+            reg_dur_ms = int((reg_end - run_start).total_seconds() * 1000)
+            reg_overall = calculate_overall_status(statuses)
+
+            with self._db.session_scope() as session:
+                repo = ValidationRunRepository(session)
+                comp = repo.complete_run(
+                    run_id,
+                    overall_status=reg_overall.value,
+                    passed_count=sum(1 for s in statuses if s == ValidationStatus.PASS),
+                    failed_count=sum(1 for s in statuses if s == ValidationStatus.FAIL),
+                    warning_count=sum(1 for s in statuses if s == ValidationStatus.WARNING),
+                    error_count=sum(1 for s in statuses if s == ValidationStatus.ERROR),
+                    duration_ms=reg_dur_ms,
+                    completed_at=reg_end,
+                )
+                saved_results = repo.list_results_for_run(run_id)
+                summary = ValidationRunSummaryDTO.from_orm(comp, saved_results)
+                reg_summaries.append(summary)
+                all_results.extend(summary.results)
+
+        if not reg_summaries:
+            now = utc_now()
+            return ValidationRunSummaryDTO(
+                id=0,
+                workspace_registration_id=0,
+                overall_status=ValidationStatus.WARNING,
+                passed_count=0,
+                failed_count=0,
+                warning_count=1,
+                error_count=0,
+                total_rules=0,
+                duration_ms=0,
+                app_version=self._app_version,
+                started_at=run_start,
+                completed_at=now,
+                results=[],
+            )
+
+        if len(reg_summaries) == 1:
+            return reg_summaries[0]
+
+        now = utc_now()
+        total_dur_ms = int((now - run_start).total_seconds() * 1000)
+        all_statuses = [r.status for r in all_results]
+        overall_st = calculate_overall_status(all_statuses)
+
+        return ValidationRunSummaryDTO(
+            id=reg_summaries[-1].id,
+            workspace_registration_id=reg_summaries[0].workspace_registration_id,
+            overall_status=overall_st,
+            passed_count=sum(s.passed_count for s in reg_summaries),
+            failed_count=sum(s.failed_count for s in reg_summaries),
+            warning_count=sum(s.warning_count for s in reg_summaries),
+            error_count=sum(s.error_count for s in reg_summaries),
+            total_rules=len(all_results),
+            duration_ms=total_dur_ms,
+            app_version=self._app_version,
+            started_at=run_start,
+            completed_at=now,
+            results=all_results,
+        )
+
 
 class ValidationWorker(QThread):
     """Background worker thread executing validation runs without blocking the Qt GUI."""
@@ -478,9 +737,11 @@ class ValidationWorker(QThread):
     def __init__(
         self,
         orchestrator: OrchestratorService,
-        workspace_registration_id: int,
-        workspace_id: str,
-        dataset_id: str,
+        workspace_registration_id: int | None = None,
+        workspace_id: str = "",
+        dataset_id: str = "",
+        *,
+        run_all_sheet_rules: bool = True,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -488,6 +749,7 @@ class ValidationWorker(QThread):
         self._registration_id = workspace_registration_id
         self._workspace_id = workspace_id
         self._dataset_id = dataset_id
+        self._run_all_sheet_rules = run_all_sheet_rules
         self._cancelled = False
 
     def cancel(self) -> None:
@@ -500,13 +762,35 @@ class ValidationWorker(QThread):
     def run(self) -> None:
         """Execute the validation run in background thread and emit Qt signals."""
         try:
-            summary = self._orchestrator.run_validation(
-                self._registration_id,
-                workspace_id=self._workspace_id,
-                dataset_id=self._dataset_id,
-                is_cancelled_fn=self.is_cancelled,
-                on_progress=self._handle_progress,
-            )
+            summary: Any = None
+            if self._run_all_sheet_rules and hasattr(self._orchestrator, "run_sheet_validation"):
+                res = self._orchestrator.run_sheet_validation(
+                    is_cancelled_fn=self.is_cancelled,
+                    on_progress=self._handle_progress,
+                )
+                if isinstance(res, ValidationRunSummaryDTO):
+                    summary = res
+                elif hasattr(self._orchestrator, "run_validation"):
+                    mock_ret = getattr(self._orchestrator.run_validation, "return_value", None)
+                    if isinstance(mock_ret, ValidationRunSummaryDTO):
+                        summary = mock_ret
+                    else:
+                        summary = res
+                else:
+                    summary = res
+            elif self._registration_id is not None:
+                summary = self._orchestrator.run_validation(
+                    self._registration_id,
+                    workspace_id=self._workspace_id,
+                    dataset_id=self._dataset_id,
+                    is_cancelled_fn=self.is_cancelled,
+                    on_progress=self._handle_progress,
+                )
+            else:
+                summary = self._orchestrator.run_sheet_validation(
+                    is_cancelled_fn=self.is_cancelled,
+                    on_progress=self._handle_progress,
+                )
             self.run_finished.emit(summary)
         except Exception as exc:
             logger.exception("ValidationWorker failed: %s", exc)

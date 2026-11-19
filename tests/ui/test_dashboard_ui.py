@@ -139,6 +139,28 @@ def test_home_page_run_validation_updates_dashboard(qtbot):
     assert page.results_table.item(1, 1).text() == "Order ID Unique Key"
 
 
+def test_home_page_run_sheet_validation_without_model_selection(qtbot):
+    summary = _make_dummy_run_summary()
+    orch_svc = MagicMock(spec=OrchestratorService)
+    orch_svc.run_sheet_validation.return_value = summary
+    orch_svc.get_latest_run.return_value = summary
+
+    page = HomePage(orchestrator_service=orch_svc)
+    qtbot.addWidget(page)
+    page.show()
+
+    # User clicks Run Validation on Home Page directly without choosing a model dropdown
+    qtbot.mouseClick(page.run_validation_button, Qt.MouseButton.LeftButton)
+
+    # Background worker runs sheet validation and populates dashboard
+    qtbot.waitUntil(lambda: page.home_failed_count.text() == "1", timeout=5000)
+
+    assert page.home_passed_count.text() == "1"
+    assert page.home_failed_count.text() == "1"
+    assert not page.results_table.isHidden()
+    assert page.results_table.rowCount() == 2
+
+
 def test_home_page_table_search_and_status_filtering(qtbot):
     page = HomePage()
     qtbot.addWidget(page)
