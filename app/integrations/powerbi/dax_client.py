@@ -106,6 +106,56 @@ class DaxQueryResult:
             return f"{self.scalar_value:,}"
         return str(self.scalar_value)
 
+    @classmethod
+    def from_raw_rows(
+        cls,
+        rows: list[dict[str, Any]],
+        *,
+        query: str = "",
+        duration_ms: int = 0,
+    ) -> DaxQueryResult:
+        scalar = None
+        is_blank = True
+        val_type = "empty"
+        if rows:
+            first_row = rows[0]
+            if first_row:
+                scalar = next(iter(first_row.values()))
+                is_blank = scalar is None
+                val_type = "numeric" if isinstance(scalar, (int, float)) and not isinstance(scalar, bool) else "text"
+        return cls(
+            is_success=True,
+            scalar_value=scalar,
+            is_blank=is_blank,
+            value_type=val_type,
+            raw_rows=rows,
+            error_message=None,
+            error_code=None,
+            duration_ms=duration_ms,
+            query=query,
+        )
+
+    @classmethod
+    def from_error(
+        cls,
+        error_message: str,
+        *,
+        error_code: str = "ERROR",
+        query: str = "",
+        duration_ms: int = 0,
+    ) -> DaxQueryResult:
+        return cls(
+            is_success=False,
+            scalar_value=None,
+            is_blank=False,
+            value_type="error",
+            raw_rows=[],
+            error_message=error_message,
+            error_code=error_code,
+            duration_ms=duration_ms,
+            query=query,
+        )
+
 
 class DaxConnectorInterface(ABC):
     """Abstract connector interface for querying Power BI semantic models."""
