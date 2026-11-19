@@ -24,33 +24,36 @@ from app.services.orchestrator_service import ValidationResultDTO
 def make_validation_status_pill(status: ValidationStatus | str) -> QLabel:
     """Create a styled status pill widget for validation results."""
     st_val = status.value if isinstance(status, ValidationStatus) else str(status).upper()
-    pill = QLabel(f" {st_val} ")
+    pill = QLabel(st_val)
     pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    pill.setFixedHeight(22)
+    pill.setMinimumWidth(80)
+    pill.setMaximumWidth(105)
 
     if st_val == "PASS":
         bg = "#DCFCE7"
-        text_color = "#166534"
-        border = "#BBF7D0"
+        text_color = "#15803D"
+        border = "#86EFAC"
     elif st_val == "FAIL":
         bg = "#FEE2E2"
-        text_color = "#991B1B"
-        border = "#FECACA"
+        text_color = "#B91C1C"
+        border = "#FCA5A5"
     elif st_val == "WARNING":
         bg = "#FEF3C7"
-        text_color = "#92400E"
-        border = "#FDE68A"
+        text_color = "#B45309"
+        border = "#FCD34D"
     elif st_val == "ERROR":
         bg = "#F3E8FF"
-        text_color = "#6B21A8"
-        border = "#E9D5FF"
+        text_color = "#7E22CE"
+        border = "#D8B4FE"
     else:
         bg = "#F1F5F9"
         text_color = "#475569"
-        border = "#E2E8F0"
+        border = "#CBD5E1"
 
     pill.setStyleSheet(
-        f"background-color: {bg}; color: {text_color}; border: 1px solid {border}; "
-        "border-radius: 4px; font-weight: 700; font-size: 11px; padding: 2px 8px;"
+        f"background-color: {bg}; color: {text_color}; border: 1.5px solid {border}; "
+        "border-radius: 4px; font-weight: 700; font-size: 11px; padding: 2px 6px;"
     )
     return pill
 

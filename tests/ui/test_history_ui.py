@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHeaderView
 import pytest
 
 from app.core.status import ValidationStatus
@@ -22,8 +23,12 @@ from app.ui.dialogs.run_comparison_dialog import RunComparisonDialog
 from app.ui.pages.history_page import HistoryPage
 
 
-def _make_dummy_run(run_id: int, status: ValidationStatus) -> ValidationRunSummaryDTO:
-    now = datetime(2026, 11, 19, 12, 0, 0, tzinfo=timezone.utc)
+def _make_dummy_run(
+    run_id: int,
+    status: ValidationStatus,
+    started_at: datetime | None = None,
+) -> ValidationRunSummaryDTO:
+    now = started_at or datetime(2026, 11, 19, 12, 0, 0, tzinfo=timezone.utc)
     res = [
         ValidationResultDTO(
             id=run_id * 10 + 1,
@@ -135,3 +140,133 @@ def test_backup_maintenance_dialog_ui(qtbot, tmp_path):
     assert dialog.spin_retention.value() == 90
 
     db.dispose()
+
+
+def test_history_page_column_resize_modes_and_widths(qtbot):
+    page = HistoryPage()
+    qtbot.addWidget(page)
+    page.show()
+
+    runs_header = page.runs_table.horizontalHeader()
+    # Check that column 1 is NOT Stretch, but Interactive so user can freely resize
+    assert runs_header.sectionResizeMode(1) == QHeaderView.ResizeMode.Interactive
+    assert runs_header.minimumSectionSize() >= 65
+    assert page.runs_table.columnWidth(1) >= 150
+    assert page.runs_table.isSortingEnabled()
+
+    # Check results drawer table
+    results_header = page.results_table.horizontalHeader()
+    assert results_header.sectionResizeMode(1) == QHeaderView.ResizeMode.Interactive
+    assert results_header.minimumSectionSize() >= 65
+    assert page.results_table.columnWidth(1) >= 180
+    assert page.results_table.isSortingEnabled()
+
+
+def test_history_page_sorting_and_date_filtering(qtbot):
+    page = HistoryPage()
+    qtbot.addWidget(page)
+    page.show()
+
+    now = datetime.now(timezone.utc)
+    old = now - timedelta(days=45)
+
+    run_new = _make_dummy_run(10, ValidationStatus.PASS, started_at=now)
+    run_old = _make_dummy_run(2, ValidationStatus.FAIL, started_at=old)
+
+    page._runs = [run_new, run_old]
+    page._render_runs_table()
+
+    assert page.runs_table.rowCount() == 2
+    assert "Showing all 2 runs" in page.lbl_filtered_count.text()
+
+    # Filter to Last 30 Days (index 3) -> should hide run_old (45 days ago)
+    page.date_filter_combo.setCurrentIndex(3)
+    assert not page.runs_table.isRowHidden(0)
+    assert page.runs_table.isRowHidden(1)
+    assert "Showing 1 of 2 runs (filtered)" in page.lbl_filtered_count.text()
+
+    # Test Clear Filters button
+    page.btn_clear_filters.click()
+    assert page.date_filter_combo.currentIndex() == 0
+    assert not page.runs_table.isRowHidden(0)
+    assert not page.runs_table.isRowHidden(1)
+    assert "Showing all 2 runs" in page.lbl_filtered_count.text()
+
+
+def test_history_drawer_filtering(qtbot):
+    page = HistoryPage()
+    qtbot.addWidget(page)
+    page.show()
+
+    now = datetime.now(timezone.utc)
+    res_pass = ValidationResultDTO(
+        id=101,
+        validation_run_id=1,
+        rule_id=1,
+        rule_name="Sales Blanks",
+        validation_type="null_check",
+        target_type="COLUMN",
+        target_display="Sales[Amount]",
+        status=ValidationStatus.PASS,
+        actual_value="0",
+        expected_value="0",
+        deviation="None",
+        result_summary="Passed",
+        detailed_message="",
+        duration_ms=20,
+        started_at=now,
+        completed_at=now,
+    )
+    res_fail = ValidationResultDTO(
+        id=102,
+        validation_run_id=1,
+        rule_id=2,
+        rule_name="Customer Duplicates",
+        validation_type="duplicate_check",
+        target_type="COLUMN",
+        target_display="Customer[ID]",
+        status=ValidationStatus.FAIL,
+        actual_value="5",
+        expected_value="0",
+        deviation="+5",
+        result_summary="Failed",
+        detailed_message="",
+        duration_ms=30,
+        started_at=now,
+        completed_at=now,
+    )
+
+    run = ValidationRunSummaryDTO(
+        id=1,
+        workspace_registration_id=1,
+        overall_status=ValidationStatus.FAIL,
+        passed_count=1,
+        failed_count=1,
+        warning_count=0,
+        error_count=0,
+        total_rules=2,
+        duration_ms=50,
+        app_version="0.1.0",
+        started_at=now,
+        completed_at=now,
+        results=[res_pass, res_fail],
+    )
+
+    page._runs = [run]
+    page._render_runs_table()
+    page.runs_table.selectRow(0)
+
+    assert not page.results_table.isHidden()
+    assert page.results_table.rowCount() == 2
+
+    # Filter drawer by rule search
+    page.results_search_input.setText("Customer")
+    assert page.results_table.isRowHidden(0)
+    assert not page.results_table.isRowHidden(1)
+
+    # Clear search and filter by status FAIL only (index 1)
+    page.results_search_input.clear()
+    page.results_status_combo.setCurrentIndex(1)
+    assert page.results_table.isRowHidden(0)
+    assert not page.results_table.isRowHidden(1)
+
