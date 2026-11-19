@@ -38,6 +38,7 @@ from app.ui.theme import make_nav_icon
 from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
+    from app.database.db import DatabaseManager
     from app.services.auth_service import AuthService
     from app.services.dax_service import DaxQueryService
     from app.services.metadata_service import MetadataService
@@ -71,12 +72,14 @@ class MainWindow(QMainWindow):
         refresh_service: RefreshService | None = None,
         dax_service: DaxQueryService | None = None,
         orchestrator_service: OrchestratorService | None = None,
+        db_manager: DatabaseManager | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._config = config or AppConfig()
         self._logs_dir = logs_dir
         self._db_path = db_path
+        self._db = db_manager
         self._token_cache_path = token_cache_path
         self._auth_service = auth_service
         self._powerbi_service = powerbi_service
@@ -161,7 +164,13 @@ class MainWindow(QMainWindow):
             dax_service=self._dax_service,
             parent=self,
         )
-        self.history_page = HistoryPage(self)
+        self.history_page = HistoryPage(
+            orchestrator_service=self._orchestrator_service,
+            registry_service=self._registry_service,
+            db_manager=self._db,
+            logs_dir=self._logs_dir,
+            parent=self,
+        )
         self.about_page = AboutPage(
             config=self._config,
             logs_dir=self._logs_dir,

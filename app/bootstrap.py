@@ -150,6 +150,7 @@ def bootstrap_application(
         refresh_service=refresh_service,
         dax_service=dax_service,
         orchestrator_service=orchestrator_service,
+        db_manager=db,
     )
 
     if config_warning:
