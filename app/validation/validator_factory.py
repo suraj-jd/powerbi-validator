@@ -14,6 +14,8 @@ from app.services.rule_service import (
     VALIDATION_TYPE_ROW_COUNT,
 )
 from app.validation.base import BaseValidator
+from app.validation.validators.anomaly_validator import AnomalyValidator
+from app.validation.validators.dax_measure_validator import DaxMeasureValidator
 from app.validation.validators.duplicate_validator import DuplicateValidator
 from app.validation.validators.latest_date_validator import LatestDateValidator
 from app.validation.validators.null_validator import NullValidator
@@ -26,6 +28,8 @@ _VALIDATOR_REGISTRY: dict[str, BaseValidator] = {
     VALIDATION_TYPE_LATEST_DATE: LatestDateValidator(),
     VALIDATION_TYPE_ROW_COUNT: RowCountValidator(),
     VALIDATION_TYPE_REFRESH: RefreshValidator(),
+    VALIDATION_TYPE_DAX_MEASURE: DaxMeasureValidator(),
+    VALIDATION_TYPE_ANOMALY: AnomalyValidator(),
 }
 
 
