@@ -81,6 +81,18 @@ class RefreshRecordRepository:
         )
         return self._session.scalars(stmt).first()
 
+    def get_latest_completed(self, workspace_registration_id: int) -> RefreshRecord | None:
+        stmt = (
+            select(RefreshRecord)
+            .where(
+                RefreshRecord.workspace_registration_id == workspace_registration_id,
+                RefreshRecord.end_time.is_not(None),
+            )
+            .order_by(RefreshRecord.start_time.desc(), RefreshRecord.id.desc())
+            .limit(1)
+        )
+        return self._session.scalars(stmt).first()
+
     def delete(self, record_id: int) -> bool:
         record = self.get_by_id(record_id)
         if record is None:

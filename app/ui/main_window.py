@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from app.services.auth_service import AuthService
     from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
+    from app.services.refresh_service import RefreshService
     from app.services.registry_service import RegistryService
     from app.services.rule_service import RuleService
 
@@ -65,6 +66,7 @@ class MainWindow(QMainWindow):
         registry_service: RegistryService | None = None,
         metadata_service: MetadataService | None = None,
         rule_service: RuleService | None = None,
+        refresh_service: RefreshService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -77,6 +79,7 @@ class MainWindow(QMainWindow):
         self._registry_service = registry_service
         self._metadata_service = metadata_service
         self._rule_service = rule_service
+        self._refresh_service = refresh_service
         self._pending_verify_reg_id: int | None = None
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
@@ -136,12 +139,17 @@ class MainWindow(QMainWindow):
 
         root_layout.addLayout(workspace_col, stretch=1)
 
-        self.home_page = HomePage(self)
+        self.home_page = HomePage(
+            refresh_service=self._refresh_service,
+            registry_service=self._registry_service,
+            parent=self,
+        )
         self.settings_page = SettingsPage(
             registry_service=self._registry_service,
             metadata_service=self._metadata_service,
             powerbi_service=self._powerbi_service,
             rule_service=self._rule_service,
+            refresh_service=self._refresh_service,
             parent=self,
         )
         self.history_page = HistoryPage(self)

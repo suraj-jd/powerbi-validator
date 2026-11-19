@@ -325,6 +325,16 @@ class AdvancedSettingsDialog(QDialog):
             form.addRow(self._make_label("Missing History Action:"), self.combo_missing)
 
         elif vtype == VALIDATION_TYPE_REFRESH:
+            self.combo_definition = QComboBox()
+            self.combo_definition.addItems([
+                "Latest Refresh Attempt",
+                "Latest Successful Refresh",
+                "Latest Completed Refresh",
+            ])
+            def_map = {"latest_attempt": 0, "latest_success": 1, "latest_completed": 2}
+            self.combo_definition.setCurrentIndex(def_map.get(self._config.get("definition", "latest_attempt"), 0))
+            form.addRow(self._make_label("Evaluation Target:"), self.combo_definition)
+
             self.combo_status = QComboBox()
             self.combo_status.addItems(["Completed", "Success", "Any Active"])
             s_idx = self.combo_status.findText(self._config.get("expected_status", "Completed"))
@@ -407,6 +417,8 @@ class AdvancedSettingsDialog(QDialog):
             cfg["missing_history_behavior"] = miss_keys[self.combo_missing.currentIndex()]
 
         elif vtype == VALIDATION_TYPE_REFRESH:
+            def_keys = ["latest_attempt", "latest_success", "latest_completed"]
+            cfg["definition"] = def_keys[self.combo_definition.currentIndex()]
             cfg["expected_status"] = self.combo_status.currentText()
             cfg["max_age_hours"] = self.spin_ref_age.value()
             cfg["max_duration_minutes"] = self.spin_ref_duration.value()

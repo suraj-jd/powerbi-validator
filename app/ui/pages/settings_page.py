@@ -19,12 +19,13 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.exceptions import PersistenceError, ValidationConfigError, format_safe_user_error
-from app.core.status import NotificationLevel
+from app.core.status import NotificationLevel, RefreshStatus
 from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata, PowerBIWorkspace
 from app.services.registry_service import RegistrationRecord, RegistryService
 from app.ui.dialogs.confirm_dialog import ConfirmDialog
 from app.ui.dialogs.import_registrations_dialog import ImportRegistrationsDialog
 from app.ui.dialogs.quick_add_workspaces_dialog import QuickAddWorkspacesDialog
+from app.ui.dialogs.refresh_details_dialog import RefreshDetailsDialog
 from app.ui.dialogs.registration_dialog import RegistrationDialog
 from app.ui.models.dict_table_model import ColumnSpec
 from app.ui.widgets.data_table import DataTableWidget
@@ -36,6 +37,7 @@ from app.ui.widgets.searchable_combo import SearchableComboBox
 if TYPE_CHECKING:
     from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
+    from app.services.refresh_service import RefreshService
     from app.services.rule_service import RuleService
 
 _REGISTRY_COLUMNS: list[ColumnSpec] = [
@@ -46,6 +48,7 @@ _REGISTRY_COLUMNS: list[ColumnSpec] = [
     ColumnSpec(key="dataset_name", header="Dataset Name"),
     ColumnSpec(key="dataset_id", header="Dataset ID"),
     ColumnSpec(key="access_status", header="Access Status"),
+    ColumnSpec(key="refresh_status", header="Latest Refresh"),
 ]
 
 
@@ -62,12 +65,14 @@ class SettingsPage(QWidget):
         metadata_service: MetadataService | None = None,
         powerbi_service: PowerBIService | None = None,
         rule_service: RuleService | None = None,
+        refresh_service: RefreshService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._registry = registry_service
         self._metadata_service = metadata_service
         self._powerbi_service = powerbi_service
+        self._refresh_service = refresh_service
         if rule_service is None and registry_service is not None and getattr(registry_service, "_db", None) is not None:
             from app.services.rule_service import RuleService as _RuleSvc
             rule_service = _RuleSvc(registry_service._db)
@@ -107,7 +112,7 @@ class SettingsPage(QWidget):
         title_col.addWidget(subtitle)
         header_row.addLayout(title_col, stretch=1)
 
-        badge = QLabel("Stage 7 — Rule Configuration Active")
+        badge = QLabel("Stage 8 — Refresh Monitoring Active")
         badge.setObjectName("StageBadge")
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header_row)
@@ -195,6 +200,12 @@ class SettingsPage(QWidget):
         self.verify_access_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.verify_access_button.clicked.connect(self._handle_verify_access)
         row_actions.addWidget(self.verify_access_button)
+
+        self.refresh_history_button = QPushButton("Refresh History...")
+        self.refresh_history_button.setObjectName("SecondaryButton")
+        self.refresh_history_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_history_button.clicked.connect(self._handle_refresh_history_clicked)
+        row_actions.addWidget(self.refresh_history_button)
 
         self.delete_button = QPushButton("Delete Selected")
         self.delete_button.setObjectName("DangerButton")
@@ -286,8 +297,21 @@ class SettingsPage(QWidget):
 
         records = self._registry.list_registrations()
         self._records = {r.id: r for r in records}
-        table_rows = [
-            {
+        table_rows = []
+        for r in records:
+            ref_status = "No History"
+            if self._refresh_service is not None:
+                latest_ref = self._refresh_service.get_latest_attempt(r.id)
+                if latest_ref is not None:
+                    status_str = latest_ref.status.value
+                    if latest_ref.status == RefreshStatus.IN_PROGRESS:
+                        ref_status = "In Progress"
+                    elif latest_ref.age_hours is not None:
+                        ref_status = f"{status_str} ({latest_ref.age_hours}h ago)"
+                    else:
+                        ref_status = status_str
+
+            table_rows.append({
                 "id": r.id,
                 "active": "Active" if r.is_active else "Inactive",
                 "workspace_name": r.workspace_name,
@@ -296,9 +320,8 @@ class SettingsPage(QWidget):
                 "dataset_name": r.dataset_name or "",
                 "dataset_id": r.dataset_id,
                 "access_status": self._access_status_by_id.get(r.id, "Not verified"),
-            }
-            for r in records
-        ]
+                "refresh_status": ref_status,
+            })
         self.registry_table.set_rows(table_rows)
 
         active_count = sum(1 for r in records if r.is_active)
@@ -599,6 +622,36 @@ class SettingsPage(QWidget):
             record.dataset_id,
             record.report_id or "",
         )
+
+    def _handle_refresh_history_clicked(self) -> None:
+        record = self.selected_registration()
+        if record is None:
+            self.registry_banner.show_message(
+                "Select a registration row to view its Power BI refresh history.",
+                level=NotificationLevel.INFO,
+                title="Selection Required",
+            )
+            return
+
+        if self._refresh_service is None:
+            self.registry_banner.show_message(
+                "Refresh monitoring service is not initialized.",
+                level=NotificationLevel.ERROR,
+                title="Service Unavailable",
+            )
+            return
+
+        ds_name = record.dataset_name or record.report_name
+        dialog = RefreshDetailsDialog(
+            workspace_registration_id=record.id,
+            workspace_id=record.workspace_id,
+            dataset_id=record.dataset_id,
+            registration_display_name=f"{ds_name} ({record.workspace_name})",
+            refresh_service=self._refresh_service,
+            parent=self,
+        )
+        dialog.exec()
+        self.refresh_registrations()
 
     def _handle_delete_clicked(self) -> None:
         if self._registry is None:

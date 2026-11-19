@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.status import RefreshStatus
 
 
 class PowerBIWorkspace(BaseModel):
@@ -58,6 +61,33 @@ class PowerBIReport(BaseModel):
     dataset_id: str | None = Field(default=None, alias="datasetId")
     web_url: str | None = Field(default=None, alias="webUrl")
     report_type: str | None = Field(default=None, alias="reportType")
+
+
+class PowerBIRefreshItem(BaseModel):
+    """Power BI dataset refresh item returned by GET /datasets/{id}/refreshes."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: int | str | None = None
+    refresh_type: str | None = Field(default=None, alias="refreshType")
+    start_time: str | None = Field(default=None, alias="startTime")
+    end_time: str | None = Field(default=None, alias="endTime")
+    status: str | None = None
+    service_exception_json: str | None = Field(default=None, alias="serviceExceptionJson")
+
+
+@dataclass(slots=True)
+class ParsedRefreshRecord:
+    """Normalized, timezone-aware Power BI refresh execution record (BRD Section 7)."""
+
+    refresh_id: str | None
+    status: RefreshStatus
+    start_time: datetime | None
+    end_time: datetime | None
+    duration_ms: int | None
+    refresh_type: str | None
+    error_details: str | None
+    raw_status: str
 
 
 @dataclass(slots=True)

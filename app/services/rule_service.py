@@ -263,9 +263,14 @@ def format_rule_conditions_summary(validation_type: str, config: dict[str, Any])
         if validation_type == VALIDATION_TYPE_REFRESH:
             expected = config.get("expected_status", "Completed")
             max_age = config.get("max_age_hours")
+            definition = config.get("definition", "latest_attempt")
             res = f"status = {expected}"
             if max_age:
                 res += f", age <= {max_age}h"
+            if definition == "latest_success":
+                res += " (latest success)"
+            elif definition == "latest_completed":
+                res += " (latest completed)"
             return res
 
     except Exception:

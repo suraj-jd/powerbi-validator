@@ -75,6 +75,22 @@ class WorkspaceRegistrationRepository:
             stmt = stmt.where(WorkspaceRegistration.report_id == norm_rpt)
         return self._session.scalars(stmt).first()
 
+    def find_by_workspace_and_dataset(
+        self,
+        workspace_id: str,
+        dataset_id: str,
+    ) -> WorkspaceRegistration | None:
+        stmt = (
+            select(WorkspaceRegistration)
+            .where(
+                WorkspaceRegistration.workspace_id == workspace_id.strip().lower(),
+                WorkspaceRegistration.dataset_id == dataset_id.strip().lower(),
+            )
+            .order_by(WorkspaceRegistration.id.asc())
+            .limit(1)
+        )
+        return self._session.scalars(stmt).first()
+
     def list_all(self) -> list[WorkspaceRegistration]:
         stmt = select(WorkspaceRegistration).order_by(WorkspaceRegistration.id.asc())
         return list(self._session.scalars(stmt).all())

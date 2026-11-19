@@ -74,6 +74,17 @@ class RegistryService:
             model = repo.get_by_id(registration_id)
             return RegistrationRecord.from_orm(model) if model is not None else None
 
+    def find_by_workspace_and_dataset(
+        self,
+        workspace_id: str,
+        dataset_id: str,
+    ) -> RegistrationRecord | None:
+        """Find an existing registration matching workspace and dataset IDs."""
+        with self._db.session_scope() as session:
+            repo = WorkspaceRegistrationRepository(session)
+            model = repo.find_by_workspace_and_dataset(workspace_id, dataset_id)
+            return RegistrationRecord.from_orm(model) if model is not None else None
+
     def create_registration(self, data: RegistrationInput) -> RegistrationRecord:
         validated, errors = validate_registration_fields(
             workspace_name=data.workspace_name,
