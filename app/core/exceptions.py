@@ -43,6 +43,14 @@ class PowerBIApiError(AppError):
     """Raised for Power BI REST or query execution errors (Stage 4+)."""
 
 
+class ConcurrentRunError(AppError):
+    """Raised when an execution run is triggered while another run is active for the same report."""
+
+
+class ExecutionCancelledError(AppError):
+    """Raised when an in-progress validation run is explicitly cancelled by the user."""
+
+
 def format_safe_user_error(exc: BaseException) -> str:
     """Return a user-safe, redacted error message suitable for UI banners."""
     if isinstance(exc, AppError):
