@@ -1,4 +1,4 @@
-"""Home / Dashboard page with authentication banner, access verifier, and refresh monitoring (Stage 8)."""
+"""Home / Dashboard page with authentication banner, access verifier, validation runner, and refresh monitoring (Stage 13)."""
 
 from __future__ import annotations
 
@@ -6,19 +6,24 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
+    QProgressBar,
     QPushButton,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from app.core.status import NotificationLevel, RefreshStatus
+from app.core.status import NotificationLevel, RefreshStatus, ValidationStatus
 from app.integrations.file_import import RegistrationInput
 from app.integrations.powerbi.models import (
     AccessVerificationResult,
@@ -27,16 +32,24 @@ from app.integrations.powerbi.models import (
     PowerBIWorkspace,
 )
 from app.ui.dialogs.refresh_details_dialog import RefreshDetailsDialog, make_status_pill
+from app.ui.dialogs.result_details_dialog import ResultDetailsDialog, make_validation_status_pill
 from app.ui.widgets.auth_banner import AuthBanner
 from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
+    from app.services.orchestrator_service import (
+        OrchestratorService,
+        ValidationResultDTO,
+        ValidationRunSummaryDTO,
+        ValidationWorker,
+    )
     from app.services.refresh_service import RefreshService
     from app.services.registry_service import RegistryService
+    from app.services.rule_service import RuleService
 
 
 class HomePage(QWidget):
-    """Dashboard page housing authentication banner, connectivity verifier, and refresh monitoring."""
+    """Dashboard page housing authentication banner, connectivity verifier, validation runner, and refresh monitoring."""
 
     load_workspaces_requested = Signal()
     load_workspace_assets_requested = Signal(str)
@@ -48,15 +61,22 @@ class HomePage(QWidget):
         *,
         refresh_service: RefreshService | None = None,
         registry_service: RegistryService | None = None,
+        orchestrator_service: OrchestratorService | None = None,
+        rule_service: RuleService | None = None,
     ) -> None:
         super().__init__(parent)
         self._refresh_service = refresh_service
         self._registry_service = registry_service
+        self._orchestrator_service = orchestrator_service
+        self._rule_service = rule_service
+        self._validation_worker: ValidationWorker | None = None
+        self._current_results: list[ValidationResultDTO] = []
         self._workspaces: list[PowerBIWorkspace] = []
         self._datasets: list[PowerBIDataset] = []
         self._reports: list[PowerBIReport] = []
         self._build_ui()
         self._connect_refresh_service()
+        self._connect_validation_service()
 
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
@@ -94,7 +114,7 @@ class HomePage(QWidget):
 
         header_row.addLayout(title_block, stretch=1)
 
-        badge = QLabel("Stage 8 — Refresh Monitoring Active")
+        badge = QLabel("Stage 13 — Health Dashboard Active")
         badge.setObjectName("StageBadge")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
@@ -182,6 +202,10 @@ class HomePage(QWidget):
         verify_layout.addWidget(self.verification_details_label)
 
         layout.addWidget(verify_card)
+
+        # Stage 13 Validation Results & Model Health Dashboard Card
+        self.validation_card = self._create_validation_dashboard_card(container)
+        layout.addWidget(self.validation_card)
 
         # Stage 8 Dataset Refresh Health & Monitoring Card
         self.refresh_card = self._create_refresh_monitoring_card(container)
@@ -611,3 +635,478 @@ class HomePage(QWidget):
         )
         dialog.exec()
         self._update_refresh_ui()
+
+    # =========================================================================
+    # Stage 13: Validation Execution & Health Dashboard Card
+    # =========================================================================
+
+    def _create_validation_dashboard_card(self, container: QWidget) -> QFrame:
+        card = QFrame(container)
+        card.setObjectName("Card")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(12)
+
+        # Header with Run Validation and Cancel buttons
+        card_header = QHBoxLayout()
+        section_title = QLabel("Semantic Model Validation & Health Check")
+        section_title.setObjectName("SectionTitle")
+        card_header.addWidget(section_title, stretch=1)
+
+        self.cancel_validation_button = QPushButton("✕ Cancel")
+        self.cancel_validation_button.setObjectName("SecondaryButton")
+        self.cancel_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_validation_button.clicked.connect(self._cancel_validation)
+        self.cancel_validation_button.hide()
+        card_header.addWidget(self.cancel_validation_button)
+
+        self.run_validation_button = QPushButton("▶  Run Validation")
+        self.run_validation_button.setObjectName("PrimaryButton")
+        self.run_validation_button.setStyleSheet(
+            "background-color: #1668DC; color: #FFFFFF; font-weight: 700; font-size: 13px; "
+            "padding: 8px 18px; border-radius: 6px;"
+        )
+        self.run_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.run_validation_button.clicked.connect(self._run_validation)
+        card_header.addWidget(self.run_validation_button)
+        layout.addLayout(card_header)
+
+        desc = QLabel(
+            "Execute all configured deterministic checks (nulls, duplicates, freshness, row count, refresh SLA) "
+            "and historical anomaly checks against the active semantic model."
+        )
+        desc.setObjectName("PageSubtitle")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # Progress bar & running status label
+        self.validation_progress_label = QLabel("Initializing validation...")
+        self.validation_progress_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #1668DC;")
+        self.validation_progress_label.hide()
+        layout.addWidget(self.validation_progress_label)
+
+        self.validation_progress_bar = QProgressBar()
+        self.validation_progress_bar.setRange(0, 100)
+        self.validation_progress_bar.setValue(0)
+        self.validation_progress_bar.setStyleSheet(
+            "QProgressBar { border: 1px solid #CBD5E1; border-radius: 4px; text-align: center; height: 16px; font-size: 10px; font-weight: 600; background: #F1F5F9; }"
+            "QProgressBar::chunk { background-color: #1668DC; border-radius: 3px; }"
+        )
+        self.validation_progress_bar.hide()
+        layout.addWidget(self.validation_progress_bar)
+
+        self.validation_banner = NotificationBanner(card)
+        layout.addWidget(self.validation_banner)
+
+        # 5 Summary KPI Cards Row
+        kpi_row = QHBoxLayout()
+        kpi_row.setSpacing(10)
+
+        # 1. Overall Status
+        card_ov = QFrame()
+        card_ov.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        lay_ov = QVBoxLayout(card_ov)
+        lay_ov.setContentsMargins(8, 8, 8, 8)
+        lay_ov.setSpacing(4)
+        lbl_ov_t = QLabel("OVERALL HEALTH")
+        lbl_ov_t.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lay_ov.addWidget(lbl_ov_t)
+
+        self.home_overall_pill_container = QWidget()
+        ov_p_lay = QHBoxLayout(self.home_overall_pill_container)
+        ov_p_lay.setContentsMargins(0, 0, 0, 0)
+        self.home_overall_pill = make_validation_status_pill("NOT RUN")
+        ov_p_lay.addWidget(self.home_overall_pill)
+        ov_p_lay.addStretch(1)
+        lay_ov.addWidget(self.home_overall_pill_container)
+
+        self.home_overall_timing = QLabel("Last Run: —")
+        self.home_overall_timing.setStyleSheet("color: #64748B; font-size: 11px;")
+        lay_ov.addWidget(self.home_overall_timing)
+        kpi_row.addWidget(card_ov, stretch=1)
+
+        # 2. Passed
+        card_pass = QFrame()
+        card_pass.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        lay_p = QVBoxLayout(card_pass)
+        lay_p.setContentsMargins(8, 8, 8, 8)
+        lay_p.setSpacing(4)
+        lbl_p_t = QLabel("PASSED CHECKS")
+        lbl_p_t.setStyleSheet("color: #166534; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lay_p.addWidget(lbl_p_t)
+        self.home_passed_count = QLabel("0")
+        self.home_passed_count.setStyleSheet("color: #166534; font-size: 20px; font-weight: 700;")
+        lay_p.addWidget(self.home_passed_count)
+        lbl_p_sub = QLabel("Within expected SLA")
+        lbl_p_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lay_p.addWidget(lbl_p_sub)
+        kpi_row.addWidget(card_pass, stretch=1)
+
+        # 3. Failed
+        card_fail = QFrame()
+        card_fail.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        lay_f = QVBoxLayout(card_fail)
+        lay_f.setContentsMargins(8, 8, 8, 8)
+        lay_f.setSpacing(4)
+        lbl_f_t = QLabel("FAILED CHECKS")
+        lbl_f_t.setStyleSheet("color: #991B1B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lay_f.addWidget(lbl_f_t)
+        self.home_failed_count = QLabel("0")
+        self.home_failed_count.setStyleSheet("color: #991B1B; font-size: 20px; font-weight: 700;")
+        lay_f.addWidget(self.home_failed_count)
+        lbl_f_sub = QLabel("Violations detected")
+        lbl_f_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lay_f.addWidget(lbl_f_sub)
+        kpi_row.addWidget(card_fail, stretch=1)
+
+        # 4. Warnings
+        card_warn = QFrame()
+        card_warn.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        lay_w = QVBoxLayout(card_warn)
+        lay_w.setContentsMargins(8, 8, 8, 8)
+        lay_w.setSpacing(4)
+        lbl_w_t = QLabel("WARNINGS / ANOMALIES")
+        lbl_w_t.setStyleSheet("color: #92400E; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lay_w.addWidget(lbl_w_t)
+        self.home_warning_count = QLabel("0")
+        self.home_warning_count.setStyleSheet("color: #92400E; font-size: 20px; font-weight: 700;")
+        lay_w.addWidget(self.home_warning_count)
+        lbl_w_sub = QLabel("Deviations or empty")
+        lbl_w_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lay_w.addWidget(lbl_w_sub)
+        kpi_row.addWidget(card_warn, stretch=1)
+
+        # 5. Errors
+        card_err = QFrame()
+        card_err.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        lay_e = QVBoxLayout(card_err)
+        lay_e.setContentsMargins(8, 8, 8, 8)
+        lay_e.setSpacing(4)
+        lbl_e_t = QLabel("EXECUTION ERRORS")
+        lbl_e_t.setStyleSheet("color: #6B21A8; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lay_e.addWidget(lbl_e_t)
+        self.home_error_count = QLabel("0")
+        self.home_error_count.setStyleSheet("color: #6B21A8; font-size: 20px; font-weight: 700;")
+        lay_e.addWidget(self.home_error_count)
+        lbl_e_sub = QLabel("Query or engine errors")
+        lbl_e_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lay_e.addWidget(lbl_e_sub)
+        kpi_row.addWidget(card_err, stretch=1)
+
+        layout.addLayout(kpi_row)
+
+        # Search & Filter row
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(10)
+
+        self.results_search_input = QLineEdit()
+        self.results_search_input.setObjectName("SearchInput")
+        self.results_search_input.setPlaceholderText("Filter checks by rule name, target, or outcome...")
+        self.results_search_input.textChanged.connect(lambda _: self._apply_results_filter())
+        filter_row.addWidget(self.results_search_input, stretch=1)
+
+        self.results_status_filter = QComboBox()
+        self.results_status_filter.setObjectName("FilterCombo")
+        self.results_status_filter.addItems([
+            "All Check Outcomes",
+            "Failed Only",
+            "Warnings Only",
+            "Errors Only",
+            "Passed Only",
+        ])
+        self.results_status_filter.currentIndexChanged.connect(lambda _: self._apply_results_filter())
+        filter_row.addWidget(self.results_status_filter)
+        layout.addLayout(filter_row)
+
+        # Detailed Results Table
+        self.results_table = QTableWidget()
+        self.results_table.setObjectName("DataTable")
+        self.results_table.setColumnCount(9)
+        self.results_table.setHorizontalHeaderLabels([
+            "Status",
+            "Rule Name",
+            "Target",
+            "Check Type",
+            "Actual Value",
+            "Expected Value",
+            "Deviation",
+            "Duration",
+            "Action",
+        ])
+        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.results_table.horizontalHeader().setStretchLastSection(False)
+        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.results_table.setAlternatingRowColors(True)
+        self.results_table.verticalHeader().setVisible(False)
+        self.results_table.setMinimumHeight(240)
+        self.results_table.cellDoubleClicked.connect(self._handle_table_double_clicked)
+        self.results_table.hide()
+        layout.addWidget(self.results_table)
+
+        self.empty_results_label = QLabel(
+            "No validation runs recorded for this dataset yet. Click 'Run Validation' above to execute checks."
+        )
+        self.empty_results_label.setStyleSheet(
+            "color: #64748B; font-size: 13px; font-style: italic; padding: 24px 0; qproperty-alignment: AlignCenter;"
+        )
+        layout.addWidget(self.empty_results_label)
+
+        return card
+
+    def _connect_validation_service(self) -> None:
+        self.dataset_id_input.textChanged.connect(lambda _: self._update_validation_ui())
+
+    def _update_validation_ui(self) -> None:
+        ws_id, ds_id, _ = self._get_active_workspace_and_dataset()
+        if not ws_id or not ds_id or self._orchestrator_service is None or self._registry_service is None:
+            self._reset_validation_ui()
+            return
+
+        existing = self._registry_service.find_by_workspace_and_dataset(ws_id, ds_id)
+        if existing is None:
+            self._reset_validation_ui()
+            return
+
+        latest_run = self._orchestrator_service.get_latest_run_for_registration(existing.id)
+        if latest_run is not None:
+            self._display_run_summary(latest_run)
+        else:
+            self._reset_validation_ui()
+
+    def _reset_validation_ui(self) -> None:
+        lbl_layout = self.home_overall_pill_container.layout()
+        if self.home_overall_pill is not None:
+            lbl_layout.removeWidget(self.home_overall_pill)
+            self.home_overall_pill.deleteLater()
+        self.home_overall_pill = make_validation_status_pill("NOT RUN")
+        lbl_layout.addWidget(self.home_overall_pill)
+        lbl_layout.addStretch(1)
+
+        self.home_overall_timing.setText("Last Run: —")
+        self.home_passed_count.setText("0")
+        self.home_failed_count.setText("0")
+        self.home_warning_count.setText("0")
+        self.home_error_count.setText("0")
+
+        self.results_table.setRowCount(0)
+        self.results_table.hide()
+        self.empty_results_label.show()
+        self._current_results = []
+
+    def _run_validation(self) -> None:
+        ws_id, ds_id, ds_name = self._get_active_workspace_and_dataset()
+        if not ws_id or not ds_id:
+            self.validation_banner.show_message(
+                "Please select or enter a valid Workspace ID and Dataset ID above first.",
+                level=NotificationLevel.WARNING,
+                title="Input Required",
+            )
+            return
+
+        if self._orchestrator_service is None:
+            self.validation_banner.show_message(
+                "Validation orchestrator service is not initialized.",
+                level=NotificationLevel.ERROR,
+                title="Service Unavailable",
+            )
+            return
+
+        reg_id = self._get_or_create_registration()
+        if reg_id is None:
+            return
+
+        if self._orchestrator_service.is_registration_running(reg_id):
+            self.validation_banner.show_message(
+                "A validation run is already executing for this dataset.",
+                level=NotificationLevel.WARNING,
+                title="Run In Progress",
+            )
+            return
+
+        from app.services.orchestrator_service import ValidationWorker
+
+        self.run_validation_button.setEnabled(False)
+        self.cancel_validation_button.show()
+        self.cancel_validation_button.setEnabled(True)
+        self.validation_progress_bar.show()
+        self.validation_progress_bar.setValue(0)
+        self.validation_progress_label.show()
+        self.validation_progress_label.setText("Preparing validation checks...")
+        self.validation_banner.hide()
+
+        self._validation_worker = ValidationWorker(
+            self._orchestrator_service,
+            reg_id,
+            workspace_id=ws_id,
+            dataset_id=ds_id,
+            parent=self,
+        )
+        self._validation_worker.progress.connect(self._on_validation_progress)
+        self._validation_worker.run_finished.connect(self._on_validation_finished)
+        self._validation_worker.error.connect(self._on_validation_error)
+        self._validation_worker.start()
+
+    def _cancel_validation(self) -> None:
+        if self._validation_worker:
+            self._validation_worker.cancel()
+            self.cancel_validation_button.setEnabled(False)
+            self.validation_progress_label.setText("Cancelling validation run...")
+
+    def _on_validation_progress(self, current: int, total: int, rule_name: str) -> None:
+        pct = int(((current - 1) / total) * 100) if total > 0 else 0
+        self.validation_progress_bar.setValue(pct)
+        self.validation_progress_label.setText(f"Evaluating {current} of {total}: {rule_name}...")
+
+    def _on_validation_finished(self, summary: Any) -> None:
+        self.run_validation_button.setEnabled(True)
+        self.cancel_validation_button.hide()
+        self.validation_progress_bar.setValue(100)
+        self.validation_progress_bar.hide()
+        self.validation_progress_label.hide()
+
+        self._display_run_summary(summary)
+
+        st = summary.overall_status
+        if st == ValidationStatus.PASS:
+            lvl = NotificationLevel.SUCCESS
+            ttl = "Validation Passed"
+        elif st == ValidationStatus.WARNING:
+            lvl = NotificationLevel.WARNING
+            ttl = "Validation Completed with Warnings"
+        else:
+            lvl = NotificationLevel.ERROR
+            ttl = "Validation Violations Detected"
+
+        msg = (
+            f"Validation completed in {summary.duration_display}: "
+            f"{summary.passed_count} passed, {summary.failed_count} failed, "
+            f"{summary.warning_count} warning(s), {summary.error_count} error(s)."
+        )
+        self.validation_banner.show_message(msg, level=lvl, title=ttl)
+
+    def _on_validation_error(self, err_msg: str) -> None:
+        self.run_validation_button.setEnabled(True)
+        self.cancel_validation_button.hide()
+        self.validation_progress_bar.hide()
+        self.validation_progress_label.hide()
+        self.validation_banner.show_message(
+            f"Validation execution aborted: {err_msg}",
+            level=NotificationLevel.ERROR,
+            title="Execution Failed",
+        )
+
+    def _display_run_summary(self, summary: Any) -> None:
+        lbl_layout = self.home_overall_pill_container.layout()
+        if self.home_overall_pill is not None:
+            lbl_layout.removeWidget(self.home_overall_pill)
+            self.home_overall_pill.deleteLater()
+        self.home_overall_pill = make_validation_status_pill(summary.overall_status)
+        lbl_layout.addWidget(self.home_overall_pill)
+        lbl_layout.addStretch(1)
+
+        self.home_overall_timing.setText(f"Run: {summary.duration_display} ({summary.started_at_display})")
+        self.home_passed_count.setText(str(summary.passed_count))
+        self.home_failed_count.setText(str(summary.failed_count))
+        self.home_warning_count.setText(str(summary.warning_count))
+        self.home_error_count.setText(str(summary.error_count))
+
+        self._populate_results_table(summary.results)
+
+    def _populate_results_table(self, results: list[Any]) -> None:
+        self._current_results = list(results)
+        if not results:
+            self.results_table.setRowCount(0)
+            self.results_table.hide()
+            self.empty_results_label.show()
+            return
+
+        self.empty_results_label.hide()
+        self.results_table.show()
+        self.results_table.setRowCount(len(results))
+
+        for row_idx, res in enumerate(results):
+            # 0: Status Pill
+            pill = make_validation_status_pill(res.status)
+            w = QWidget()
+            wl = QHBoxLayout(w)
+            wl.setContentsMargins(4, 2, 4, 2)
+            wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            wl.addWidget(pill)
+            self.results_table.setCellWidget(row_idx, 0, w)
+
+            # 1: Rule Name
+            item_name = QTableWidgetItem(res.rule_name)
+            item_name.setToolTip(res.result_summary)
+            self.results_table.setItem(row_idx, 1, item_name)
+
+            # 2: Target
+            self.results_table.setItem(row_idx, 2, QTableWidgetItem(res.target_display))
+
+            # 3: Check Type
+            self.results_table.setItem(row_idx, 3, QTableWidgetItem(res.validation_type))
+
+            # 4: Actual Value
+            self.results_table.setItem(row_idx, 4, QTableWidgetItem(res.actual_value or "—"))
+
+            # 5: Expected Value
+            self.results_table.setItem(row_idx, 5, QTableWidgetItem(res.expected_value or "—"))
+
+            # 6: Deviation
+            self.results_table.setItem(row_idx, 6, QTableWidgetItem(res.deviation or "None"))
+
+            # 7: Duration
+            self.results_table.setItem(row_idx, 7, QTableWidgetItem(f"{res.duration_ms} ms"))
+
+            # 8: Action button
+            btn_details = QPushButton("Details...")
+            btn_details.setObjectName("SecondaryButton")
+            btn_details.setStyleSheet(
+                "padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 4px;"
+            )
+            btn_details.setCursor(Qt.CursorShape.PointingHandCursor)
+            # Capture res in default argument of lambda
+            btn_details.clicked.connect(lambda _, r=res: self._open_result_details(r))
+            self.results_table.setCellWidget(row_idx, 8, btn_details)
+
+        self._apply_results_filter()
+
+    def _apply_results_filter(self) -> None:
+        query = self.results_search_input.text().strip().lower()
+        filter_mode = self.results_status_filter.currentIndex()
+
+        for row_idx in range(self.results_table.rowCount()):
+            if row_idx >= len(self._current_results):
+                continue
+            res = self._current_results[row_idx]
+
+            # Status filter
+            st_val = res.status.value.upper()
+            status_match = True
+            if filter_mode == 1 and st_val != "FAIL":
+                status_match = False
+            elif filter_mode == 2 and st_val != "WARNING":
+                status_match = False
+            elif filter_mode == 3 and st_val != "ERROR":
+                status_match = False
+            elif filter_mode == 4 and st_val != "PASS":
+                status_match = False
+
+            # Query filter
+            query_match = True
+            if query:
+                text_blob = f"{res.rule_name} {res.target_display} {res.validation_type} {res.result_summary} {res.actual_value} {res.deviation}".lower()
+                query_match = query in text_blob
+
+            self.results_table.setRowHidden(row_idx, not (status_match and query_match))
+
+    def _handle_table_double_clicked(self, row: int, _col: int) -> None:
+        if 0 <= row < len(self._current_results):
+            self._open_result_details(self._current_results[row])
+
+    def _open_result_details(self, result: Any) -> None:
+        dialog = ResultDetailsDialog(result, parent=self)
+        dialog.exec()
+

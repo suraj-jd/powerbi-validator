@@ -30,6 +30,7 @@ from app.integrations.powerbi.refresh_client import RefreshClient
 from app.services.auth_service import AuthService
 from app.services.dax_service import DaxQueryService
 from app.services.metadata_service import MetadataService
+from app.services.orchestrator_service import OrchestratorService
 from app.services.powerbi_service import PowerBIService
 from app.services.refresh_service import RefreshService
 from app.services.registry_service import RegistryService
@@ -129,6 +130,12 @@ def bootstrap_application(
     refresh_service = RefreshService(db=db, refresh_client=refresh_client)
     dax_client = DaxQueryClient(rest_client=powerbi_service.rest_client)
     dax_service = DaxQueryService(dax_client=dax_client)
+    orchestrator_service = OrchestratorService(
+        db=db,
+        rule_service=rule_service,
+        dax_client=dax_client,
+        refresh_service=refresh_service,
+    )
 
     window = MainWindow(
         config=config,
@@ -142,6 +149,7 @@ def bootstrap_application(
         rule_service=rule_service,
         refresh_service=refresh_service,
         dax_service=dax_service,
+        orchestrator_service=orchestrator_service,
     )
 
     if config_warning:
