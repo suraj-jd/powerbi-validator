@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -64,6 +65,42 @@ class NumericTableWidgetItem(QTableWidgetItem):
                 except (ValueError, TypeError):
                     return str(v1) < str(v2)
         return super().__lt__(other)
+
+
+def make_status_table_item(status: ValidationStatus | str | None) -> NumericTableWidgetItem:
+    """Create a crisp, bold, colorful table item for validation status (no widget shrink)."""
+    if not status:
+        item = NumericTableWidgetItem("—")
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        item.setForeground(QColor("#94A3B8"))
+        item.setData(Qt.ItemDataRole.UserRole, "")
+        return item
+
+    st_val = status.value if isinstance(status, ValidationStatus) else str(status).upper()
+    item = NumericTableWidgetItem(st_val)
+    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+    font = item.font()
+    font.setBold(True)
+    font.setPointSize(10)
+    item.setFont(font)
+    item.setData(Qt.ItemDataRole.UserRole, st_val)
+
+    if st_val == "PASS":
+        item.setForeground(QColor("#15803D"))
+        item.setBackground(QColor("#DCFCE7"))
+    elif st_val == "FAIL":
+        item.setForeground(QColor("#B91C1C"))
+        item.setBackground(QColor("#FEE2E2"))
+    elif st_val == "WARNING":
+        item.setForeground(QColor("#B45309"))
+        item.setBackground(QColor("#FEF3C7"))
+    elif st_val == "ERROR":
+        item.setForeground(QColor("#7E22CE"))
+        item.setBackground(QColor("#F3E8FF"))
+    else:
+        item.setForeground(QColor("#475569"))
+        item.setBackground(QColor("#F1F5F9"))
+    return item
 
 
 class HistoryPage(QWidget):
@@ -460,19 +497,9 @@ class HistoryPage(QWidget):
                 item_dur.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.runs_table.setItem(row_idx, 2, item_dur)
 
-                # Col 3: Overall Status Pill
-                item_st = NumericTableWidgetItem("")
-                item_st.setForeground(Qt.GlobalColor.transparent)
-                item_st.setData(Qt.ItemDataRole.UserRole, run.overall_status.value)
+                # Col 3: Overall Status
+                item_st = make_status_table_item(run.overall_status)
                 self.runs_table.setItem(row_idx, 3, item_st)
-
-                pill = make_validation_status_pill(run.overall_status)
-                w = QWidget()
-                wl = QHBoxLayout(w)
-                wl.setContentsMargins(0, 0, 0, 0)
-                wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                wl.addWidget(pill)
-                self.runs_table.setCellWidget(row_idx, 3, w)
 
                 # Col 4: Passed
                 item_p = NumericTableWidgetItem(str(run.passed_count))
@@ -556,19 +583,10 @@ class HistoryPage(QWidget):
             self.results_table.show()
 
             for r_idx, res in enumerate(run.results):
-                # Col 0: Status Pill
-                item_st = NumericTableWidgetItem("")
-                item_st.setForeground(Qt.GlobalColor.transparent)
+                # Col 0: Status
+                item_st = make_status_table_item(res.status)
                 item_st.setData(Qt.ItemDataRole.UserRole, res.id)
                 self.results_table.setItem(r_idx, 0, item_st)
-
-                pill = make_validation_status_pill(res.status)
-                w = QWidget()
-                wl = QHBoxLayout(w)
-                wl.setContentsMargins(0, 0, 0, 0)
-                wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                wl.addWidget(pill)
-                self.results_table.setCellWidget(r_idx, 0, w)
 
                 # Col 1: Rule Name
                 item_rn = QTableWidgetItem(res.rule_name)

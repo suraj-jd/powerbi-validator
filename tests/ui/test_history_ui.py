@@ -91,11 +91,13 @@ def test_history_page_renders_runs_and_drawer(qtbot):
     assert page.results_table.rowCount() == 1
     assert page.results_table.item(0, 1).text() == "Sales Null Check"
 
-    # Verify no ghost text is rendered behind status pills in either table
-    assert page.runs_table.item(0, 3).text() == ""
-    assert page.runs_table.cellWidget(0, 3) is not None
-    assert page.results_table.item(0, 0).text() == ""
-    assert page.results_table.cellWidget(0, 0) is not None
+    # Verify status items render bold colorful text without cell widgets
+    assert page.runs_table.item(0, 3).text() == "FAIL"
+    assert page.runs_table.item(0, 3).font().bold() is True
+    assert page.runs_table.cellWidget(0, 3) is None
+    assert page.results_table.item(0, 0).text() == "FAIL"
+    assert page.results_table.item(0, 0).font().bold() is True
+    assert page.results_table.cellWidget(0, 0) is None
 
 
 def test_history_page_filtering(qtbot):
