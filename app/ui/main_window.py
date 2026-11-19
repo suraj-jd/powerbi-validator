@@ -34,6 +34,7 @@ from app.ui.pages.about_page import AboutPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.home_page import HomePage
 from app.ui.pages.settings_page import SettingsPage
+from app.ui.pages.sheet_settings_page import SheetSettingsPage
 from app.ui.theme import make_nav_icon
 from app.ui.widgets.notification_banner import NotificationBanner
 
@@ -155,6 +156,13 @@ class MainWindow(QMainWindow):
             rule_service=self._rule_service,
             parent=self,
         )
+        self.sheet_settings_page = SheetSettingsPage(
+            db=self._db,
+            registry_service=self._registry_service,
+            rule_service=self._rule_service,
+            powerbi_service=self._powerbi_service,
+            parent=self,
+        )
         self.settings_page = SettingsPage(
             registry_service=self._registry_service,
             metadata_service=self._metadata_service,
@@ -180,6 +188,7 @@ class MainWindow(QMainWindow):
         )
 
         self._register_page("home", "Home", self.home_page)
+        self._register_page("sheet_settings", "Validation Sheet", self.sheet_settings_page)
         self._register_page("settings", "Settings", self.settings_page)
         self._register_page("history", "History", self.history_page)
         self._register_page("about", "About", self.about_page)
@@ -316,6 +325,9 @@ class MainWindow(QMainWindow):
         self.home_page.verify_access_requested.connect(self._handle_verify_access_requested)
         self.settings_page.verify_registration_requested.connect(
             self._handle_verify_registration_requested
+        )
+        self.sheet_settings_page.sync_workspaces_requested.connect(
+            self._powerbi_service.list_workspaces_async
         )
 
         self._powerbi_service.busy_changed.connect(self.home_page.set_connectivity_busy)

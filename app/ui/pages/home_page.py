@@ -193,8 +193,11 @@ class HomePage(QWidget):
 
         self.workspace_combo = QComboBox(container)
         self.workspace_combo.hide()
+        self.workspace_combo.currentIndexChanged.connect(self._on_workspace_selected)
+
         self.dataset_combo = QComboBox(container)
         self.dataset_combo.hide()
+        self.dataset_combo.currentIndexChanged.connect(self._on_dataset_selected)
 
         self.load_workspaces_button = QPushButton("Load My Workspaces", container)
         self.load_workspaces_button.hide()

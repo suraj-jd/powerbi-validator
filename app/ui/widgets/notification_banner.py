@@ -77,6 +77,9 @@ class NotificationBanner(QFrame):
     def current_message(self) -> str:
         return self._current_message
 
+    def text(self) -> str:
+        return self._current_message
+
     def post_message(
         self,
         message: str,
