@@ -7,6 +7,9 @@ msal>=1.31.0,<2.0.0
 httpx>=0.28.0,<1.0.0
 openpyxl>=3.1.5,<4.0.0
 
+# Packaging & distribution (Stage 15)
+pyinstaller>=6.10.0
+
 # Development & testing
 pytest>=8.3.0
 pytest-qt>=4.4.0
