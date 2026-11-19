@@ -132,8 +132,8 @@ def test_sheet_settings_page_add_and_save_flow(qtbot, db: DatabaseManager, sampl
     # 2. Configure row widgets
     tbl_input = page.sheet_table.cellWidget(0, 5)
     col_input = page.sheet_table.cellWidget(0, 6)
-    assert isinstance(tbl_input, QLineEdit)
-    assert isinstance(col_input, QLineEdit)
+    assert isinstance(tbl_input, (QLineEdit, QComboBox))
+    assert isinstance(col_input, (QLineEdit, QComboBox))
 
     tbl_input.setText("Orders")
     col_input.setText("OrderID")
@@ -363,6 +363,122 @@ def test_import_sheet_dialog_demo_table_and_file_selection(qtbot, tmp_path: Path
 
     assert dialog.import_button.isEnabled()
     assert str(csv_file) in dialog.file_path_input.text()
+
+
+def test_sheet_settings_page_auto_save(qtbot, db: DatabaseManager, sample_registration: int) -> None:
+    page = SheetSettingsPage(db=db)
+    qtbot.addWidget(page)
+    page.show()
+
+    # Verify auto-save timer and status label
+    assert hasattr(page, "lbl_auto_save")
+    assert "Auto-save active (1 min)" in page.lbl_auto_save.text()
+    assert hasattr(page, "_auto_save_timer")
+    assert page._auto_save_timer.isActive()
+    assert page._auto_save_timer.interval() == 60_000
+
+    # Click Add Row
+    qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
+    assert page.sheet_table.rowCount() == 1
+    assert page._is_dirty is True
+    assert "Unsaved changes" in page.lbl_auto_save.text()
+
+    # Fill in required fields
+    tbl_input = page.sheet_table.cellWidget(0, 5)
+    col_input = page.sheet_table.cellWidget(0, 6)
+    tbl_input.setText("Orders")
+    col_input.setText("OrderID")
+
+    # Trigger auto-save handler directly
+    page._handle_auto_save()
+
+    assert page._is_dirty is False
+    assert "Auto-saved at" in page.lbl_auto_save.text()
+
+    # Verify saved to database
+    sheet_service = SheetService(db=db)
+    rows = sheet_service.load_sheet_rows()
+    assert len(rows) == 1
+    assert rows[0].table_name == "Orders"
+    assert rows[0].column_name == "OrderID"
+
+
+def test_sheet_settings_cascading_metadata_dropdowns(qtbot, db: DatabaseManager) -> None:
+    from unittest.mock import MagicMock
+    from app.integrations.powerbi.models import (
+        DatasetMetadata,
+        PowerBIDataset,
+        PowerBIWorkspace,
+        SemanticColumnMetadata,
+        SemanticMeasureMetadata,
+        SemanticTableMetadata,
+    )
+    from app.services.metadata_service import MetadataService
+
+    meta = DatasetMetadata(
+        dataset_id=DS_ID,
+        workspace_id=WS_ID,
+        tables=[
+            SemanticTableMetadata(
+                name="Customers",
+                columns=[SemanticColumnMetadata(name="CustomerID"), SemanticColumnMetadata(name="CustomerName")],
+            ),
+            SemanticTableMetadata(
+                name="Orders",
+                columns=[SemanticColumnMetadata(name="OrderID"), SemanticColumnMetadata(name="OrderAmount")],
+            ),
+        ],
+        measures=[
+            SemanticMeasureMetadata(name="Total Revenue"),
+        ],
+    )
+
+    mock_meta_svc = MagicMock(spec=MetadataService)
+    mock_meta_svc.is_busy = False
+    mock_meta_svc.get_cached_metadata.return_value = meta
+
+    mock_pbi = MagicMock(spec=PowerBIService)
+    mock_pbi.is_busy = False
+    mock_pbi.cached_workspaces = [PowerBIWorkspace(id=WS_ID, name="Finance WS")]
+    mock_pbi.get_cached_datasets.return_value = [PowerBIDataset(id=DS_ID, name="Finance Dataset")]
+    mock_pbi.get_cached_reports.return_value = []
+
+    page = SheetSettingsPage(db=db, powerbi_service=mock_pbi, metadata_service=mock_meta_svc)
+    qtbot.addWidget(page)
+    page.show()
+
+    # Add row
+    qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
+    assert page.sheet_table.rowCount() == 1
+
+    tbl_combo = page.sheet_table.cellWidget(0, 5)
+    col_combo = page.sheet_table.cellWidget(0, 6)
+    test_combo = page.sheet_table.cellWidget(0, 4)
+
+    # Tables should be populated from metadata
+    assert tbl_combo.count() == 2
+    assert tbl_combo.itemText(0) == "Customers"
+    assert tbl_combo.itemText(1) == "Orders"
+
+    # Select "Orders" table
+    tbl_combo.setCurrentIndex(1)
+    assert tbl_combo.currentText() == "Orders"
+
+    # Cascading: Columns should now be populated with Orders columns
+    assert col_combo.count() == 2
+    assert col_combo.itemText(0) == "OrderID"
+    assert col_combo.itemText(1) == "OrderAmount"
+
+    # Switch test to DAX Measure Check
+    idx_dax = next(i for i in range(test_combo.count()) if test_combo.itemData(i) == VALIDATION_TYPE_DAX_MEASURE)
+    test_combo.setCurrentIndex(idx_dax)
+
+    # Table combo disabled for DAX measure
+    assert not tbl_combo.isEnabled()
+    # Column/Measure combo should now be populated with discovered measures
+    assert col_combo.count() == 1
+    assert col_combo.itemText(0) == "[Total Revenue]"
+
 
 
 

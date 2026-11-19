@@ -8,11 +8,12 @@ gear configuration.
 from __future__ import annotations
 
 import csv
+from datetime import datetime
 import logging
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -35,7 +36,13 @@ from PySide6.QtWidgets import (
 from app.core.exceptions import format_safe_user_error
 from app.core.status import NotificationLevel
 from app.database.db import DatabaseManager
-from app.integrations.powerbi.models import PowerBIDataset, PowerBIReport, PowerBIWorkspace
+from app.integrations.powerbi.models import (
+    DatasetMetadata,
+    PowerBIDataset,
+    PowerBIReport,
+    PowerBIWorkspace,
+)
+from app.services.metadata_service import MetadataService
 from app.services.powerbi_service import PowerBIService
 from app.services.registry_service import RegistrationRecord, RegistryService
 from app.services.rule_service import (
@@ -57,7 +64,7 @@ from app.services.sheet_service import (
 )
 from app.ui.dialogs.sheet_rule_config_dialog import SheetRuleConfigDialog
 from app.ui.theme import CHEVRON_ACTIVE_PATH, CHEVRON_DOWN_PATH
-from app.ui.widgets.animated_combo import AnimatedComboBox
+from app.ui.widgets.animated_combo import AnimatedComboBox, EditableCellCombo
 from app.ui.widgets.notification_banner import NotificationBanner
 from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 
@@ -77,6 +84,7 @@ class SheetSettingsPage(QWidget):
         registry_service: RegistryService | None = None,
         rule_service: RuleService | None = None,
         powerbi_service: PowerBIService | None = None,
+        metadata_service: MetadataService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -93,6 +101,7 @@ class SheetSettingsPage(QWidget):
             else None
         )
         self._powerbi_service = powerbi_service
+        self._metadata_service = metadata_service
 
         self._cached_workspaces: list[PowerBIWorkspace] = []
         self._cached_assets: dict[str, tuple[list[PowerBIDataset], list[PowerBIReport]]] = {}
@@ -101,11 +110,38 @@ class SheetSettingsPage(QWidget):
 
         self._init_ui()
         self._connect_powerbi_service()
+        self._connect_metadata_service()
+        self._init_auto_save()
         self.reload_sheet()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self.reload_sheet()
+
+    def closeEvent(self, event) -> None:
+        if hasattr(self, "_auto_save_timer") and self._auto_save_timer.isActive():
+            self._auto_save_timer.stop()
+        super().closeEvent(event)
+
+    def _init_auto_save(self) -> None:
+        self._auto_save_timer = QTimer(self)
+        self._auto_save_timer.setInterval(60_000)  # Auto-save every 1 minute
+        self._auto_save_timer.timeout.connect(self._handle_auto_save)
+        self._auto_save_timer.start()
+
+    def _mark_dirty(self) -> None:
+        self._is_dirty = True
+        if hasattr(self, "lbl_auto_save"):
+            self.lbl_auto_save.setStyleSheet("font-size: 11px; font-weight: 600; color: #D97706; margin-left: 8px;")
+            self.lbl_auto_save.setText("● Unsaved changes (auto-saving in 1 min)")
+
+    def _mark_clean(self, msg: str | None = None) -> None:
+        self._is_dirty = False
+        if hasattr(self, "lbl_auto_save"):
+            now_str = datetime.now().strftime("%H:%M:%S")
+            text = msg or f"✓ Saved at {now_str}"
+            self.lbl_auto_save.setStyleSheet("font-size: 11px; font-weight: 600; color: #059669; margin-left: 8px;")
+            self.lbl_auto_save.setText(text)
 
     # =========================================================================
     # UI Construction
@@ -327,7 +363,7 @@ class SheetSettingsPage(QWidget):
             "} "
             "QComboBox#SheetCellCombo { "
             "  combobox-popup: 0; "
-            "  border: 1px solid #E2E8F0; "
+            "  border: 1px solid #CBD5E1; "
             "  border-radius: 4px; "
             "  background-color: #FFFFFF; "
             "  padding: 2px 20px 2px 7px; "
@@ -342,6 +378,23 @@ class SheetSettingsPage(QWidget):
             "QComboBox#SheetCellCombo:focus { "
             "  border: 1.5px solid #1668DC; "
             "  background-color: #FFFFFF; "
+            "} "
+            "QComboBox#SheetCellCombo:disabled { "
+            "  background-color: #F8FAFC; "
+            "  color: #94A3B8; "
+            "  border-color: #E2E8F0; "
+            "} "
+            "QComboBox#SheetCellCombo QLineEdit { "
+            "  border: none; "
+            "  background: transparent; "
+            "  padding: 0px; "
+            "  margin: 0px; "
+            "  font-size: 12px; "
+            "  color: #0F172A; "
+            "} "
+            "QComboBox#SheetCellCombo:disabled QLineEdit { "
+            "  color: #94A3B8; "
+            "  font-style: italic; "
             "} "
             "QComboBox#SheetCellCombo::drop-down { "
             "  subcontrol-origin: padding; "
@@ -416,6 +469,10 @@ class SheetSettingsPage(QWidget):
         self.lbl_row_stats.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
         bar.addWidget(self.lbl_row_stats)
 
+        self.lbl_auto_save = QLabel("✓ Auto-save active (1 min)")
+        self.lbl_auto_save.setStyleSheet("font-size: 11px; font-weight: 600; color: #059669; margin-left: 8px;")
+        bar.addWidget(self.lbl_auto_save)
+
         bar.addStretch(1)
 
         hint = QLabel("💡 Tip: Click the ⚙️ gear button to customize allowed blanks, freshness SLA, deviation %, or baselines.")
@@ -469,7 +526,7 @@ class SheetSettingsPage(QWidget):
         chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         chk = QCheckBox()
         chk.setChecked(dto.enabled)
-        chk.toggled.connect(lambda state, r=dto: setattr(r, "enabled", state))
+        chk.toggled.connect(lambda state, r=dto: self._on_row_enabled_changed(state, r))
         chk_layout.addWidget(chk)
         self.sheet_table.setCellWidget(row_idx, 1, chk_widget)
 
@@ -490,14 +547,6 @@ class SheetSettingsPage(QWidget):
         )
         self.sheet_table.setCellWidget(row_idx, 3, ds_combo)
 
-        # Connect Workspace change to cascade into Report/Dataset combo
-        ws_combo.currentIndexChanged.connect(
-            lambda _, w=ws_combo, d=ds_combo, r=dto: self._on_row_workspace_changed(w, d, r)
-        )
-        ds_combo.currentIndexChanged.connect(
-            lambda _, d=ds_combo, r=dto: self._on_row_dataset_changed(d, r)
-        )
-
         # Col 4: Test to Do Dropdown
         test_combo = AnimatedComboBox()
         test_combo.setObjectName("SheetCellCombo")
@@ -511,24 +560,30 @@ class SheetSettingsPage(QWidget):
         test_combo.setCurrentIndex(cur_test_idx)
         self.sheet_table.setCellWidget(row_idx, 4, test_combo)
 
-        # Col 5: Table Name input
-        tbl_input = QLineEdit()
-        tbl_input.setObjectName("SheetCellInput")
-        tbl_input.setText(dto.table_name or "")
-        tbl_input.setPlaceholderText("e.g. Sales")
-        tbl_input.textChanged.connect(lambda txt, r=dto: setattr(r, "table_name", txt.strip() or None))
-        self.sheet_table.setCellWidget(row_idx, 5, tbl_input)
-
-        # Col 6: Column or Measure input
-        col_input = QLineEdit()
-        col_input.setObjectName("SheetCellInput")
-        val = dto.measure_name if dto.measure_name else (dto.column_name or "")
-        col_input.setText(val)
-        col_input.setPlaceholderText("Column or [Measure]")
-        col_input.textChanged.connect(
-            lambda txt, r=dto: self._on_col_measure_changed(txt, r)
+        # Col 5: Table Name Dropdown
+        tbl_combo = EditableCellCombo()
+        tbl_combo.setObjectName("SheetCellCombo")
+        self._populate_table_combo(
+            tbl_combo,
+            workspace_id=dto.workspace_id,
+            dataset_id=dto.dataset_id,
+            selected_tbl=dto.table_name,
         )
-        self.sheet_table.setCellWidget(row_idx, 6, col_input)
+        self.sheet_table.setCellWidget(row_idx, 5, tbl_combo)
+
+        # Col 6: Column or Measure Dropdown
+        col_combo = EditableCellCombo()
+        col_combo.setObjectName("SheetCellCombo")
+        selected_target = dto.measure_name if dto.measure_name else (dto.column_name or "")
+        self._populate_column_measure_combo(
+            col_combo,
+            workspace_id=dto.workspace_id,
+            dataset_id=dto.dataset_id,
+            table_name=dto.table_name,
+            selected_val=selected_target,
+            validation_type=dto.validation_type,
+        )
+        self.sheet_table.setCellWidget(row_idx, 6, col_combo)
 
         # Col 7: ⚙️ Gear Rule Configuration Button
         btn_gear = QPushButton(f"⚙️  {dto.conditions_summary}")
@@ -549,17 +604,194 @@ class SheetSettingsPage(QWidget):
 
         self.sheet_table.setRowHeight(row_idx, 32)
 
-        # Connect test combo change to toggle field states
+        # Connect cascading signals
+        ws_combo.currentIndexChanged.connect(
+            lambda _, w=ws_combo, d=ds_combo, t=tbl_combo, c=col_combo, r=dto: self._on_row_workspace_changed(
+                w, d, t, c, r
+            )
+        )
+        ds_combo.currentIndexChanged.connect(
+            lambda _, d=ds_combo, t=tbl_combo, c=col_combo, r=dto: self._on_row_dataset_changed(
+                d, r, t, c
+            )
+        )
+        tbl_combo.currentTextChanged.connect(
+            lambda txt, r=dto, cc=col_combo: self._on_row_table_changed(txt, r, cc)
+        )
+        col_combo.currentTextChanged.connect(
+            lambda txt, r=dto: self._on_row_column_measure_changed(txt, r)
+        )
         test_combo.currentIndexChanged.connect(
-            lambda _, tc=test_combo, ti=tbl_input, ci=col_input, bg=btn_gear, r=dto: self._on_test_type_changed(
+            lambda _, tc=test_combo, ti=tbl_combo, ci=col_combo, bg=btn_gear, r=dto: self._on_test_type_changed(
                 tc, ti, ci, bg, r
             )
         )
-        self._apply_test_type_rules(test_combo.currentData(), tbl_input, col_input)
+        self._apply_test_type_rules(test_combo.currentData(), tbl_combo, col_combo)
 
     # =========================================================================
     # Cascading Dropdowns & Control Handlers
     # =========================================================================
+
+    def _connect_metadata_service(self) -> None:
+        if self._metadata_service is not None:
+            self._metadata_service.metadata_loaded.connect(self._on_metadata_loaded)
+            self._metadata_service.metadata_failed.connect(self._on_metadata_failed)
+
+    def _on_metadata_loaded(self, metadata: DatasetMetadata) -> None:
+        """Repopulate table and column/measure dropdowns once background discovery finishes."""
+        for row_idx in range(self.sheet_table.rowCount()):
+            if row_idx < len(self._rows):
+                dto = self._rows[row_idx]
+                ws_match = (
+                    not dto.workspace_id
+                    or dto.workspace_id.lower() == metadata.workspace_id.lower()
+                    or metadata.workspace_id == "my_workspace"
+                )
+                ds_match = (
+                    not dto.dataset_id
+                    or dto.dataset_id.lower() == metadata.dataset_id.lower()
+                )
+                if ws_match and ds_match:
+                    tbl_combo = self.sheet_table.cellWidget(row_idx, 5)
+                    col_combo = self.sheet_table.cellWidget(row_idx, 6)
+                    if isinstance(tbl_combo, EditableCellCombo):
+                        self._populate_table_combo(
+                            tbl_combo,
+                            workspace_id=dto.workspace_id,
+                            dataset_id=dto.dataset_id,
+                            selected_tbl=dto.table_name or tbl_combo.text(),
+                        )
+                    if isinstance(col_combo, EditableCellCombo):
+                        self._populate_column_measure_combo(
+                            col_combo,
+                            workspace_id=dto.workspace_id,
+                            dataset_id=dto.dataset_id,
+                            table_name=dto.table_name or (tbl_combo.text() if isinstance(tbl_combo, EditableCellCombo) else None),
+                            selected_val=dto.measure_name or dto.column_name or col_combo.text(),
+                            validation_type=dto.validation_type,
+                        )
+
+    def _on_metadata_failed(self, dataset_id: str, error_msg: str) -> None:
+        logger.debug("Metadata discovery notice for dataset %s: %s", dataset_id, error_msg)
+
+    def _populate_table_combo(
+        self,
+        combo: EditableCellCombo,
+        *,
+        workspace_id: str,
+        dataset_id: str,
+        selected_tbl: str | None = None,
+    ) -> None:
+        combo.blockSignals(True)
+        current_val = selected_tbl if selected_tbl is not None else combo.text()
+        combo.clear()
+
+        table_names: list[str] = []
+        if self._metadata_service is not None and dataset_id:
+            meta = self._metadata_service.get_cached_metadata(workspace_id, dataset_id)
+            if meta is not None and meta.table_names:
+                table_names = list(meta.table_names)
+            elif not meta and not self._metadata_service.is_busy:
+                self._metadata_service.fetch_metadata_async(workspace_id, dataset_id)
+
+        for tbl_name in table_names:
+            combo.addItem(tbl_name, tbl_name)
+
+        if current_val:
+            idx = combo.findText(current_val)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+            else:
+                combo.setCurrentIndex(-1)
+                combo.setEditText(current_val)
+        else:
+            combo.setCurrentIndex(-1)
+            combo.setEditText("")
+
+        combo.setPlaceholderText("Table, e.g. Sales")
+        combo.blockSignals(False)
+
+    def _populate_column_measure_combo(
+        self,
+        combo: EditableCellCombo,
+        *,
+        workspace_id: str,
+        dataset_id: str,
+        table_name: str | None,
+        selected_val: str | None = None,
+        validation_type: str = VALIDATION_TYPE_NULL,
+    ) -> None:
+        combo.blockSignals(True)
+        current_val = selected_val if selected_val is not None else combo.text()
+        combo.clear()
+
+        if validation_type == VALIDATION_TYPE_REFRESH:
+            combo.setCurrentIndex(-1)
+            combo.setEditText("")
+            combo.setPlaceholderText("— (Model SLA)")
+            combo.blockSignals(False)
+            return
+
+        if validation_type == VALIDATION_TYPE_DAX_MEASURE:
+            combo.setPlaceholderText("Measure, e.g. [Total Sales]")
+            measure_names: list[str] = []
+            if self._metadata_service is not None and dataset_id:
+                meta = self._metadata_service.get_cached_metadata(workspace_id, dataset_id)
+                if meta is not None and meta.measure_names:
+                    measure_names = list(meta.measure_names)
+                elif not meta and not self._metadata_service.is_busy:
+                    self._metadata_service.fetch_metadata_async(workspace_id, dataset_id)
+
+            for m in measure_names:
+                display = f"[{m}]"
+                combo.addItem(display, m)
+
+            if current_val:
+                bare = current_val.strip("[]")
+                bracketed = f"[{bare}]"
+                idx = combo.findText(bracketed)
+                if idx < 0:
+                    idx = combo.findText(bare)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+                else:
+                    combo.setCurrentIndex(-1)
+                    combo.setEditText(current_val)
+            else:
+                combo.setCurrentIndex(-1)
+                combo.setEditText("")
+        else:
+            combo.setPlaceholderText("Column, e.g. Amount")
+            column_names: list[str] = []
+            if self._metadata_service is not None and dataset_id and table_name:
+                meta = self._metadata_service.get_cached_metadata(workspace_id, dataset_id)
+                if meta is not None:
+                    tbl = meta.get_table(table_name)
+                    if tbl is not None and tbl.column_names:
+                        column_names = list(tbl.column_names)
+                elif not meta and not self._metadata_service.is_busy:
+                    self._metadata_service.fetch_metadata_async(workspace_id, dataset_id)
+
+            for col in column_names:
+                combo.addItem(col, col)
+
+            if current_val:
+                idx = combo.findText(current_val)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+                else:
+                    combo.setCurrentIndex(-1)
+                    combo.setEditText(current_val)
+            else:
+                combo.setCurrentIndex(-1)
+                combo.setEditText("")
+
+        combo.blockSignals(False)
+
+    def _on_row_enabled_changed(self, state: bool, dto: SheetRowDTO) -> None:
+        dto.enabled = state
+        self._mark_dirty()
+        self._update_stats_label()
 
     def _populate_workspace_combo(
         self,
@@ -663,29 +895,97 @@ class SheetSettingsPage(QWidget):
         combo.setCurrentIndex(select_idx)
         combo.blockSignals(False)
 
-    def _on_row_workspace_changed(self, ws_combo: QComboBox, ds_combo: QComboBox, dto: SheetRowDTO) -> None:
+    def _on_row_workspace_changed(
+        self,
+        ws_combo: QComboBox,
+        ds_combo: QComboBox,
+        tbl_combo: EditableCellCombo,
+        col_combo: EditableCellCombo,
+        dto: SheetRowDTO,
+    ) -> None:
         ws_id = str(ws_combo.currentData() or "")
         ws_name = ws_combo.currentText().split(" (")[0]
-        dto.workspace_id = ws_id
-        dto.workspace_name = ws_name
+        if dto.workspace_id != ws_id:
+            dto.workspace_id = ws_id
+            dto.workspace_name = ws_name
+            self._mark_dirty()
 
-        # Cascade update dataset dropdown
-        self._populate_dataset_combo(ds_combo, workspace_id=ws_id)
-        self._on_row_dataset_changed(ds_combo, dto)
+            # Cascade update dataset dropdown
+            self._populate_dataset_combo(ds_combo, workspace_id=ws_id)
+            self._on_row_dataset_changed(ds_combo, dto, tbl_combo, col_combo)
 
-        # Trigger async fetch if assets not yet cached
-        ws_key = ws_id.lower() if ws_id else ""
-        if ws_key and ws_key not in self._cached_assets and self._powerbi_service is not None:
-            self._powerbi_service.list_workspace_assets_async(ws_id)
+            # Trigger async fetch if assets not yet cached
+            ws_key = ws_id.lower() if ws_id else ""
+            if ws_key and ws_key not in self._cached_assets and self._powerbi_service is not None:
+                self._powerbi_service.list_workspace_assets_async(ws_id)
 
-    def _on_row_dataset_changed(self, ds_combo: QComboBox, dto: SheetRowDTO) -> None:
+    def _on_row_dataset_changed(
+        self,
+        ds_combo: QComboBox,
+        dto: SheetRowDTO,
+        tbl_combo: EditableCellCombo | None = None,
+        col_combo: EditableCellCombo | None = None,
+    ) -> None:
         data = ds_combo.currentData()
         if isinstance(data, tuple) and len(data) >= 3:
             ds_id, rpt_name, rpt_id = data
-            dto.dataset_id = ds_id
-            dto.report_name = rpt_name
-            dto.dataset_name = rpt_name
-            dto.report_id = rpt_id or None
+            if dto.dataset_id != ds_id:
+                dto.dataset_id = ds_id
+                dto.report_name = rpt_name
+                dto.dataset_name = rpt_name
+                dto.report_id = rpt_id or None
+                self._mark_dirty()
+
+                # Refresh table & column combos for this row if provided
+                if tbl_combo is not None:
+                    self._populate_table_combo(
+                        tbl_combo,
+                        workspace_id=dto.workspace_id,
+                        dataset_id=dto.dataset_id,
+                        selected_tbl="",
+                    )
+                if col_combo is not None:
+                    self._populate_column_measure_combo(
+                        col_combo,
+                        workspace_id=dto.workspace_id,
+                        dataset_id=dto.dataset_id,
+                        table_name=dto.table_name,
+                        selected_val="",
+                        validation_type=dto.validation_type,
+                    )
+
+                # Trigger async fetch if metadata not yet cached
+                if self._metadata_service is not None and dto.workspace_id and dto.dataset_id:
+                    meta = self._metadata_service.get_cached_metadata(dto.workspace_id, dto.dataset_id)
+                    if meta is None and not self._metadata_service.is_busy:
+                        self._metadata_service.fetch_metadata_async(dto.workspace_id, dto.dataset_id)
+
+    def _on_row_table_changed(
+        self,
+        txt: str,
+        dto: SheetRowDTO,
+        col_combo: EditableCellCombo,
+    ) -> None:
+        tbl_name = txt.strip() or None
+        if dto.table_name != tbl_name:
+            dto.table_name = tbl_name
+            self._mark_dirty()
+            # Cascade into column combo
+            self._populate_column_measure_combo(
+                col_combo,
+                workspace_id=dto.workspace_id,
+                dataset_id=dto.dataset_id,
+                table_name=tbl_name,
+                selected_val=col_combo.text(),
+                validation_type=dto.validation_type,
+            )
+
+    def _on_row_column_measure_changed(self, txt: str, dto: SheetRowDTO) -> None:
+        old_col = dto.column_name
+        old_meas = dto.measure_name
+        self._on_col_measure_changed(txt, dto)
+        if dto.column_name != old_col or dto.measure_name != old_meas:
+            self._mark_dirty()
 
     def _on_col_measure_changed(self, txt: str, dto: SheetRowDTO) -> None:
         raw = txt.strip()
@@ -699,41 +999,60 @@ class SheetSettingsPage(QWidget):
     def _on_test_type_changed(
         self,
         test_combo: QComboBox,
-        tbl_input: QLineEdit,
-        col_input: QLineEdit,
+        tbl_combo: QWidget,
+        col_combo: QWidget,
         btn_gear: QPushButton,
         dto: SheetRowDTO,
     ) -> None:
         new_vtype = str(test_combo.currentData() or VALIDATION_TYPE_NULL)
-        dto.validation_type = new_vtype
-        self._apply_test_type_rules(new_vtype, tbl_input, col_input)
+        if dto.validation_type != new_vtype:
+            dto.validation_type = new_vtype
+            self._mark_dirty()
 
-        # Provide friendly default config if type was switched
-        if new_vtype == VALIDATION_TYPE_REFRESH and "expected_status" not in dto.config:
-            dto.config = {"expected_status": "Completed", "max_age_hours": 24}
-        elif new_vtype == VALIDATION_TYPE_NULL and "allowed_blank_count" not in dto.config:
-            dto.config = {"allowed_blank_count": 0, "include_empty_string": True}
-        elif new_vtype == VALIDATION_TYPE_DUPLICATE and "allowed_duplicate_count" not in dto.config:
-            dto.config = {"allowed_duplicate_count": 0}
+            self._apply_test_type_rules(new_vtype, tbl_combo, col_combo)
 
-        btn_gear.setText(f"⚙️  {dto.conditions_summary}")
+            if isinstance(col_combo, EditableCellCombo):
+                self._populate_column_measure_combo(
+                    col_combo,
+                    workspace_id=dto.workspace_id,
+                    dataset_id=dto.dataset_id,
+                    table_name=dto.table_name,
+                    selected_val=dto.measure_name or dto.column_name or col_combo.text(),
+                    validation_type=new_vtype,
+                )
 
-    def _apply_test_type_rules(self, vtype: str, tbl_input: QLineEdit, col_input: QLineEdit) -> None:
+            # Provide friendly default config if type was switched
+            if new_vtype == VALIDATION_TYPE_REFRESH and "expected_status" not in dto.config:
+                dto.config = {"expected_status": "Completed", "max_age_hours": 24}
+            elif new_vtype == VALIDATION_TYPE_NULL and "allowed_blank_count" not in dto.config:
+                dto.config = {"allowed_blank_count": 0, "include_empty_string": True}
+            elif new_vtype == VALIDATION_TYPE_DUPLICATE and "allowed_duplicate_count" not in dto.config:
+                dto.config = {"allowed_duplicate_count": 0}
+
+            btn_gear.setText(f"⚙️  {dto.conditions_summary}")
+
+    def _apply_test_type_rules(self, vtype: str, tbl_input: QWidget, col_input: QWidget) -> None:
         if vtype == VALIDATION_TYPE_REFRESH:
             tbl_input.setEnabled(False)
-            tbl_input.setPlaceholderText("— (Model SLA)")
+            if hasattr(tbl_input, "setPlaceholderText"):
+                tbl_input.setPlaceholderText("— (Model SLA)")
             col_input.setEnabled(False)
-            col_input.setPlaceholderText("— (Model SLA)")
+            if hasattr(col_input, "setPlaceholderText"):
+                col_input.setPlaceholderText("— (Model SLA)")
         elif vtype == VALIDATION_TYPE_DAX_MEASURE:
             tbl_input.setEnabled(False)
-            tbl_input.setPlaceholderText("— (DAX Measure)")
+            if hasattr(tbl_input, "setPlaceholderText"):
+                tbl_input.setPlaceholderText("— (DAX Measure)")
             col_input.setEnabled(True)
-            col_input.setPlaceholderText("Measure, e.g. [Sales]")
+            if hasattr(col_input, "setPlaceholderText"):
+                col_input.setPlaceholderText("Measure, e.g. [Sales]")
         else:
             tbl_input.setEnabled(True)
-            tbl_input.setPlaceholderText("Table, e.g. Sales")
+            if hasattr(tbl_input, "setPlaceholderText"):
+                tbl_input.setPlaceholderText("Table, e.g. Sales")
             col_input.setEnabled(True)
-            col_input.setPlaceholderText("Column, e.g. Amount")
+            if hasattr(col_input, "setPlaceholderText"):
+                col_input.setPlaceholderText("Column, e.g. Amount")
 
     def _open_gear_dialog(self, btn_gear: QPushButton, dto: SheetRowDTO) -> None:
         dialog = SheetRuleConfigDialog(
@@ -748,6 +1067,7 @@ class SheetSettingsPage(QWidget):
             if dialog.rule_name:
                 dto.rule_name = dialog.rule_name
             btn_gear.setText(f"⚙️  {dto.conditions_summary}")
+            self._mark_dirty()
             self.banner.show_message(
                 f"Updated conditions for row #{dto.sr_no}: {dto.conditions_summary}",
                 level=NotificationLevel.INFO,
@@ -812,6 +1132,7 @@ class SheetSettingsPage(QWidget):
         self._render_row_cells(new_row_idx, new_dto)
         self.sheet_table.scrollToBottom()
         self._update_stats_label()
+        self._mark_dirty()
 
         self.banner.show_message(
             f"Added new validation row #{new_row_idx + 1}. Configure your test and click 'Save Sheet'.",
@@ -852,6 +1173,7 @@ class SheetSettingsPage(QWidget):
         self.sheet_table.removeRow(row_idx)
         self._renumber_sr_column()
         self._update_stats_label()
+        self._mark_dirty()
 
         self.banner.show_message(
             "Row removed from validation sheet.",
@@ -867,24 +1189,8 @@ class SheetSettingsPage(QWidget):
             if idx < len(self._rows):
                 self._rows[idx].sr_no = idx + 1
 
-    def _handle_save_sheet(self) -> None:
-        if self._sheet_service is None:
-            self.banner.show_message(
-                "Sheet storage service is not initialized.",
-                level=NotificationLevel.ERROR,
-                title="Service Error",
-            )
-            return
-
-        if not self._rows:
-            self.banner.show_message(
-                "The sheet is currently empty. Click '➕ Add Row' to define your first test.",
-                level=NotificationLevel.WARNING,
-                title="Empty Sheet",
-            )
-            return
-
-        # Sync values from table cell widgets into DTOs before saving
+    def _sync_widgets_to_rows(self) -> None:
+        """Sync values from table cell widgets into in-memory DTOs."""
         for idx in range(self.sheet_table.rowCount()):
             if idx < len(self._rows):
                 r = self._rows[idx]
@@ -903,10 +1209,68 @@ class SheetSettingsPage(QWidget):
                         r.report_name = d_data[1]
                         r.dataset_name = d_data[1]
                         r.report_id = d_data[2] or None
-                if isinstance(tbl_input, QLineEdit):
-                    r.table_name = tbl_input.text().strip() or None
-                if isinstance(col_input, QLineEdit):
-                    self._on_col_measure_changed(col_input.text(), r)
+                if isinstance(tbl_input, (QLineEdit, QComboBox)):
+                    tbl_val = (
+                        tbl_input.currentText().strip()
+                        if isinstance(tbl_input, QComboBox)
+                        else tbl_input.text().strip()
+                    )
+                    r.table_name = tbl_val or None
+                if isinstance(col_input, (QLineEdit, QComboBox)):
+                    col_val = (
+                        col_input.currentText().strip()
+                        if isinstance(col_input, QComboBox)
+                        else col_input.text().strip()
+                    )
+                    self._on_col_measure_changed(col_val, r)
+
+    def _handle_auto_save(self) -> None:
+        """Periodic background auto-save (runs every 1 minute) to persist changes safely."""
+        if not self._is_dirty or not self._rows or self._sheet_service is None:
+            return
+
+        self._sync_widgets_to_rows()
+
+        # Check if rows are configured enough to be persisted
+        for r in self._rows:
+            if not r.workspace_id or not r.dataset_id:
+                return
+            if r.validation_type != VALIDATION_TYPE_REFRESH:
+                if r.validation_type == VALIDATION_TYPE_DAX_MEASURE and not r.measure_name:
+                    return
+                elif r.validation_type != VALIDATION_TYPE_DAX_MEASURE and not r.table_name:
+                    return
+                if r.validation_type in (VALIDATION_TYPE_NULL, VALIDATION_TYPE_DUPLICATE, VALIDATION_TYPE_LATEST_DATE) and not r.column_name:
+                    return
+
+        try:
+            saved_rows = self._sheet_service.save_all_rows(self._rows)
+            for idx, s_row in enumerate(saved_rows):
+                if idx < len(self._rows):
+                    self._rows[idx].row_id = s_row.row_id
+            self._mark_clean(f"✓ Auto-saved at {datetime.now().strftime('%H:%M:%S')}")
+            logger.info("Auto-saved %d sheet row(s) successfully.", len(saved_rows))
+        except Exception as exc:
+            logger.warning("Auto-save attempt skipped due to error: %s", exc)
+
+    def _handle_save_sheet(self) -> None:
+        if self._sheet_service is None:
+            self.banner.show_message(
+                "Sheet storage service is not initialized.",
+                level=NotificationLevel.ERROR,
+                title="Service Error",
+            )
+            return
+
+        if not self._rows:
+            self.banner.show_message(
+                "The sheet is currently empty. Click '➕ Add Row' to define your first test.",
+                level=NotificationLevel.WARNING,
+                title="Empty Sheet",
+            )
+            return
+
+        self._sync_widgets_to_rows()
 
         # Validate rows before saving
         for idx, r in enumerate(self._rows, start=1):
@@ -947,6 +1311,7 @@ class SheetSettingsPage(QWidget):
             saved_rows = self._sheet_service.save_all_rows(self._rows)
             self._rows = saved_rows
             self.reload_sheet()
+            self._mark_clean()
             self.banner.show_message(
                 f"Successfully saved {len(saved_rows)} validation test row(s) to Power BI tool database!",
                 level=NotificationLevel.SUCCESS,

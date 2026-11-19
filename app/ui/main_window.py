@@ -164,6 +164,7 @@ class MainWindow(QMainWindow):
             registry_service=self._registry_service,
             rule_service=self._rule_service,
             powerbi_service=self._powerbi_service,
+            metadata_service=self._metadata_service,
             parent=self,
         )
         self.history_page = HistoryPage(

@@ -53,6 +53,8 @@ class AnimatedComboBox(QComboBox):
 
     def showPopup(self) -> None:
         """Open the popup menu with a smooth slide-and-fade animation."""
+        if self.count() == 0:
+            return
         super().showPopup()
         popup = self.view().window()
         if popup is None:
@@ -94,3 +96,31 @@ class AnimatedComboBox(QComboBox):
         if self._anim_group is not None and self._anim_group.state() == QParallelAnimationGroup.State.Running:
             self._anim_group.stop()
         super().hidePopup()
+
+
+class EditableCellCombo(AnimatedComboBox):
+    """Editable cell dropdown supporting discovered options and custom typed values."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        line_edit = self.lineEdit()
+        if line_edit is not None:
+            line_edit.setObjectName("SheetCellInput")
+
+    def setText(self, text: str) -> None:
+        self.setEditText(text)
+
+    def text(self) -> str:
+        return self.currentText().strip()
+
+    def setPlaceholderText(self, text: str) -> None:
+        line_edit = self.lineEdit()
+        if line_edit is not None:
+            line_edit.setPlaceholderText(text)
+
+    def placeholderText(self) -> str:
+        line_edit = self.lineEdit()
+        return line_edit.placeholderText() if line_edit is not None else ""
+
