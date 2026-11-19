@@ -29,6 +29,9 @@ def test_safe_dax_identifiers_and_queries() -> None:
     assert escape_measure_name("Total Sales") == "[Total Sales]"
     assert escape_measure_name("[Total Sales]") == "[Total Sales]"
     assert escape_measure_name("  Margin %  ") == "[Margin %]"
+    assert escape_measure_name("Sales[Total Sales]") == "'Sales'[Total Sales]"
+    assert escape_measure_name("'Sales'[Total Sales]") == "'Sales'[Total Sales]"
+    assert escape_measure_name("Total Sales", "Sales") == "'Sales'[Total Sales]"
     with pytest.raises(ValueError):
         escape_measure_name("")
 
@@ -42,6 +45,9 @@ def test_safe_dax_identifiers_and_queries() -> None:
 
     # 3. Column reference
     assert escape_column_reference("Amount", "Sales") == "'Sales'[Amount]"
+    assert escape_column_reference("[Amount]", "Sales") == "'Sales'[Amount]"
+    assert escape_column_reference("Sales[Amount]") == "'Sales'[Amount]"
+    assert escape_column_reference("'Sales'[Amount]") == "'Sales'[Amount]"
     assert escape_column_reference("Amount") == "[Amount]"
 
     # 4. Measure query construction
@@ -213,3 +219,51 @@ def test_xmla_adomd_connector_stub() -> None:
     res = xmla.execute_query(WS_ID, DS_ID, "EVALUATE ...")
     assert res.is_success is False
     assert res.error_code == "XMLA_NOT_CONFIGURED"
+
+
+def test_dax_query_client_with_real_powerbi_rest_client() -> None:
+    import httpx
+    from app.integrations.powerbi.rest_client import PowerBIRestClient
+
+    captured_requests = []
+
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        captured_requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "tables": [
+                            {
+                                "rows": [{"[RowCount]": 42}]
+                            }
+                        ]
+                    }
+                ]
+            },
+        )
+
+    real_rest = PowerBIRestClient(
+        token_provider=lambda: "test_token_123",
+        transport=httpx.MockTransport(mock_handler),
+    )
+
+    try:
+        # Verify PowerBIRestClient has 'post' and 'get' methods
+        assert hasattr(real_rest, "post")
+        assert hasattr(real_rest, "get")
+
+        client = DaxQueryClient(rest_client=real_rest)
+
+        # Execute DAX query - must succeed without AttributeError on 'post'
+        res = client.execute_raw_dax(WS_ID, DS_ID, 'EVALUATE ROW("RowCount", COUNTROWS(\'Sales\'))')
+        assert res.is_success is True
+        assert res.scalar_value == 42
+        assert len(captured_requests) == 1
+        assert captured_requests[0].method == "POST"
+        assert f"/groups/{WS_ID}/datasets/{DS_ID}/executeQueries" in str(captured_requests[0].url)
+        assert captured_requests[0].headers["Authorization"] == "Bearer test_token_123"
+    finally:
+        real_rest.close()
+

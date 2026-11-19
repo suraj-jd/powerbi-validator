@@ -127,3 +127,39 @@ def test_rest_client_maps_timeout_to_friendly_error() -> None:
         assert "timed out" in exc_info.value.user_message.lower()
     finally:
         client.close()
+
+
+def test_rest_client_post_and_get_methods() -> None:
+    captured = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        if request.method == "POST":
+            return httpx.Response(200, json={"status": "created", "id": 101})
+        return httpx.Response(200, json={"status": "ok"})
+
+    client = PowerBIRestClient(
+        token_provider=lambda: "auth_token_xyz",
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        # 1. Test client.post
+        resp_post = client.post("/items", json={"name": "test_item"}, timeout=15)
+        assert isinstance(resp_post, httpx.Response)
+        assert resp_post.status_code == 200
+        assert resp_post.json() == {"status": "created", "id": 101}
+        assert captured[0].method == "POST"
+        assert captured[0].headers["Authorization"] == "Bearer auth_token_xyz"
+
+        # 2. Test client.get
+        resp_get = client.get("/items/101")
+        assert isinstance(resp_get, httpx.Response)
+        assert resp_get.status_code == 200
+        assert resp_get.json() == {"status": "ok"}
+        assert captured[1].method == "GET"
+
+        # 3. Test client.post_json
+        json_res = client.post_json("/items", json_body={"name": "json_item"})
+        assert json_res == {"status": "created", "id": 101}
+    finally:
+        client.close()

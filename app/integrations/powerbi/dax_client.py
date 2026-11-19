@@ -19,15 +19,23 @@ from app.integrations.powerbi.workspace_client import MY_WORKSPACE_ID
 logger = logging.getLogger(__name__)
 
 
-def escape_measure_name(name: str) -> str:
-    """Safely format a measure name into standard bracketed DAX identifier syntax [Measure]."""
+def escape_measure_name(name: str, table_name: str | None = None) -> str:
+    """Safely format a measure name into standard bracketed DAX identifier syntax [Measure] or 'Table'[Measure]."""
     clean = name.strip()
     if not clean:
         raise ValueError("Measure name cannot be empty.")
-    if clean.startswith("[") and clean.endswith("]"):
-        clean = clean[1:-1].strip()
-    # Replace internal closing brackets to avoid syntax escapes
-    clean = clean.replace("]", "")
+
+    m = re.match(r"^(?:'([^']+)'|([a-zA-Z0-9_\s]+))?\[([^\]]+)\]$", clean)
+    if m:
+        tbl = m.group(1) or m.group(2) or table_name
+        meas = m.group(3).strip()
+        if tbl and tbl.strip():
+            return f"{escape_table_name(tbl)}[{meas}]"
+        return f"[{meas}]"
+
+    clean = clean.strip("[]'\"").strip()
+    if table_name and table_name.strip():
+        return f"{escape_table_name(table_name)}[{clean}]"
     return f"[{clean}]"
 
 
@@ -36,7 +44,7 @@ def escape_table_name(name: str) -> str:
     clean = name.strip()
     if not clean:
         raise ValueError("Table name cannot be empty.")
-    if clean.startswith("'") and clean.endswith("'"):
+    if clean.startswith("'") and clean.endswith("'") and len(clean) >= 2:
         clean = clean[1:-1].strip()
     clean = clean.replace("'", "''")
     return f"'{clean}'"
@@ -44,11 +52,22 @@ def escape_table_name(name: str) -> str:
 
 def escape_column_reference(column_name: str, table_name: str | None = None) -> str:
     """Safely format a column reference into 'Table'[Column] or [Column]."""
-    col = escape_measure_name(column_name)
+    clean = column_name.strip()
+    if not clean:
+        raise ValueError("Column name cannot be empty.")
+
+    m = re.match(r"^(?:'([^']+)'|([a-zA-Z0-9_\s]+))?\[([^\]]+)\]$", clean)
+    if m:
+        tbl = m.group(1) or m.group(2) or table_name
+        col = m.group(3).strip()
+        if tbl and tbl.strip():
+            return f"{escape_table_name(tbl)}[{col}]"
+        return f"[{col}]"
+
+    clean_col = clean.strip("[]'\"").strip()
     if table_name and table_name.strip():
-        tbl = escape_table_name(table_name)
-        return f"{tbl}{col}"
-    return col
+        return f"{escape_table_name(table_name)}[{clean_col}]"
+    return f"[{clean_col}]"
 
 
 def build_measure_query(measure_name: str, filter_context: str | None = None) -> str:
@@ -200,9 +219,15 @@ class RestExecuteQueriesConnector(DaxConnectorInterface):
 
         t_start = time.perf_counter()
         try:
-            resp = self._rest.post(endpoint, json=payload, timeout=timeout_seconds)
-            duration_ms = int((time.perf_counter() - t_start) * 1000)
-            data = resp.json()
+            if hasattr(self._rest, "post"):
+                resp = self._rest.post(endpoint, json=payload, timeout=timeout_seconds)
+                duration_ms = int((time.perf_counter() - t_start) * 1000)
+                data = resp.json() if hasattr(resp, "json") else resp
+            elif hasattr(self._rest, "post_json"):
+                data = self._rest.post_json(endpoint, json_body=payload, timeout=timeout_seconds)
+                duration_ms = int((time.perf_counter() - t_start) * 1000)
+            else:
+                raise AttributeError("PowerBIRestClient has neither 'post' nor 'post_json' method.")
             return self._parse_api_response(data, duration_ms, query)
         except PowerBIHttpError as exc:
             duration_ms = int((time.perf_counter() - t_start) * 1000)

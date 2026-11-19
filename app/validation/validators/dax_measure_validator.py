@@ -50,7 +50,7 @@ class DaxMeasureValidator(BaseValidator):
         allowed_dev_pct = float(cfg.get("allowed_deviation_pct", 5.0))
         allowed_dev_abs = float(cfg["allowed_deviation_abs"]) if "allowed_deviation_abs" in cfg and cfg["allowed_deviation_abs"] is not None else None
 
-        clean_measure = escape_measure_name(rule.measure_name)
+        clean_measure = escape_measure_name(rule.measure_name, rule.table_name)
         query = build_measure_query(clean_measure, filter_context=filter_context)
 
         dax_res = dax_client.execute_raw_dax(workspace_id, dataset_id, query)

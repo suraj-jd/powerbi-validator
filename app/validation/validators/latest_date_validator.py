@@ -152,9 +152,18 @@ class LatestDateValidator(BaseValidator):
             )
 
         first_row = rows[0]
-        total_rows = int(first_row.get("[TotalRows]") or first_row.get("TotalRows") or 0)
-        raw_latest = first_row.get("[LatestDate]") if "[LatestDate]" in first_row else first_row.get("LatestDate")
-        raw_earliest = first_row.get("[EarliestDate]") if "[EarliestDate]" in first_row else first_row.get("EarliestDate")
+        def _get_val(keys: list[str]) -> Any:
+            for k in keys:
+                if k in first_row and first_row[k] is not None:
+                    return first_row[k]
+                for rk, rv in first_row.items():
+                    if rk.strip().strip("[]").lower() == k.strip().strip("[]").lower() and rv is not None:
+                        return rv
+            return None
+
+        total_rows = int(_get_val(["[TotalRows]", "TotalRows"]) or 0)
+        raw_latest = _get_val(["[LatestDate]", "LatestDate"])
+        raw_earliest = _get_val(["[EarliestDate]", "EarliestDate"])
 
         if total_rows == 0 or raw_latest is None:
             return CheckEvaluationResult(

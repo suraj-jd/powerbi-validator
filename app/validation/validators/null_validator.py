@@ -108,9 +108,17 @@ class NullValidator(BaseValidator):
             )
 
         first_row = rows[0]
-        # Keys from ROW(...) are usually "[TotalRows]" and "[BlankCount]"
-        total_rows = int(first_row.get("[TotalRows]") or first_row.get("TotalRows") or 0)
-        blank_count = int(first_row.get("[BlankCount]") or first_row.get("BlankCount") or 0)
+        def _get_val(keys: list[str]) -> Any:
+            for k in keys:
+                if k in first_row and first_row[k] is not None:
+                    return first_row[k]
+                for rk, rv in first_row.items():
+                    if rk.strip().strip("[]").lower() == k.strip().strip("[]").lower() and rv is not None:
+                        return rv
+            return None
+
+        total_rows = int(_get_val(["[TotalRows]", "TotalRows"]) or 0)
+        blank_count = int(_get_val(["[BlankCount]", "BlankCount"]) or 0)
 
         blank_pct = round((blank_count / total_rows * 100.0), 2) if total_rows > 0 else 0.0
 

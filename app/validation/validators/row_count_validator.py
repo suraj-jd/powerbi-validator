@@ -88,7 +88,14 @@ class RowCountValidator(BaseValidator):
             )
 
         first_row = rows[0]
-        actual_count = int(first_row.get("[RowCount]") or first_row.get("RowCount") or 0)
+        raw_val = first_row.get("[RowCount]")
+        if raw_val is None:
+            raw_val = first_row.get("RowCount")
+        if raw_val is None and dax_res.scalar_value is not None:
+            raw_val = dax_res.scalar_value
+        if raw_val is None and first_row:
+            raw_val = next(iter(first_row.values()))
+        actual_count = int(raw_val or 0)
         actual_str = f"{actual_count:,} rows"
 
         # Mode A: Range / Min-Max check

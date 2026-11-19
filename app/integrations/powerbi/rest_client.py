@@ -97,31 +97,26 @@ class PowerBIRestClient:
         """Close the underlying HTTP connection pool."""
         self._client.close()
 
-    def get_json(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Issue an authenticated GET request and return parsed JSON."""
-        return self._request_json("GET", path, params=params)
-
-    def post_json(
-        self,
-        path: str,
-        *,
-        json_body: dict[str, Any] | None = None,
-        params: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Issue an authenticated POST request and return parsed JSON."""
-        return self._request_json("POST", path, params=params, json_body=json_body)
-
-    def _request_json(
+    def request(
         self,
         method: str,
         path: str,
         *,
         params: dict[str, Any] | None = None,
-        json_body: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        json: Any = None,
+        json_body: Any = None,
+        timeout: float | httpx.Timeout | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """Issue an authenticated HTTP request with retries, 429 throttling backoff, and error mapping."""
         normalized_path = path if path.startswith("/") else f"/{path}"
         token = self._token_provider()
-        headers = {"Authorization": f"Bearer {token}"}
+        req_headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        if headers:
+            req_headers.update(headers)
+
+        body = json if json is not None else json_body
+        req_timeout = httpx.Timeout(timeout) if isinstance(timeout, (int, float)) else (timeout or self._timeout)
 
         attempt = 0
         while True:
@@ -131,8 +126,9 @@ class PowerBIRestClient:
                     method,
                     normalized_path,
                     params=params,
-                    json=json_body,
-                    headers=headers,
+                    json=body,
+                    headers=req_headers,
+                    timeout=req_timeout,
                 )
             except httpx.TimeoutException as exc:
                 raise PowerBIHttpError(
@@ -178,20 +174,100 @@ class PowerBIRestClient:
                 )
 
             if 200 <= status < 300:
-                if not response.content:
-                    return {}
-                try:
-                    data = response.json()
-                    return data if isinstance(data, dict) else {"value": data}
-                except ValueError as exc:
-                    raise PowerBIHttpError(
-                        f"Power BI API returned non-JSON payload for {normalized_path}.",
-                        status_code=status,
-                        user_message="Power BI Service returned an unexpected response format.",
-                    ) from exc
+                return response
 
             error_code, detail = _extract_pbi_error_detail(response)
             raise self._map_http_error(status, normalized_path, error_code, detail)
+
+    def post(
+        self,
+        path: str,
+        *,
+        json: Any = None,
+        json_body: Any = None,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> httpx.Response:
+        """Issue an authenticated POST request and return the raw httpx.Response."""
+        body = json if json is not None else json_body
+        return self.request("POST", path, json=body, params=params, timeout=timeout)
+
+    def get(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> httpx.Response:
+        """Issue an authenticated GET request and return the raw httpx.Response."""
+        return self.request("GET", path, params=params, timeout=timeout)
+
+    def get_json(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        """Issue an authenticated GET request and return parsed JSON."""
+        resp = self.get(path, params=params, timeout=timeout)
+        if not resp.content:
+            return {}
+        try:
+            data = resp.json()
+            return data if isinstance(data, dict) else {"value": data}
+        except ValueError as exc:
+            raise PowerBIHttpError(
+                f"Power BI API returned non-JSON payload for GET {path}.",
+                status_code=resp.status_code,
+                user_message="Power BI Service returned an unexpected response format.",
+            ) from exc
+
+    def post_json(
+        self,
+        path: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        json: Any = None,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        """Issue an authenticated POST request and return parsed JSON."""
+        body = json if json is not None else json_body
+        resp = self.post(path, json=body, params=params, timeout=timeout)
+        if not resp.content:
+            return {}
+        try:
+            data = resp.json()
+            return data if isinstance(data, dict) else {"value": data}
+        except ValueError as exc:
+            raise PowerBIHttpError(
+                f"Power BI API returned non-JSON payload for POST {path}.",
+                status_code=resp.status_code,
+                user_message="Power BI Service returned an unexpected response format.",
+            ) from exc
+
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        resp = self.request(method, path, params=params, json=json_body, timeout=timeout)
+        if not resp.content:
+            return {}
+        try:
+            data = resp.json()
+            return data if isinstance(data, dict) else {"value": data}
+        except ValueError as exc:
+            raise PowerBIHttpError(
+                f"Power BI API returned non-JSON payload for {method} {path}.",
+                status_code=resp.status_code,
+                user_message="Power BI Service returned an unexpected response format.",
+            ) from exc
 
     @staticmethod
     def _map_http_error(
