@@ -23,7 +23,7 @@ def test_main_window_initial_state(qtbot) -> None:
 
 
 @pytest.mark.parametrize("page_key,expected_label", [
-    ("settings", "Settings"),
+    ("sheet_settings", "Validation Sheet"),
     ("history", "History"),
     ("about", "About"),
     ("home", "Home"),

@@ -163,15 +163,6 @@ class MainWindow(QMainWindow):
             powerbi_service=self._powerbi_service,
             parent=self,
         )
-        self.settings_page = SettingsPage(
-            registry_service=self._registry_service,
-            metadata_service=self._metadata_service,
-            powerbi_service=self._powerbi_service,
-            rule_service=self._rule_service,
-            refresh_service=self._refresh_service,
-            dax_service=self._dax_service,
-            parent=self,
-        )
         self.history_page = HistoryPage(
             orchestrator_service=self._orchestrator_service,
             registry_service=self._registry_service,
@@ -189,7 +180,6 @@ class MainWindow(QMainWindow):
 
         self._register_page("home", "Home", self.home_page)
         self._register_page("sheet_settings", "Validation Sheet", self.sheet_settings_page)
-        self._register_page("settings", "Settings", self.settings_page)
         self._register_page("history", "History", self.history_page)
         self._register_page("about", "About", self.about_page)
 
@@ -323,9 +313,6 @@ class MainWindow(QMainWindow):
             self._powerbi_service.list_workspace_assets_async
         )
         self.home_page.verify_access_requested.connect(self._handle_verify_access_requested)
-        self.settings_page.verify_registration_requested.connect(
-            self._handle_verify_registration_requested
-        )
         self.sheet_settings_page.sync_workspaces_requested.connect(
             self._powerbi_service.list_workspaces_async
         )
@@ -376,10 +363,11 @@ class MainWindow(QMainWindow):
     def _handle_access_verified(self, result: object) -> None:
         self.home_page.display_verification_result(result)  # type: ignore[arg-type]
         if self._pending_verify_reg_id is not None:
-            self.settings_page.set_verification_result(
-                self._pending_verify_reg_id,
-                result,  # type: ignore[arg-type]
-            )
+            if hasattr(self, "settings_page") and self.settings_page is not None:
+                self.settings_page.set_verification_result(
+                    self._pending_verify_reg_id,
+                    result,  # type: ignore[arg-type]
+                )
             self._pending_verify_reg_id = None
         if self._auth_service is not None:
             self.home_page.auth_banner.apply_state(self._auth_service.state)

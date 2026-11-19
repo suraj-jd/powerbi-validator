@@ -105,12 +105,12 @@ def test_sheet_settings_page_initial_ui(qtbot, db: DatabaseManager, sample_regis
     page.show()
 
     # Ribbon buttons
-    assert page.btn_add_row.text() == "➕  Add Row"
-    assert page.btn_delete_row.text() == "🗑️  Delete Row"
-    assert page.btn_save_sheet.text() == "💾  Save Sheet"
-    assert page.btn_sync_pbi.text() == "🔄  Sync Power BI"
-    assert page.btn_import.text() == "📥  Import (Excel/CSV)"
-    assert page.btn_export.text() == "📤  Export (Excel/CSV)"
+    assert "Add Row" in page.btn_add_row.text()
+    assert "Delete" in page.btn_delete_row.text()
+    assert "Save Sheet" in page.btn_save_sheet.text()
+    assert "Sync PBI" in page.btn_sync_pbi.text()
+    assert "Import..." in page.btn_import.text()
+    assert "Export..." in page.btn_export.text()
 
     # Table columns
     assert page.sheet_table.columnCount() == 9
@@ -240,4 +240,49 @@ def test_main_window_registers_sheet_settings_tab(qtbot, db: DatabaseManager) ->
     btn = win._nav_buttons.get("sheet_settings")
     assert btn is not None
     assert "Validation Sheet" in btn.text()
+
+    # Verify legacy settings page is cleanly removed
+    assert "settings" not in win._pages
+    assert "settings" not in win._nav_buttons
+
+
+def test_import_sheet_dialog_structure_and_template(qtbot, tmp_path: Path) -> None:
+    from app.ui.dialogs.import_sheet_dialog import ImportSheetDialog
+
+    dialog = ImportSheetDialog()
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    assert "Import Validation Sheet" in dialog.windowTitle()
+    assert dialog.test_selector_combo.count() >= 7
+
+    # Test downloading sample CSV template
+    csv_file = tmp_path / "sample.csv"
+    saved_path = dialog._download_sample_template(is_xlsx=False, destination=csv_file)
+    assert saved_path is not None
+    assert csv_file.exists()
+
+    # Directly verify _parse_dict maps correctly
+    sample_item = {
+        "Workspace Name": "HR Operations",
+        "Workspace ID": WS_ID,
+        "Report Name": "Staffing",
+        "Dataset ID": DS_ID,
+        "Table Name": "Employees",
+        "Column Name": "EmployeeID",
+        "Test to Do": "Duplicate Check",
+    }
+    dto = dialog._parse_dict(sample_item, forced_test="auto")
+    assert dto is not None
+    assert dto.workspace_id == WS_ID
+    assert dto.dataset_id == DS_ID
+    assert dto.table_name == "Employees"
+    assert dto.column_name == "EmployeeID"
+    assert dto.validation_type == VALIDATION_TYPE_DUPLICATE
+
+    # Test forced test
+    dto_forced = dialog._parse_dict(sample_item, forced_test=VALIDATION_TYPE_NULL)
+    assert dto_forced is not None
+    assert dto_forced.validation_type == VALIDATION_TYPE_NULL
+
 

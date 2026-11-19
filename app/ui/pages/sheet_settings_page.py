@@ -162,32 +162,38 @@ class SheetSettingsPage(QWidget):
         ribbon.setObjectName("RibbonBar")
         ribbon.setStyleSheet(
             "#RibbonBar { background-color: #FFFFFF; border: 1px solid #CBD5E1; "
-            "border-radius: 8px; padding: 6px 12px; }"
+            "border-radius: 8px; padding: 4px 8px; }"
         )
         ribbon_layout = QHBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(8, 6, 8, 6)
-        ribbon_layout.setSpacing(10)
+        ribbon_layout.setContentsMargins(6, 4, 6, 4)
+        ribbon_layout.setSpacing(6)
 
         # Group 1: Sheet Actions
-        self.btn_add_row = QPushButton("➕  Add Row")
+        self.btn_add_row = QPushButton("➕ Add Row")
         self.btn_add_row.setObjectName("PrimaryButton")
+        self.btn_add_row.setToolTip("Add a new validation rule row")
         self.btn_add_row.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 6px 14px; border-radius: 6px;"
+            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 5px 10px; border-radius: 5px; font-size: 12px;"
         )
         self.btn_add_row.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add_row.clicked.connect(self._handle_add_row)
         ribbon_layout.addWidget(self.btn_add_row)
 
-        self.btn_delete_row = QPushButton("🗑️  Delete Row")
+        self.btn_delete_row = QPushButton("🗑️ Delete")
         self.btn_delete_row.setObjectName("SecondaryButton")
+        self.btn_delete_row.setToolTip("Delete the selected validation row")
+        self.btn_delete_row.setStyleSheet(
+            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
+        )
         self.btn_delete_row.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete_row.clicked.connect(self._handle_delete_selected_row)
         ribbon_layout.addWidget(self.btn_delete_row)
 
-        self.btn_save_sheet = QPushButton("💾  Save Sheet")
+        self.btn_save_sheet = QPushButton("💾 Save Sheet")
         self.btn_save_sheet.setObjectName("PrimaryButton")
+        self.btn_save_sheet.setToolTip("Save all validation rules to local database")
         self.btn_save_sheet.setStyleSheet(
-            "background-color: #10B981; color: #FFFFFF; font-weight: 700; padding: 6px 16px; border-radius: 6px;"
+            "background-color: #10B981; color: #FFFFFF; font-weight: 700; padding: 5px 12px; border-radius: 5px; font-size: 12px;"
         )
         self.btn_save_sheet.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save_sheet.clicked.connect(self._handle_save_sheet)
@@ -196,8 +202,12 @@ class SheetSettingsPage(QWidget):
         self._add_ribbon_separator(ribbon_layout)
 
         # Group 2: Power BI Sync
-        self.btn_sync_pbi = QPushButton("🔄  Sync Power BI")
+        self.btn_sync_pbi = QPushButton("🔄 Sync PBI")
         self.btn_sync_pbi.setObjectName("SecondaryButton")
+        self.btn_sync_pbi.setToolTip("Fetch accessible workspaces and datasets from Power BI")
+        self.btn_sync_pbi.setStyleSheet(
+            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
+        )
         self.btn_sync_pbi.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_sync_pbi.clicked.connect(self._handle_sync_powerbi)
         ribbon_layout.addWidget(self.btn_sync_pbi)
@@ -205,14 +215,22 @@ class SheetSettingsPage(QWidget):
         self._add_ribbon_separator(ribbon_layout)
 
         # Group 3: File Transfer
-        self.btn_import = QPushButton("📥  Import (Excel/CSV)")
+        self.btn_import = QPushButton("📥 Import...")
         self.btn_import.setObjectName("SecondaryButton")
+        self.btn_import.setToolTip("Import validation rules from Excel or CSV with template support")
+        self.btn_import.setStyleSheet(
+            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
+        )
         self.btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_import.clicked.connect(self._handle_import_sheet)
         ribbon_layout.addWidget(self.btn_import)
 
-        self.btn_export = QPushButton("📤  Export (Excel/CSV)")
+        self.btn_export = QPushButton("📤 Export...")
         self.btn_export.setObjectName("SecondaryButton")
+        self.btn_export.setToolTip("Export validation sheet to Excel (.xlsx) or CSV")
+        self.btn_export.setStyleSheet(
+            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
+        )
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.clicked.connect(self._handle_export_sheet)
         ribbon_layout.addWidget(self.btn_export)
@@ -221,9 +239,15 @@ class SheetSettingsPage(QWidget):
 
         # Group 4: Quick Search
         self.search_filter = QLineEdit()
-        self.search_filter.setObjectName("SearchInput")
-        self.search_filter.setPlaceholderText("🔍  Filter sheet...")
-        self.search_filter.setMinimumWidth(200)
+        self.search_filter.setObjectName("RibbonSearch")
+        self.search_filter.setPlaceholderText("🔍 Filter...")
+        self.search_filter.setMinimumWidth(80)
+        self.search_filter.setMaximumWidth(150)
+        self.search_filter.setStyleSheet(
+            "QLineEdit#RibbonSearch { background: #F8FAFC; border: 1px solid #CBD5E1; "
+            "border-radius: 4px; padding: 4px 8px; font-size: 11px; } "
+            "QLineEdit#RibbonSearch:focus { border-color: #1668DC; background: #FFFFFF; }"
+        )
         self.search_filter.textChanged.connect(self._apply_filter)
         ribbon_layout.addWidget(self.search_filter)
 
@@ -233,12 +257,12 @@ class SheetSettingsPage(QWidget):
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setFrameShadow(QFrame.Shadow.Sunken)
-        sep.setStyleSheet("color: #E2E8F0; margin: 2px 4px;")
+        sep.setStyleSheet("color: #E2E8F0; margin: 2px 2px; max-width: 1px;")
         layout.addWidget(sep)
 
     def _build_sheet_table(self) -> QTableWidget:
         table = QTableWidget()
-        table.setObjectName("DataTable")
+        table.setObjectName("SheetTable")
         table.setColumnCount(9)
         table.setHorizontalHeaderLabels([
             "Sr.",
@@ -255,26 +279,120 @@ class SheetSettingsPage(QWidget):
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(False)
-        header.resizeSection(0, 48)   # Sr.
-        header.resizeSection(1, 68)   # Enabled
-        header.resizeSection(2, 210)  # Workspace
-        header.resizeSection(3, 230)  # Report / Dataset
-        header.resizeSection(4, 190)  # Test to Do
-        header.resizeSection(5, 140)  # Table Name
-        header.resizeSection(6, 170)  # Column or Measure
-        header.resizeSection(7, 230)  # Settings
-        header.resizeSection(8, 65)   # Action
+        header.resizeSection(0, 42)   # Sr.
+        header.resizeSection(1, 60)   # Enabled
+        header.resizeSection(2, 180)  # Workspace
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Report / Dataset
+        header.resizeSection(4, 165)  # Test to Do
+        header.resizeSection(5, 120)  # Table Name
+        header.resizeSection(6, 140)  # Column or Measure
+        header.resizeSection(7, 210)  # Settings
+        header.resizeSection(8, 48)   # Action
 
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         table.setShowGrid(True)
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
+        table.verticalHeader().setDefaultSectionSize(32)
         table.setStyleSheet(
-            "QTableWidget { gridline-color: #E2E8F0; background: #FFFFFF; font-size: 12px; }"
-            "QTableWidget::item { padding: 4px; }"
-            "QHeaderView::section { background-color: #F8FAFC; color: #1E293B; font-weight: 700; "
-            "border: 1px solid #CBD5E1; padding: 6px; font-size: 11px; }"
+            "QTableWidget#SheetTable { "
+            "  background-color: #FFFFFF; "
+            "  alternate-background-color: #F8FAFC; "
+            "  gridline-color: #E2E8F0; "
+            "  border: 1px solid #CBD5E1; "
+            "  border-radius: 4px; "
+            "  font-size: 12px; "
+            "  selection-background-color: #EFF6FF; "
+            "  selection-color: #0F172A; "
+            "} "
+            "QTableWidget#SheetTable::item { "
+            "  padding: 0px; "
+            "  margin: 0px; "
+            "  border: none; "
+            "} "
+            "QTableWidget#SheetTable QHeaderView::section { "
+            "  background-color: #F1F5F9; "
+            "  color: #0F172A; "
+            "  font-weight: 700; "
+            "  font-size: 11px; "
+            "  border: none; "
+            "  border-right: 1px solid #CBD5E1; "
+            "  border-bottom: 1.5px solid #CBD5E1; "
+            "  padding: 6px 8px; "
+            "} "
+            "QComboBox#SheetCellCombo { "
+            "  border: 1px solid transparent; "
+            "  border-radius: 0px; "
+            "  background-color: transparent; "
+            "  padding: 2px 6px; "
+            "  margin: 1px; "
+            "  font-size: 12px; "
+            "  color: #0F172A; "
+            "} "
+            "QComboBox#SheetCellCombo:hover { "
+            "  border: 1px solid #94A3B8; "
+            "  background-color: #FFFFFF; "
+            "} "
+            "QComboBox#SheetCellCombo:focus { "
+            "  border: 1.5px solid #1668DC; "
+            "  background-color: #FFFFFF; "
+            "} "
+            "QComboBox#SheetCellCombo::drop-down { "
+            "  subcontrol-origin: padding; "
+            "  subcontrol-position: top right; "
+            "  width: 16px; "
+            "  border-left: none; "
+            "} "
+            "QLineEdit#SheetCellInput { "
+            "  border: 1px solid transparent; "
+            "  border-radius: 0px; "
+            "  background-color: transparent; "
+            "  padding: 2px 6px; "
+            "  margin: 1px; "
+            "  font-size: 12px; "
+            "  color: #0F172A; "
+            "} "
+            "QLineEdit#SheetCellInput:hover { "
+            "  border: 1px solid #94A3B8; "
+            "  background-color: #FFFFFF; "
+            "} "
+            "QLineEdit#SheetCellInput:focus { "
+            "  border: 1.5px solid #1668DC; "
+            "  background-color: #FFFFFF; "
+            "} "
+            "QLineEdit#SheetCellInput:disabled { "
+            "  color: #94A3B8; "
+            "  background-color: #F8FAFC; "
+            "  font-style: italic; "
+            "} "
+            "QPushButton#SheetCellGear { "
+            "  text-align: left; "
+            "  padding: 2px 8px; "
+            "  font-size: 11px; "
+            "  font-weight: 500; "
+            "  background-color: #F1F5F9; "
+            "  border: 1px solid #CBD5E1; "
+            "  border-radius: 3px; "
+            "  margin: 2px 4px; "
+            "  color: #1E293B; "
+            "} "
+            "QPushButton#SheetCellGear:hover { "
+            "  background-color: #E2E8F0; "
+            "  border-color: #94A3B8; "
+            "  color: #0F172A; "
+            "} "
+            "QPushButton#SheetCellDelete { "
+            "  background-color: transparent; "
+            "  border: none; "
+            "  border-radius: 3px; "
+            "  font-size: 13px; "
+            "  padding: 2px; "
+            "  margin: 2px; "
+            "} "
+            "QPushButton#SheetCellDelete:hover { "
+            "  background-color: #FEE2E2; "
+            "}"
         )
         return table
 
@@ -333,6 +451,7 @@ class SheetSettingsPage(QWidget):
 
         # Col 1: Enabled Checkbox
         chk_widget = QWidget()
+        chk_widget.setStyleSheet("background: transparent;")
         chk_layout = QHBoxLayout(chk_widget)
         chk_layout.setContentsMargins(0, 0, 0, 0)
         chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -344,13 +463,13 @@ class SheetSettingsPage(QWidget):
 
         # Col 2: Workspace Dropdown
         ws_combo = QComboBox()
-        ws_combo.setObjectName("FilterCombo")
+        ws_combo.setObjectName("SheetCellCombo")
         self._populate_workspace_combo(ws_combo, selected_id=dto.workspace_id, selected_name=dto.workspace_name)
         self.sheet_table.setCellWidget(row_idx, 2, ws_combo)
 
         # Col 3: Report / Dataset Dropdown
         ds_combo = QComboBox()
-        ds_combo.setObjectName("FilterCombo")
+        ds_combo.setObjectName("SheetCellCombo")
         self._populate_dataset_combo(
             ds_combo,
             workspace_id=dto.workspace_id,
@@ -369,7 +488,7 @@ class SheetSettingsPage(QWidget):
 
         # Col 4: Test to Do Dropdown
         test_combo = QComboBox()
-        test_combo.setObjectName("FilterCombo")
+        test_combo.setObjectName("SheetCellCombo")
         for key, friendly in FRIENDLY_TEST_NAMES.items():
             test_combo.addItem(friendly, key)
         # Select matching
@@ -382,7 +501,7 @@ class SheetSettingsPage(QWidget):
 
         # Col 5: Table Name input
         tbl_input = QLineEdit()
-        tbl_input.setObjectName("SearchInput")
+        tbl_input.setObjectName("SheetCellInput")
         tbl_input.setText(dto.table_name or "")
         tbl_input.setPlaceholderText("e.g. Sales")
         tbl_input.textChanged.connect(lambda txt, r=dto: setattr(r, "table_name", txt.strip() or None))
@@ -390,7 +509,7 @@ class SheetSettingsPage(QWidget):
 
         # Col 6: Column or Measure input
         col_input = QLineEdit()
-        col_input.setObjectName("SearchInput")
+        col_input.setObjectName("SheetCellInput")
         val = dto.measure_name if dto.measure_name else (dto.column_name or "")
         col_input.setText(val)
         col_input.setPlaceholderText("Column or [Measure]")
@@ -401,11 +520,7 @@ class SheetSettingsPage(QWidget):
 
         # Col 7: ⚙️ Gear Rule Configuration Button
         btn_gear = QPushButton(f"⚙️  {dto.conditions_summary}")
-        btn_gear.setObjectName("SecondaryButton")
-        btn_gear.setStyleSheet(
-            "text-align: left; padding: 4px 10px; font-size: 11px; font-weight: 600; "
-            "background-color: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 4px;"
-        )
+        btn_gear.setObjectName("SheetCellGear")
         btn_gear.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_gear.clicked.connect(
             lambda _, b=btn_gear, r=dto: self._open_gear_dialog(b, r)
@@ -414,12 +529,13 @@ class SheetSettingsPage(QWidget):
 
         # Col 8: Action Delete Button
         btn_del = QPushButton("🗑️")
-        btn_del.setObjectName("SecondaryButton")
+        btn_del.setObjectName("SheetCellDelete")
         btn_del.setToolTip("Delete this rule row")
         btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_del.setStyleSheet("padding: 3px 6px; font-size: 12px; border-radius: 4px;")
         btn_del.clicked.connect(lambda _, r=dto, idx=row_idx: self._handle_delete_row(r, idx))
         self.sheet_table.setCellWidget(row_idx, 8, btn_del)
+
+        self.sheet_table.setRowHeight(row_idx, 32)
 
         # Connect test combo change to toggle field states
         test_combo.currentIndexChanged.connect(
@@ -997,39 +1113,27 @@ class SheetSettingsPage(QWidget):
         wb.save(dest)
 
     def _handle_import_sheet(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Import Validation Sheet",
-            "",
-            "Spreadsheets (*.xlsx *.csv);;Excel Files (*.xlsx);;CSV Files (*.csv)",
-        )
-        if not file_path:
+        from app.ui.dialogs.import_sheet_dialog import ImportSheetDialog
+
+        dialog = ImportSheetDialog(sheet_service=self._sheet_service, parent=self)
+        if not dialog.exec():
             return
 
-        try:
-            imported = self._parse_import_file(Path(file_path))
-            if not imported:
-                self.banner.show_message(
-                    "No valid validation test rows found in the selected file.",
-                    level=NotificationLevel.WARNING,
-                    title="Import Empty",
-                )
-                return
+        imported = dialog.imported_rows
+        if not imported:
+            return
 
+        if dialog.replace_mode:
+            self._rows = imported
+        else:
             self._rows.extend(imported)
-            self._handle_save_sheet()
-            self.banner.show_message(
-                f"Successfully imported and saved {len(imported)} new validation test(s)!",
-                level=NotificationLevel.SUCCESS,
-                title="Import Successful",
-            )
-        except Exception as exc:
-            logger.exception("Failed to import sheet: %s", exc)
-            self.banner.show_message(
-                f"Import failed: {format_safe_user_error(exc)}",
-                level=NotificationLevel.ERROR,
-                title="Import Error",
-            )
+
+        self._handle_save_sheet()
+        self.banner.show_message(
+            f"Successfully imported {len(imported)} validation test(s)!",
+            level=NotificationLevel.SUCCESS,
+            title="Import Successful",
+        )
 
     def _parse_import_file(self, path: Path) -> list[SheetRowDTO]:
         rows: list[SheetRowDTO] = []
