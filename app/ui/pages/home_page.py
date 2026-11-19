@@ -210,6 +210,17 @@ class HomePage(QWidget):
         self.auth_banner = AuthBanner(container)
         layout.addWidget(self.auth_banner)
 
+        # Verification Banner & Details (hidden by default; displayed only on explicit access verification)
+        self.verification_banner = NotificationBanner(container)
+        self.verification_banner.hide()
+        layout.addWidget(self.verification_banner)
+
+        self.verification_details_label = QLabel("", container)
+        self.verification_details_label.setObjectName("BodyText")
+        self.verification_details_label.setWordWrap(True)
+        self.verification_details_label.hide()
+        layout.addWidget(self.verification_details_label)
+
         # Header row
         header_row = QHBoxLayout()
         header_row.setSpacing(12)
@@ -258,12 +269,6 @@ class HomePage(QWidget):
         self.verify_access_button.hide()
         self.verify_access_button.clicked.connect(self._emit_verify_access)
 
-        self.verification_banner = NotificationBanner(container)
-        self.verification_banner.hide()
-
-        self.verification_details_label = QLabel("", container)
-        self.verification_details_label.hide()
-
         # Stage 13 Validation Results & Model Health Dashboard Card
         self.validation_card = self._create_validation_dashboard_card(container)
         layout.addWidget(self.validation_card)
@@ -290,12 +295,6 @@ class HomePage(QWidget):
         for ws in workspaces:
             self.workspace_combo.addItem(f"{ws.name} ({ws.id})", ws.id)
         self.workspace_combo.blockSignals(False)
-
-        self.verification_banner.show_message(
-            f"Loaded {len(workspaces)} accessible Power BI workspace(s).",
-            level=NotificationLevel.INFO,
-            title="Workspaces Loaded",
-        )
         self.reload_registered_models()
 
     def set_workspace_assets(
@@ -314,12 +313,6 @@ class HomePage(QWidget):
         for ds in datasets:
             self.dataset_combo.addItem(f"{ds.name} ({ds.id})", ds.id)
         self.dataset_combo.blockSignals(False)
-
-        self.verification_banner.show_message(
-            f"Workspace {workspace_id}: found {len(datasets)} dataset(s) and {len(reports)} report(s).",
-            level=NotificationLevel.INFO,
-            title="Assets Loaded",
-        )
         self.reload_registered_models()
 
     def display_verification_result(self, result: AccessVerificationResult) -> None:

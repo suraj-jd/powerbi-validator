@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
 
 from app.core.status import NotificationLevel
 
@@ -44,6 +44,8 @@ class NotificationBanner(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("NotificationBanner")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.setMinimumHeight(38)
         self._current_level = NotificationLevel.INFO
         self._current_message = ""
 
@@ -121,7 +123,7 @@ class NotificationBanner(QFrame):
                 color: {palette['fg']};
                 font-size: 11px;
                 font-weight: 700;
-                padding: 2px 6px;
+                padding: 3px 8px;
                 border: 1px solid {palette['border']};
                 border-radius: 4px;
                 background-color: #FFFFFF;
