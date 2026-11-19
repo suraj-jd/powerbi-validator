@@ -7,12 +7,19 @@ import logging
 from pathlib import Path
 import shutil
 import sqlite3
+from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 
 from app.core.exceptions import PersistenceError
 from app.database.db import DatabaseManager
-from app.database.models import ValidationRun, utc_now
+from app.database.models import (
+    ValidationResult,
+    ValidationRule,
+    ValidationRun,
+    WorkspaceRegistration,
+    utc_now,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +91,12 @@ def validate_database_backup(backup_path: Path | str) -> bool:
         return False
 
 
-def restore_database_backup(backup_path: Path | str, target_db_path: Path | str) -> bool:
-    """Restore database from a validated backup file."""
+def restore_database_backup(
+    backup_path: Path | str,
+    target_db_path: Path | str,
+    db_manager: DatabaseManager | None = None,
+) -> bool:
+    """Restore database from a validated backup file, disposing engine to prevent Windows file locks."""
     b_path = Path(backup_path)
     t_path = Path(target_db_path)
 
@@ -94,31 +105,129 @@ def restore_database_backup(backup_path: Path | str, target_db_path: Path | str)
 
     t_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Dispose active SQLAlchemy engine handles before file operations
+    if db_manager is not None:
+        try:
+            db_manager.dispose()
+        except Exception as exc:
+            logger.warning("Could not dispose db engine before restore: %s", exc)
+
     # Create safety snapshot of target if it exists
     if t_path.exists():
         pre_restore = t_path.with_suffix(".pre_restore.bak")
-        shutil.copy2(t_path, pre_restore)
+        try:
+            shutil.copy2(t_path, pre_restore)
+        except Exception as exc:
+            logger.warning("Could not create pre-restore snapshot: %s", exc)
+
+    # Clean up any SQLite WAL files around target
+    for wal_suffix in ("-wal", "-shm"):
+        wal_file = Path(f"{t_path}{wal_suffix}")
+        if wal_file.exists():
+            try:
+                wal_file.unlink()
+            except Exception as exc:
+                logger.warning("Could not remove stale %s file: %s", wal_suffix, exc)
 
     try:
-        # Atomic file copy
         shutil.copy2(b_path, t_path)
         logger.info("Successfully restored database from %s to %s", b_path, t_path)
-        return True
     except Exception as exc:
         raise PersistenceError(f"Restore operation failed: {exc}") from exc
 
+    # Reconnect and ensure migrations on the newly restored database
+    if db_manager is not None:
+        try:
+            db_manager.reconnect()
+            db_manager.run_migrations()
+        except Exception as exc:
+            logger.warning("Failed to reconnect or migrate after restore: %s", exc)
+
+    return True
+
 
 def prune_history(db_manager: DatabaseManager, retention_days: int) -> int:
-    """Prune validation runs older than the specified retention window."""
+    """Prune validation runs older than the specified retention window and compact database."""
     if retention_days < 1:
         raise ValueError("Retention days must be at least 1.")
 
     cutoff = utc_now() - timedelta(days=retention_days)
 
     with db_manager.session_scope() as session:
-        # Cascade delete is configured on ValidationRun -> ValidationResult
-        stmt = delete(ValidationRun).where(ValidationRun.started_at < cutoff)
-        res = session.execute(stmt)
-        deleted_count = res.rowcount or 0
+        # Find run IDs to delete
+        stmt_select = select(ValidationRun.id).where(ValidationRun.started_at < cutoff)
+        run_ids = session.scalars(stmt_select).all()
+        if not run_ids:
+            logger.info("No validation runs found older than %d days (cutoff: %s)", retention_days, cutoff)
+            return 0
+
+        # Delete associated results first for safety across SQLite configurations
+        session.execute(
+            delete(ValidationResult).where(ValidationResult.validation_run_id.in_(run_ids))
+        )
+        # Delete validation runs
+        res = session.execute(
+            delete(ValidationRun).where(ValidationRun.id.in_(run_ids))
+        )
+        deleted_count = res.rowcount or len(run_ids)
         logger.info("Pruned %d validation runs older than %d days (cutoff: %s)", deleted_count, retention_days, cutoff)
-        return deleted_count
+
+    # Reclaim freed disk space with VACUUM
+    try:
+        db_manager.vacuum()
+    except Exception as exc:
+        logger.warning("Vacuum after prune failed: %s", exc)
+
+    return deleted_count
+
+
+def count_runs_older_than(db_manager: DatabaseManager, retention_days: int) -> int:
+    """Count how many validation runs exceed the retention age."""
+    if retention_days < 1:
+        return 0
+    cutoff = utc_now() - timedelta(days=retention_days)
+    with db_manager.session_scope() as session:
+        stmt = select(func.count(ValidationRun.id)).where(ValidationRun.started_at < cutoff)
+        return session.scalar(stmt) or 0
+
+
+def vacuum_database(db_manager: DatabaseManager) -> int:
+    """Run VACUUM on database and return updated file size in bytes."""
+    db_manager.vacuum()
+    return db_manager.db_path.stat().st_size if db_manager.db_path.exists() else 0
+
+
+def format_file_size(size_bytes: int) -> str:
+    """Format bytes into readable KB/MB string."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{round(size_bytes / 1024.0, 1)} KB"
+    else:
+        return f"{round(size_bytes / (1024.0 * 1024.0), 2)} MB"
+
+
+def get_database_stats(db_manager: DatabaseManager) -> dict[str, Any]:
+    """Retrieve summary metrics and sizing for the SQLite database."""
+    path = db_manager.db_path
+    size_bytes = path.stat().st_size if path.exists() else 0
+
+    with db_manager.session_scope() as session:
+        runs_count = session.scalar(select(func.count(ValidationRun.id))) or 0
+        results_count = session.scalar(select(func.count(ValidationResult.id))) or 0
+        rules_count = session.scalar(select(func.count(ValidationRule.id))) or 0
+        workspaces_count = session.scalar(select(func.count(WorkspaceRegistration.id))) or 0
+        oldest_run = session.scalar(select(func.min(ValidationRun.started_at)))
+        newest_run = session.scalar(select(func.max(ValidationRun.started_at)))
+
+    return {
+        "db_path": str(path.resolve()),
+        "file_size_bytes": size_bytes,
+        "file_size_display": format_file_size(size_bytes),
+        "runs_count": runs_count,
+        "results_count": results_count,
+        "rules_count": rules_count,
+        "workspaces_count": workspaces_count,
+        "oldest_run": oldest_run,
+        "newest_run": newest_run,
+    }

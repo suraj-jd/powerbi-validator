@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Sequence
 
 from app.core.status import ValidationStatus
@@ -137,3 +139,35 @@ def compare_validation_runs(
         new_rules_count=new_cnt,
         removed_rules_count=rem_cnt,
     )
+
+
+def export_comparison_to_csv(comparison: RunComparisonDTO, destination: Path | str) -> Path:
+    """Export run comparison diff to a structured CSV report."""
+    dest = Path(destination)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "Change Type",
+            "Rule Name",
+            "Validation Type",
+            "Target",
+            f"Run #{comparison.run_a.id} Status",
+            f"Run #{comparison.run_b.id} Status",
+            f"Run #{comparison.run_a.id} Actual",
+            f"Run #{comparison.run_b.id} Actual",
+            f"Run #{comparison.run_b.id} Deviation",
+        ])
+        for c in comparison.rule_comparisons:
+            writer.writerow([
+                c.change_type,
+                c.rule_name,
+                c.validation_type,
+                c.target_display,
+                c.status_a.value if c.status_a else "—",
+                c.status_b.value if c.status_b else "—",
+                c.actual_a or "—",
+                c.actual_b or "—",
+                c.deviation_b or "—",
+            ])
+    return dest

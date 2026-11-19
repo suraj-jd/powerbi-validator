@@ -285,3 +285,70 @@ def test_history_drawer_filtering(qtbot):
     assert page.results_table.isRowHidden(0)
     assert not page.results_table.isRowHidden(1)
 
+
+def test_run_comparison_dialog_run_switching_and_filtering(qtbot, tmp_path):
+    run1 = _make_dummy_run(1, ValidationStatus.PASS)
+    run2 = _make_dummy_run(2, ValidationStatus.FAIL)
+    run3 = _make_dummy_run(3, ValidationStatus.WARNING)
+
+    cmp = compare_validation_runs(run1, run2)
+    dialog = RunComparisonDialog(cmp, all_runs=[run1, run2, run3])
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    assert dialog.combo_run_a.count() == 3
+    assert dialog.combo_run_b.count() == 3
+
+    # Swap runs
+    dialog._handle_swap_runs()
+    assert dialog._cmp.run_a.id == 2
+    assert dialog._cmp.run_b.id == 1
+
+    # Filter by search text
+    dialog.search_input.setText("NonExistent")
+    assert dialog.diff_table.isRowHidden(0)
+
+    dialog.search_input.clear()
+    assert not dialog.diff_table.isRowHidden(0)
+
+    # Filter by change type
+    dialog._filter_by_card("REGRESSION")
+    assert dialog._current_filter_change == "REGRESSION"
+
+    # Reset filters
+    dialog._handle_reset_filters()
+    assert dialog._current_filter_change == "ALL"
+    assert not dialog.diff_table.isRowHidden(0)
+
+    # Test export diff to CSV
+    csv_out = tmp_path / "diff_test.csv"
+    from app.services.compare_service import export_comparison_to_csv
+    export_comparison_to_csv(dialog._cmp, csv_out)
+    assert csv_out.exists()
+    assert "REGRESSION" in csv_out.read_text(encoding="utf-8") or "IMPROVEMENT" in csv_out.read_text(encoding="utf-8")
+
+
+def test_backup_maintenance_dialog_stats_and_actions(qtbot, tmp_path):
+    db_file = tmp_path / "maint_test_ext.db"
+    db = DatabaseManager(db_file)
+    db.run_migrations()
+
+    dialog = BackupMaintenanceDialog(db)
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    assert "Database File:" in dialog.lbl_path.text()
+    assert "Runs: 0" in dialog.lbl_metrics.text()
+    assert "Storage Size:" in dialog.lbl_metrics.text()
+
+    # Prune preview updates
+    dialog.spin_retention.setValue(30)
+    assert "0 runs are older than 30 days" in dialog.lbl_prune_info.text()
+
+    # Vacuum action executes cleanly
+    dialog._handle_vacuum()
+    assert "Database Compacted" in dialog.banner.current_message or "defragmented" in dialog.banner.current_message
+
+    db.dispose()
+
+

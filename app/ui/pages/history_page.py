@@ -788,35 +788,49 @@ class HistoryPage(QWidget):
         dialog.exec()
 
     def _handle_compare_runs(self) -> None:
-        selected_rows = self.runs_table.selectionModel().selectedRows()
-        if len(selected_rows) < 2:
-            if len(self._runs) < 2:
-                self.banner.show_message(
-                    "At least 2 validation runs are required to perform a comparison.",
-                    level=NotificationLevel.WARNING,
-                    title="Comparison Requirement",
-                )
-                return
-            # Default compare top 2 runs
-            run_b = self._runs[0]
-            run_a = self._runs[1]
-        else:
-            def _get_run_for_row(row_i: int) -> ValidationRunSummaryDTO | None:
-                it = self.runs_table.item(row_i, 0)
-                if it is not None:
-                    rid = it.data(Qt.ItemDataRole.UserRole)
-                    found = next((r for r in self._runs if r.id == rid), None)
-                    if found is not None:
-                        return found
-                return self._runs[row_i] if 0 <= row_i < len(self._runs) else None
+        if len(self._runs) < 2:
+            self.banner.show_message(
+                "At least 2 validation runs are required to perform a comparison.",
+                level=NotificationLevel.WARNING,
+                title="Comparison Requirement",
+            )
+            return
 
+        selected_rows = self.runs_table.selectionModel().selectedRows()
+
+        def _get_run_for_row(row_i: int) -> ValidationRunSummaryDTO | None:
+            it = self.runs_table.item(row_i, 0)
+            if it is not None:
+                rid = it.data(Qt.ItemDataRole.UserRole)
+                found = next((r for r in self._runs if r.id == rid), None)
+                if found is not None:
+                    return found
+            return self._runs[row_i] if 0 <= row_i < len(self._runs) else None
+
+        if len(selected_rows) >= 2:
             run_b = _get_run_for_row(selected_rows[0].row())
             run_a = _get_run_for_row(selected_rows[1].row())
-            if not run_a or not run_b:
-                return
+        elif len(selected_rows) == 1:
+            sel_run = _get_run_for_row(selected_rows[0].row())
+            if sel_run:
+                other_run = next((r for r in self._runs if r.id != sel_run.id), self._runs[0])
+                if sel_run.id > other_run.id:
+                    run_a, run_b = other_run, sel_run
+                else:
+                    run_a, run_b = sel_run, other_run
+            else:
+                run_b = self._runs[0]
+                run_a = self._runs[1]
+        else:
+            run_b = self._runs[0]
+            run_a = self._runs[1]
+
+        if not run_a or not run_b:
+            run_b = self._runs[0]
+            run_a = self._runs[1]
 
         comparison = compare_validation_runs(run_a, run_b)
-        dialog = RunComparisonDialog(comparison, parent=self)
+        dialog = RunComparisonDialog(comparison, all_runs=self._runs, parent=self)
         dialog.exec()
 
     def _handle_export_csv(self) -> None:

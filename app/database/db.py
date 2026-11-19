@@ -11,7 +11,7 @@ from typing import Any
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.exceptions import PersistenceError
@@ -115,3 +115,25 @@ class DatabaseManager:
         """Release all pooled SQLite connections cleanly."""
         self.engine.dispose()
         logger.debug("Disposed SQLite engine for %s", self.db_path)
+
+    def reconnect(self) -> None:
+        """Dispose current connections and reinitialize engine and session factory."""
+        self.dispose()
+        self.engine = create_engine(
+            self.url,
+            future=True,
+            connect_args={"check_same_thread": False},
+        )
+        event.listen(self.engine, "connect", _configure_sqlite_pragmas)
+        self._session_factory = sessionmaker(
+            bind=self.engine,
+            autoflush=False,
+            expire_on_commit=False,
+        )
+        logger.info("Reconnected SQLite engine for %s", self.db_path)
+
+    def vacuum(self) -> None:
+        """Run SQLite VACUUM to reclaim free space and defragment database pages."""
+        with self.engine.connect() as conn:
+            conn.execution_options(isolation_level="AUTOCOMMIT").execute(text("VACUUM;"))
+        logger.info("Executed SQLite VACUUM on %s", self.db_path)
