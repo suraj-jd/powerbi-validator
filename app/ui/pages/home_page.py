@@ -77,6 +77,43 @@ class HomePage(QWidget):
         self._build_ui()
         self._connect_refresh_service()
         self._connect_validation_service()
+        self.reload_registered_models()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.reload_registered_models()
+
+    def reload_registered_models(self) -> None:
+        """Populate the active semantic model dropdown with all registered models."""
+        if self._registry_service is None:
+            return
+        current_ds_id = self.dataset_id_input.text().strip()
+        registrations = self._registry_service.list_registrations(active_only=True)
+        self.model_selector_combo.blockSignals(True)
+        self.model_selector_combo.clear()
+        if not registrations:
+            self.model_selector_combo.addItem("No semantic models registered yet", None)
+        else:
+            select_idx = 0
+            for idx, reg in enumerate(registrations):
+                display = f"{reg.report_name} ({reg.workspace_name})"
+                self.model_selector_combo.addItem(display, reg)
+                if current_ds_id and reg.dataset_id.lower() == current_ds_id.lower():
+                    select_idx = idx
+            self.model_selector_combo.setCurrentIndex(select_idx)
+        self.model_selector_combo.blockSignals(False)
+        self._on_model_selector_changed(self.model_selector_combo.currentIndex())
+
+    def _on_model_selector_changed(self, index: int) -> None:
+        if index < 0:
+            return
+        reg = self.model_selector_combo.itemData(index)
+        if reg is not None and hasattr(reg, "workspace_id"):
+            self.workspace_id_input.setText(reg.workspace_id)
+            self.dataset_id_input.setText(reg.dataset_id)
+            self.report_id_input.setText(reg.report_id or "")
+            self._update_validation_ui()
+            self._update_refresh_ui()
 
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
@@ -121,87 +158,57 @@ class HomePage(QWidget):
 
         layout.addLayout(header_row)
 
-        # Stage 4 Power BI Connectivity & Permission Verification Card
-        verify_card = QFrame()
-        verify_card.setObjectName("Card")
-        verify_layout = QVBoxLayout(verify_card)
-        verify_layout.setContentsMargins(22, 20, 22, 20)
-        verify_layout.setSpacing(12)
+        # Active Semantic Model Selector Card (Simplified Home Dashboard)
+        selector_card = QFrame(container)
+        selector_card.setObjectName("Card")
+        selector_layout = QHBoxLayout(selector_card)
+        selector_layout.setContentsMargins(20, 14, 20, 14)
+        selector_layout.setSpacing(14)
 
-        card_header = QHBoxLayout()
-        section_title = QLabel("Power BI Connectivity & Access Verification")
-        section_title.setObjectName("SectionTitle")
-        card_header.addWidget(section_title, stretch=1)
+        lbl_select = QLabel("Active Semantic Model / Report:")
+        lbl_select.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        selector_layout.addWidget(lbl_select)
 
-        self.load_workspaces_button = QPushButton("Load My Workspaces")
-        self.load_workspaces_button.setObjectName("SecondaryButton")
-        self.load_workspaces_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.model_selector_combo = QComboBox()
+        self.model_selector_combo.setObjectName("FilterCombo")
+        self.model_selector_combo.setMinimumWidth(340)
+        self.model_selector_combo.currentIndexChanged.connect(self._on_model_selector_changed)
+        selector_layout.addWidget(self.model_selector_combo, stretch=1)
+
+        self.refresh_models_button = QPushButton("↻ Refresh Models")
+        self.refresh_models_button.setObjectName("SecondaryButton")
+        self.refresh_models_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_models_button.clicked.connect(self.reload_registered_models)
+        selector_layout.addWidget(self.refresh_models_button)
+
+        layout.addWidget(selector_card)
+
+        # Internal/backward-compatible widgets (kept hidden to support APIs and test fixtures)
+        self.workspace_id_input = QLineEdit(container)
+        self.workspace_id_input.hide()
+        self.dataset_id_input = QLineEdit(container)
+        self.dataset_id_input.hide()
+        self.report_id_input = QLineEdit(container)
+        self.report_id_input.hide()
+
+        self.workspace_combo = QComboBox(container)
+        self.workspace_combo.hide()
+        self.dataset_combo = QComboBox(container)
+        self.dataset_combo.hide()
+
+        self.load_workspaces_button = QPushButton("Load My Workspaces", container)
+        self.load_workspaces_button.hide()
         self.load_workspaces_button.clicked.connect(self.load_workspaces_requested.emit)
-        card_header.addWidget(self.load_workspaces_button)
-        verify_layout.addLayout(card_header)
 
-        desc = QLabel(
-            "Select an accessible workspace or paste Workspace, Dataset, and optional Report GUIDs "
-            "to verify that your signed-in Microsoft account has the required Power BI access."
-        )
-        desc.setObjectName("PageSubtitle")
-        desc.setWordWrap(True)
-        verify_layout.addWidget(desc)
-
-        form = QFormLayout()
-        form.setSpacing(10)
-
-        self.workspace_combo = QComboBox()
-        self.workspace_combo.setObjectName("FilterCombo")
-        self.workspace_combo.addItem("Select a loaded workspace (optional)", "")
-        self.workspace_combo.currentIndexChanged.connect(self._on_workspace_selected)
-        form.addRow("Accessible Workspaces:", self.workspace_combo)
-
-        self.dataset_combo = QComboBox()
-        self.dataset_combo.setObjectName("FilterCombo")
-        self.dataset_combo.addItem("Select a loaded dataset (optional)", "")
-        self.dataset_combo.currentIndexChanged.connect(self._on_dataset_selected)
-        form.addRow("Workspace Datasets:", self.dataset_combo)
-
-        self.workspace_id_input = QLineEdit()
-        self.workspace_id_input.setObjectName("SearchInput")
-        self.workspace_id_input.setPlaceholderText("Workspace GUID (required)")
-        form.addRow("Workspace ID:", self.workspace_id_input)
-
-        self.dataset_id_input = QLineEdit()
-        self.dataset_id_input.setObjectName("SearchInput")
-        self.dataset_id_input.setPlaceholderText("Semantic Model / Dataset GUID (required)")
-        form.addRow("Dataset ID:", self.dataset_id_input)
-
-        self.report_id_input = QLineEdit()
-        self.report_id_input.setObjectName("SearchInput")
-        self.report_id_input.setPlaceholderText("Report GUID (optional)")
-        form.addRow("Report ID:", self.report_id_input)
-
-        verify_layout.addLayout(form)
-
-        action_row = QHBoxLayout()
-        self.verify_access_button = QPushButton("Verify Access")
-        self.verify_access_button.setObjectName("PrimaryButton")
-        self.verify_access_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.verify_access_button = QPushButton("Verify Access", container)
+        self.verify_access_button.hide()
         self.verify_access_button.clicked.connect(self._emit_verify_access)
-        action_row.addWidget(self.verify_access_button)
-        action_row.addStretch(1)
-        verify_layout.addLayout(action_row)
 
-        self.verification_banner = NotificationBanner(verify_card)
-        verify_layout.addWidget(self.verification_banner)
+        self.verification_banner = NotificationBanner(container)
+        self.verification_banner.hide()
 
-        self.verification_details_label = QLabel("")
-        self.verification_details_label.setObjectName("InfoBanner")
-        self.verification_details_label.setWordWrap(True)
-        self.verification_details_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
+        self.verification_details_label = QLabel("", container)
         self.verification_details_label.hide()
-        verify_layout.addWidget(self.verification_details_label)
-
-        layout.addWidget(verify_card)
 
         # Stage 13 Validation Results & Model Health Dashboard Card
         self.validation_card = self._create_validation_dashboard_card(container)
@@ -452,7 +459,13 @@ class HomePage(QWidget):
     def _get_active_workspace_and_dataset(self) -> tuple[str, str, str]:
         ws_id = self.workspace_id_input.text().strip()
         ds_id = self.dataset_id_input.text().strip()
-        ds_name = self.dataset_combo.currentText().split(" (")[0] if self.dataset_combo.currentIndex() > 0 else (f"Dataset {ds_id[:8]}" if ds_id else "")
+        reg = self.model_selector_combo.currentData() if hasattr(self, "model_selector_combo") else None
+        if reg is not None and hasattr(reg, "report_name") and reg.report_name:
+            ds_name = reg.report_name
+        elif hasattr(self, "dataset_combo") and self.dataset_combo.currentIndex() > 0:
+            ds_name = self.dataset_combo.currentText().split(" (")[0]
+        else:
+            ds_name = f"Dataset {ds_id[:8]}" if ds_id else ""
         return ws_id, ds_id, ds_name
 
     def _get_or_create_registration(self) -> int | None:
@@ -467,7 +480,13 @@ class HomePage(QWidget):
             return existing.id
 
         # Auto-create registration so refresh history can be indexed and persisted cleanly
-        ws_name = self.workspace_combo.currentText().split(" (")[0] if self.workspace_combo.currentIndex() > 0 else f"Workspace {ws_id[:8]}"
+        ws_name = f"Workspace {ws_id[:8]}"
+        reg = self.model_selector_combo.currentData() if hasattr(self, "model_selector_combo") else None
+        if reg is not None and hasattr(reg, "workspace_name") and reg.workspace_name:
+            ws_name = reg.workspace_name
+        elif hasattr(self, "workspace_combo") and self.workspace_combo.currentIndex() > 0:
+            ws_name = self.workspace_combo.currentText().split(" (")[0]
+
         rpt_id = self.report_id_input.text().strip() or None
         created = self._registry_service.create_registration(
             RegistrationInput(

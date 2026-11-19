@@ -187,3 +187,43 @@ def test_result_details_dialog(qtbot):
     clipboard_text = QApplication.clipboard().text()
     assert "Rule: Order ID Unique Key" in clipboard_text
     assert "Status: FAIL" in clipboard_text
+
+
+def test_home_page_model_selector_dropdown(qtbot):
+    reg_svc = MagicMock(spec=RegistryService)
+    rec1 = RegistrationRecord(
+        id=1,
+        workspace_name="Sales WS",
+        workspace_id="ws-sales",
+        report_name="Sales Executive",
+        report_id="rpt-sales",
+        dataset_name="Sales Model",
+        dataset_id="ds-sales",
+        is_active=True,
+    )
+    rec2 = RegistrationRecord(
+        id=2,
+        workspace_name="Finance WS",
+        workspace_id="ws-fin",
+        report_name="Finance P&L",
+        report_id=None,
+        dataset_name="Finance Model",
+        dataset_id="ds-fin",
+        is_active=True,
+    )
+    reg_svc.list_registrations.return_value = [rec1, rec2]
+
+    page = HomePage(registry_service=reg_svc)
+    qtbot.addWidget(page)
+    page.show()
+
+    assert page.model_selector_combo.count() == 2
+    assert "Sales Executive (Sales WS)" in page.model_selector_combo.itemText(0)
+    assert page.workspace_id_input.text() == "ws-sales"
+    assert page.dataset_id_input.text() == "ds-sales"
+
+    # Switch to Finance
+    page.model_selector_combo.setCurrentIndex(1)
+    assert page.workspace_id_input.text() == "ws-fin"
+    assert page.dataset_id_input.text() == "ds-fin"
+
