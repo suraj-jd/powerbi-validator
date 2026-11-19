@@ -1,5 +1,17 @@
 """Power BI REST API connectors and typed response models."""
 
+from app.integrations.powerbi.dax_client import (
+    DaxConnectorInterface,
+    DaxQueryClient,
+    DaxQueryResult,
+    RestExecuteQueriesConnector,
+    XmlaAdomdConnector,
+    build_measure_query,
+    build_test_query,
+    escape_column_reference,
+    escape_measure_name,
+    escape_table_name,
+)
 from app.integrations.powerbi.dataset_client import DatasetClient
 from app.integrations.powerbi.metadata_client import MetadataClient
 from app.integrations.powerbi.models import (
@@ -21,6 +33,9 @@ from app.integrations.powerbi.workspace_client import MY_WORKSPACE_ID, Workspace
 
 __all__ = [
     "AccessVerificationResult",
+    "DaxConnectorInterface",
+    "DaxQueryClient",
+    "DaxQueryResult",
     "DatasetClient",
     "DatasetMetadata",
     "MY_WORKSPACE_ID",

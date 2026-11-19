@@ -24,9 +24,11 @@ from app.core.exceptions import ConfigurationError, install_exception_hooks
 from app.core.logging_config import setup_logging
 from app.core.status import NotificationLevel
 from app.database.db import DatabaseManager
+from app.integrations.powerbi.dax_client import DaxQueryClient
 from app.integrations.powerbi.metadata_client import MetadataClient
 from app.integrations.powerbi.refresh_client import RefreshClient
 from app.services.auth_service import AuthService
+from app.services.dax_service import DaxQueryService
 from app.services.metadata_service import MetadataService
 from app.services.powerbi_service import PowerBIService
 from app.services.refresh_service import RefreshService
@@ -52,6 +54,7 @@ class AppContext:
     metadata_service: MetadataService
     rule_service: RuleService
     refresh_service: RefreshService
+    dax_service: DaxQueryService
     data_dir: Path
     logs_dir: Path
     log_file: Path
@@ -124,6 +127,8 @@ def bootstrap_application(
     metadata_service = MetadataService(metadata_client=metadata_client)
     refresh_client = RefreshClient(powerbi_service.rest_client)
     refresh_service = RefreshService(db=db, refresh_client=refresh_client)
+    dax_client = DaxQueryClient(rest_client=powerbi_service.rest_client)
+    dax_service = DaxQueryService(dax_client=dax_client)
 
     window = MainWindow(
         config=config,
@@ -136,6 +141,7 @@ def bootstrap_application(
         metadata_service=metadata_service,
         rule_service=rule_service,
         refresh_service=refresh_service,
+        dax_service=dax_service,
     )
 
     if config_warning:
@@ -158,6 +164,7 @@ def bootstrap_application(
         auth_service.restore_session_async()
 
     def _on_quit() -> None:
+        dax_service.shutdown()
         refresh_service.shutdown()
         metadata_service.shutdown()
         powerbi_service.shutdown()
@@ -178,6 +185,7 @@ def bootstrap_application(
         metadata_service=metadata_service,
         rule_service=rule_service,
         refresh_service=refresh_service,
+        dax_service=dax_service,
         data_dir=resolved_data_dir,
         logs_dir=resolved_logs_dir,
         log_file=log_file,

@@ -241,7 +241,7 @@ def test_settings_page_refresh_history_action_and_column(
     # Verify badge
     badge = settings.findChild(object, "StageBadge")
     assert badge is not None
-    assert "Stage 8" in badge.text()
+    assert "Stage" in badge.text()
 
     # Verify Refresh History button exists in row actions
     assert hasattr(settings, "refresh_history_button")

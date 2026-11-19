@@ -39,6 +39,7 @@ from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
     from app.services.auth_service import AuthService
+    from app.services.dax_service import DaxQueryService
     from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
     from app.services.refresh_service import RefreshService
@@ -67,6 +68,7 @@ class MainWindow(QMainWindow):
         metadata_service: MetadataService | None = None,
         rule_service: RuleService | None = None,
         refresh_service: RefreshService | None = None,
+        dax_service: DaxQueryService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -80,6 +82,7 @@ class MainWindow(QMainWindow):
         self._metadata_service = metadata_service
         self._rule_service = rule_service
         self._refresh_service = refresh_service
+        self._dax_service = dax_service
         self._pending_verify_reg_id: int | None = None
 
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
@@ -150,6 +153,7 @@ class MainWindow(QMainWindow):
             powerbi_service=self._powerbi_service,
             rule_service=self._rule_service,
             refresh_service=self._refresh_service,
+            dax_service=self._dax_service,
             parent=self,
         )
         self.history_page = HistoryPage(self)

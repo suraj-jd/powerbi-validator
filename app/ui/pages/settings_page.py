@@ -23,6 +23,7 @@ from app.core.status import NotificationLevel, RefreshStatus
 from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata, PowerBIWorkspace
 from app.services.registry_service import RegistrationRecord, RegistryService
 from app.ui.dialogs.confirm_dialog import ConfirmDialog
+from app.ui.dialogs.dax_inspector_dialog import DaxInspectorDialog
 from app.ui.dialogs.import_registrations_dialog import ImportRegistrationsDialog
 from app.ui.dialogs.quick_add_workspaces_dialog import QuickAddWorkspacesDialog
 from app.ui.dialogs.refresh_details_dialog import RefreshDetailsDialog
@@ -35,6 +36,7 @@ from app.ui.widgets.rules_table_widget import ValidationRulesTableWidget
 from app.ui.widgets.searchable_combo import SearchableComboBox
 
 if TYPE_CHECKING:
+    from app.services.dax_service import DaxQueryService
     from app.services.metadata_service import MetadataService
     from app.services.powerbi_service import PowerBIService
     from app.services.refresh_service import RefreshService
@@ -66,6 +68,7 @@ class SettingsPage(QWidget):
         powerbi_service: PowerBIService | None = None,
         rule_service: RuleService | None = None,
         refresh_service: RefreshService | None = None,
+        dax_service: DaxQueryService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -73,6 +76,7 @@ class SettingsPage(QWidget):
         self._metadata_service = metadata_service
         self._powerbi_service = powerbi_service
         self._refresh_service = refresh_service
+        self._dax_service = dax_service
         if rule_service is None and registry_service is not None and getattr(registry_service, "_db", None) is not None:
             from app.services.rule_service import RuleService as _RuleSvc
             rule_service = _RuleSvc(registry_service._db)
@@ -112,7 +116,7 @@ class SettingsPage(QWidget):
         title_col.addWidget(subtitle)
         header_row.addLayout(title_col, stretch=1)
 
-        badge = QLabel("Stage 8 — Refresh Monitoring Active")
+        badge = QLabel("Stage 9 — DAX Query Execution Active")
         badge.setObjectName("StageBadge")
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header_row)
@@ -233,6 +237,13 @@ class SettingsPage(QWidget):
         sec2_title = QLabel("2. Semantic Model Metadata Discovery")
         sec2_title.setObjectName("SectionTitle")
         meta_header.addWidget(sec2_title, stretch=1)
+
+        self.inspect_dax_button = QPushButton("▶ Inspect Measure DAX...")
+        self.inspect_dax_button.setObjectName("SecondaryButton")
+        self.inspect_dax_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.inspect_dax_button.clicked.connect(self._handle_inspect_dax_clicked)
+        meta_header.addWidget(self.inspect_dax_button)
+
         meta_layout.addLayout(meta_header)
 
         # Target dataset selector row
@@ -418,6 +429,41 @@ class SettingsPage(QWidget):
                     error_message="Metadata service is not connected.",
                 )
             )
+
+    def _handle_inspect_dax_clicked(self) -> None:
+        if self._dax_service is None:
+            self.registry_banner.show_message(
+                "DAX query execution service is not configured.",
+                level=NotificationLevel.ERROR,
+                title="Service Unavailable",
+            )
+            return
+
+        current_data = self.dataset_selector_combo.currentData()
+        if not current_data or not isinstance(current_data, tuple):
+            self.registry_banner.show_message(
+                "Please select a registered semantic model in the dropdown above first.",
+                level=NotificationLevel.WARNING,
+                title="No Model Selected",
+            )
+            return
+
+        ws_id, ds_id = current_data[0], current_data[1]
+        disp_name = current_data[3] if len(current_data) > 3 else f"{ds_id[:8]}..."
+        cached_meta = self._metadata_service.get_cached_metadata(ws_id, ds_id) if self._metadata_service else None
+        current_obj = self.metadata_selector.selected_object()
+        preselected_measure = current_obj.measure_name if current_obj and current_obj.measure_name else None
+
+        dialog = DaxInspectorDialog(
+            workspace_id=ws_id,
+            dataset_id=ds_id,
+            display_name=disp_name,
+            dax_service=self._dax_service,
+            metadata=cached_meta,
+            preselected_measure=preselected_measure,
+            parent=self,
+        )
+        dialog.exec()
 
     def selected_registration(self) -> RegistrationRecord | None:
         """Return the currently selected registration record, or None."""
