@@ -71,8 +71,8 @@ class ImportSheetDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Import Validation Sheet (Excel / CSV)")
         self.setModal(True)
-        self.setMinimumWidth(720)
-        self.setMinimumHeight(540)
+        self.setMinimumWidth(740)
+        self.setMinimumHeight(420)
         self.setObjectName("ConfirmDialog")
 
         self._sheet_service = sheet_service
@@ -95,146 +95,165 @@ class ImportSheetDialog(QDialog):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(14)
 
-        # Header Title
-        title = QLabel("Import Validation Rules from Excel or CSV")
+        # Header Title & Subtitle
+        title = QLabel("Import Validation Sheet (Excel / CSV)")
         title.setObjectName("DialogTitle")
         layout.addWidget(title)
 
-        banner = QLabel(
-            "Select an Excel (.xlsx) or CSV (.csv) spreadsheet to import validation tests. "
-            "You can choose a default test to apply to imported rows, or have it auto-detected from the file."
-        )
-        banner.setObjectName("InfoBanner")
-        banner.setWordWrap(True)
-        layout.addWidget(banner)
+        subtitle = QLabel("Review the demo sheet format below and choose your Excel or CSV file to import.")
+        subtitle.setObjectName("DialogSubtitle")
+        subtitle.setStyleSheet("color: #64748B; font-size: 12px; margin-bottom: 2px;")
+        layout.addWidget(subtitle)
 
-        # 1. Supported Columns Table Card
-        cols_card = QFrame()
-        cols_card.setObjectName("DialogCard")
-        cols_card.setStyleSheet(
+        # 1. Demo Sheet Card
+        demo_card = QFrame()
+        demo_card.setObjectName("DialogCard")
+        demo_card.setStyleSheet(
             "#DialogCard { background-color: #FFFFFF; border: 1px solid #CBD5E1; "
             "border-radius: 8px; padding: 10px; }"
         )
-        cols_layout = QVBoxLayout(cols_card)
-        cols_layout.setContentsMargins(8, 8, 8, 8)
-        cols_layout.setSpacing(8)
+        demo_layout = QVBoxLayout(demo_card)
+        demo_layout.setContentsMargins(10, 8, 10, 8)
+        demo_layout.setSpacing(8)
 
-        card_title_row = QHBoxLayout()
-        lbl_cols = QLabel("Supported Spreadsheet Columns & Format:")
-        lbl_cols.setStyleSheet("font-size: 12px; font-weight: 700; color: #0F172A;")
-        card_title_row.addWidget(lbl_cols, stretch=1)
+        demo_header = QHBoxLayout()
+        demo_header.setSpacing(8)
+        lbl_demo = QLabel("📋 Demo Sheet Format (Supported Columns)")
+        lbl_demo.setStyleSheet("font-size: 12px; font-weight: 700; color: #0F172A;")
+        demo_header.addWidget(lbl_demo, stretch=1)
 
-        # Sample download buttons
-        btn_sample_xlsx = QPushButton("📥 Sample Template (.xlsx)")
-        btn_sample_xlsx.setObjectName("SecondaryButton")
-        btn_sample_xlsx.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_sample_xlsx.clicked.connect(lambda: self._download_sample_template(is_xlsx=True))
-        card_title_row.addWidget(btn_sample_xlsx)
+        btn_demo_xlsx = QPushButton("📥 Download Demo (.xlsx)")
+        btn_demo_xlsx.setObjectName("SecondaryButton")
+        btn_demo_xlsx.setStyleSheet("font-size: 11px; padding: 4px 10px; border-radius: 5px;")
+        btn_demo_xlsx.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_demo_xlsx.clicked.connect(lambda: self._download_sample_template(is_xlsx=True))
+        demo_header.addWidget(btn_demo_xlsx)
 
-        btn_sample_csv = QPushButton("📥 Sample Template (.csv)")
-        btn_sample_csv.setObjectName("SecondaryButton")
-        btn_sample_csv.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_sample_csv.clicked.connect(lambda: self._download_sample_template(is_xlsx=False))
-        card_title_row.addWidget(btn_sample_csv)
-        cols_layout.addLayout(card_title_row)
+        btn_demo_csv = QPushButton("📥 Download Demo (.csv)")
+        btn_demo_csv.setObjectName("SecondaryButton")
+        btn_demo_csv.setStyleSheet("font-size: 11px; padding: 4px 10px; border-radius: 5px;")
+        btn_demo_csv.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_demo_csv.clicked.connect(lambda: self._download_sample_template(is_xlsx=False))
+        demo_header.addWidget(btn_demo_csv)
+        demo_layout.addLayout(demo_header)
 
-        # Schema Table
-        table = QTableWidget()
-        table.setColumnCount(3)
-        table.setHorizontalHeaderLabels(["Column Name", "Requirement", "Description & Sample Values"])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        table.horizontalHeader().resizeSection(0, 140)
-        table.horizontalHeader().resizeSection(1, 100)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        table.setRowCount(len(SUPPORTED_COLUMNS_INFO))
-        table.setAlternatingRowColors(True)
-        table.verticalHeader().setVisible(False)
-        table.setMaximumHeight(180)
-        table.setStyleSheet(
-            "QTableWidget { gridline-color: #E2E8F0; font-size: 11px; background: #FFFFFF; border: 1px solid #E2E8F0; }"
-            "QHeaderView::section { background: #F8FAFC; color: #334155; font-weight: 700; border: none; "
-            "border-bottom: 1px solid #CBD5E1; padding: 4px; font-size: 11px; }"
+        # Demo Sample Table
+        self.demo_table = QTableWidget()
+        self.demo_table.setColumnCount(8)
+        self.demo_table.setHorizontalHeaderLabels([
+            "SR",
+            "Workspace Name",
+            "Workspace ID",
+            "Report Name",
+            "Dataset ID",
+            "Test to Do",
+            "Table Name",
+            "Column or Measure",
+        ])
+        header = self.demo_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(0, 35)   # SR
+        header.resizeSection(1, 115)  # Workspace Name
+        header.resizeSection(2, 115)  # Workspace ID
+        header.resizeSection(3, 115)  # Report Name
+        header.resizeSection(4, 115)  # Dataset ID
+        header.resizeSection(5, 120)  # Test to Do
+        header.resizeSection(6, 85)   # Table Name
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)  # Column or Measure
+
+        demo_samples = [
+            ("1", "Sales Operations", "31696f1e-...", "Executive Sales", "6935123a-...", "Null / Blank Check", "Orders", "OrderID"),
+            ("2", "Finance Team", "a8c9b3e1-...", "Revenue Model", "f7b198c2-...", "Row Count Check", "Transactions", "—"),
+            ("3", "DAXX (Operations)", "31696f1e-...", "Dax_Practice", "6935123a-...", "Power BI Refresh SLA", "—", "—"),
+        ]
+        self.demo_table.setRowCount(len(demo_samples))
+        self.demo_table.setShowGrid(True)
+        self.demo_table.setAlternatingRowColors(True)
+        self.demo_table.verticalHeader().setVisible(False)
+        self.demo_table.verticalHeader().setDefaultSectionSize(26)
+        self.demo_table.setFixedHeight(108)
+        self.demo_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.demo_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.demo_table.setStyleSheet(
+            "QTableWidget { gridline-color: #E2E8F0; font-size: 11px; background: #FFFFFF; "
+            "border: 1px solid #CBD5E1; border-radius: 4px; } "
+            "QHeaderView::section { background: #F8FAFC; color: #334155; font-weight: 700; "
+            "border: none; border-bottom: 1px solid #CBD5E1; padding: 4px; font-size: 11px; }"
         )
 
-        for row_idx, (col_name, req, desc) in enumerate(SUPPORTED_COLUMNS_INFO):
-            item_name = QTableWidgetItem(col_name)
-            item_name.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-            item_name.setFlags(item_name.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        for r_idx, row_data in enumerate(demo_samples):
+            for c_idx, val in enumerate(row_data):
+                item = QTableWidgetItem(val)
+                if c_idx == 0:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.demo_table.setItem(r_idx, c_idx, item)
 
-            item_req = QTableWidgetItem(req)
-            item_req.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_req.setFlags(item_req.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            if "Required" in req:
-                item_req.setForeground(Qt.GlobalColor.darkRed)
+        demo_layout.addWidget(self.demo_table)
+        layout.addWidget(demo_card)
 
-            item_desc = QTableWidgetItem(desc)
-            item_desc.setFlags(item_desc.flags() & ~Qt.ItemFlag.ItemIsEditable)
-
-            table.setItem(row_idx, 0, item_name)
-            table.setItem(row_idx, 1, item_req)
-            table.setItem(row_idx, 2, item_desc)
-
-        cols_layout.addWidget(table)
-        layout.addWidget(cols_card)
-
-        # 2. Import Settings Card (Choose Test + Import Mode)
-        settings_card = QFrame()
-        settings_card.setObjectName("DialogCard")
-        settings_card.setStyleSheet(
-            "#DialogCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+        # 2. Choose File Card
+        file_card = QFrame()
+        file_card.setObjectName("DialogCard")
+        file_card.setStyleSheet(
+            "#DialogCard { background-color: #F8FAFC; border: 1px solid #CBD5E1; "
             "border-radius: 8px; padding: 12px; }"
         )
-        settings_form = QFormLayout(settings_card)
-        settings_form.setSpacing(10)
-        settings_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        file_layout = QVBoxLayout(file_card)
+        file_layout.setContentsMargins(12, 10, 12, 10)
+        file_layout.setSpacing(8)
 
-        # Test to Perform Dropdown
-        self.test_selector_combo = AnimatedComboBox()
-        self.test_selector_combo.setObjectName("FilterCombo")
-        self.test_selector_combo.addItem("Auto-Detect from 'Test to Do' column in file", "auto")
-        for key, name in FRIENDLY_TEST_NAMES.items():
-            self.test_selector_combo.addItem(f"Force: {name}", key)
-        settings_form.addRow("Test to Perform / Do:", self.test_selector_combo)
+        file_lbl = QLabel("Select File to Import:")
+        file_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #0F172A;")
+        file_layout.addWidget(file_lbl)
 
-        # Import Mode Radio Group
-        mode_box = QHBoxLayout()
-        mode_box.setSpacing(16)
-        self.mode_group = QButtonGroup(self)
+        file_row = QHBoxLayout()
+        file_row.setSpacing(10)
 
-        self.radio_append = QRadioButton("Append to existing sheet rows")
-        self.radio_append.setChecked(True)
-        self.radio_replace = QRadioButton("Replace current sheet with imported rows")
-
-        for i, rb in enumerate((self.radio_append, self.radio_replace)):
-            rb.setStyleSheet("color: #1E293B; font-size: 12px; font-weight: 500;")
-            self.mode_group.addButton(rb, i)
-            mode_box.addWidget(rb)
-        mode_box.addStretch(1)
-        settings_form.addRow("Import Destination:", mode_box)
-
-        # File Chooser Row
-        file_box = QHBoxLayout()
-        file_box.setSpacing(8)
+        self.btn_browse = QPushButton("📁  Choose File (.xlsx, .csv)...")
+        self.btn_browse.setObjectName("PrimaryButton")
+        self.btn_browse.setStyleSheet(
+            "background-color: #1668DC; color: #FFFFFF; font-weight: 700; font-size: 12px; "
+            "padding: 8px 16px; border-radius: 6px;"
+        )
+        self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_browse.clicked.connect(self._handle_browse_file)
+        file_row.addWidget(self.btn_browse)
 
         self.file_path_input = QLineEdit()
         self.file_path_input.setObjectName("SearchInput")
-        self.file_path_input.setPlaceholderText("Select an .xlsx or .csv file...")
+        self.file_path_input.setPlaceholderText("No file chosen yet...")
         self.file_path_input.setReadOnly(True)
-        file_box.addWidget(self.file_path_input, stretch=1)
-
-        self.btn_browse = QPushButton("Browse...")
-        self.btn_browse.setObjectName("SecondaryButton")
-        self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_browse.clicked.connect(self._handle_browse_file)
-        file_box.addWidget(self.btn_browse)
-
-        settings_form.addRow("Spreadsheet File:", file_box)
-        layout.addWidget(settings_card)
+        self.file_path_input.setStyleSheet(
+            "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px 10px; font-size: 12px; }"
+        )
+        file_row.addWidget(self.file_path_input, stretch=1)
+        file_layout.addLayout(file_row)
 
         # Status / Feedback label
-        self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #64748B; font-size: 12px; font-style: italic;")
-        layout.addWidget(self.status_label)
+        self.status_label = QLabel("Click 'Choose File' to select your Excel (.xlsx) or CSV (.csv) file.")
+        self.status_label.setStyleSheet("color: #64748B; font-size: 11px; font-style: italic;")
+        file_layout.addWidget(self.status_label)
+
+        layout.addWidget(file_card)
+
+        # Retain test_selector_combo and radio buttons hidden for backward compatibility
+        self.test_selector_combo = AnimatedComboBox(self)
+        self.test_selector_combo.addItem("Auto-Detect from 'Test to Do' column in file", "auto")
+        for key, name in FRIENDLY_TEST_NAMES.items():
+            self.test_selector_combo.addItem(f"Force: {name}", key)
+        self.test_selector_combo.hide()
+
+        self.mode_group = QButtonGroup(self)
+        self.radio_append = QRadioButton("Append", self)
+        self.radio_append.setChecked(True)
+        self.radio_replace = QRadioButton("Replace", self)
+        self.mode_group.addButton(self.radio_append, 0)
+        self.mode_group.addButton(self.radio_replace, 1)
+        self.radio_append.hide()
+        self.radio_replace.hide()
+
+        layout.addStretch(1)
 
         # Bottom Buttons
         btn_row = QHBoxLayout()
@@ -247,10 +266,10 @@ class ImportSheetDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
         btn_row.addWidget(self.cancel_button)
 
-        self.import_button = QPushButton("✔  Import & Apply to Sheet")
+        self.import_button = QPushButton("✔  Import to Sheet")
         self.import_button.setObjectName("PrimaryButton")
         self.import_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 7px 18px; border-radius: 6px;"
+            "background-color: #10B981; color: #FFFFFF; font-weight: 700; padding: 7px 20px; border-radius: 6px; font-size: 12px;"
         )
         self.import_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.import_button.setEnabled(False)
@@ -273,7 +292,14 @@ class ImportSheetDialog(QDialog):
         self._selected_file = p
         self.file_path_input.setText(str(p))
         self.import_button.setEnabled(True)
-        self.status_label.setText(f"Selected: {p.name} (Ready to import)")
+
+        try:
+            records = self._read_file_records(p)
+            self.status_label.setText(f"✓ Selected '{p.name}' ({len(records)} row(s) found). Ready to import.")
+            self.status_label.setStyleSheet("color: #059669; font-size: 11px; font-weight: 600;")
+        except Exception:
+            self.status_label.setText(f"Selected: {p.name} (Ready to import)")
+            self.status_label.setStyleSheet("color: #1668DC; font-size: 11px; font-weight: 600;")
 
     def _download_sample_template(self, is_xlsx: bool, destination: Path | str | None = None) -> Path | None:
         if destination is not None:

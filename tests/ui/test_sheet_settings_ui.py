@@ -336,4 +336,34 @@ def test_sheet_settings_page_populates_live_workspaces_and_cascades_datasets(qtb
     mock_pbi.sync_all_workspaces_and_assets_async.assert_called_once()
 
 
+def test_import_sheet_dialog_demo_table_and_file_selection(qtbot, tmp_path: Path) -> None:
+    from app.ui.dialogs.import_sheet_dialog import ImportSheetDialog
+
+    dialog = ImportSheetDialog()
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    # Check demo table structure
+    assert dialog.demo_table.columnCount() == 8
+    assert dialog.demo_table.rowCount() == 3
+    assert dialog.demo_table.horizontalHeaderItem(0).text() == "SR"
+    assert dialog.demo_table.horizontalHeaderItem(5).text() == "Test to Do"
+
+    # Initially import button is disabled
+    assert not dialog.import_button.isEnabled()
+    assert dialog.btn_browse.text() == "📁  Choose File (.xlsx, .csv)..."
+
+    # Simulate selecting a valid CSV file
+    csv_file = tmp_path / "valid_rules.csv"
+    dialog._download_sample_template(is_xlsx=False, destination=csv_file)
+
+    dialog._selected_file = csv_file
+    dialog.file_path_input.setText(str(csv_file))
+    dialog.import_button.setEnabled(True)
+
+    assert dialog.import_button.isEnabled()
+    assert str(csv_file) in dialog.file_path_input.text()
+
+
+
 
