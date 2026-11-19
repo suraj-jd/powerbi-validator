@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -32,11 +33,16 @@ from app.integrations.powerbi.models import (
     PowerBIReport,
     PowerBIWorkspace,
 )
-from app.ui.dialogs.refresh_details_dialog import RefreshDetailsDialog, make_status_pill
+from app.ui.dialogs.refresh_details_dialog import (
+    RefreshDetailsDialog,
+    make_status_pill,
+    update_refresh_status_pill,
+)
 from app.ui.dialogs.result_details_dialog import (
     ResultDetailsDialog,
     make_status_table_item,
     make_validation_status_pill,
+    update_validation_status_pill,
 )
 from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.auth_banner import AuthBanner
@@ -567,14 +573,7 @@ class HomePage(QWidget):
         # Update Latest Attempt
         latest = summary.latest_attempt
         if latest is not None:
-            lbl_layout = self.home_attempt_pill_container.layout()
-            if self.home_attempt_pill is not None:
-                lbl_layout.removeWidget(self.home_attempt_pill)
-                self.home_attempt_pill.deleteLater()
-            self.home_attempt_pill = make_status_pill(latest.status)
-            lbl_layout.addWidget(self.home_attempt_pill)
-            lbl_layout.addStretch(1)
-
+            update_refresh_status_pill(self.home_attempt_pill, latest.status)
             self.home_attempt_start.setText(f"Start: {latest.start_time_display}")
             self.home_attempt_duration.setText(f"Duration: {latest.duration_display}")
         else:
@@ -601,13 +600,7 @@ class HomePage(QWidget):
         )
 
     def _reset_attempt_pill(self) -> None:
-        lbl_layout = self.home_attempt_pill_container.layout()
-        if self.home_attempt_pill is not None:
-            lbl_layout.removeWidget(self.home_attempt_pill)
-            self.home_attempt_pill.deleteLater()
-        self.home_attempt_pill = make_status_pill(RefreshStatus.UNKNOWN)
-        lbl_layout.addWidget(self.home_attempt_pill)
-        lbl_layout.addStretch(1)
+        update_refresh_status_pill(self.home_attempt_pill, RefreshStatus.UNKNOWN)
 
     def _reset_refresh_cards(self) -> None:
         self._reset_attempt_pill()
@@ -939,6 +932,7 @@ class HomePage(QWidget):
         self.results_table.setMinimumHeight(240)
         apply_smooth_scrolling(self.results_table)
         self.results_table.cellDoubleClicked.connect(self._handle_table_double_clicked)
+        self.results_table.cellClicked.connect(self._handle_table_clicked)
         self.results_table.hide()
         layout.addWidget(self.results_table)
 
@@ -980,13 +974,7 @@ class HomePage(QWidget):
             self._reset_validation_ui()
 
     def _reset_validation_ui(self) -> None:
-        lbl_layout = self.home_overall_pill_container.layout()
-        if self.home_overall_pill is not None:
-            lbl_layout.removeWidget(self.home_overall_pill)
-            self.home_overall_pill.deleteLater()
-        self.home_overall_pill = make_validation_status_pill("NOT RUN")
-        lbl_layout.addWidget(self.home_overall_pill)
-        lbl_layout.addStretch(1)
+        update_validation_status_pill(self.home_overall_pill, "NOT RUN")
 
         self.home_overall_timing.setText("Last Run: —")
         self.home_passed_count.setText("0")
@@ -1118,13 +1106,7 @@ class HomePage(QWidget):
         )
 
     def _display_run_summary(self, summary: Any) -> None:
-        lbl_layout = self.home_overall_pill_container.layout()
-        if self.home_overall_pill is not None:
-            lbl_layout.removeWidget(self.home_overall_pill)
-            self.home_overall_pill.deleteLater()
-        self.home_overall_pill = make_validation_status_pill(summary.overall_status)
-        lbl_layout.addWidget(self.home_overall_pill)
-        lbl_layout.addStretch(1)
+        update_validation_status_pill(self.home_overall_pill, summary.overall_status)
 
         self.home_overall_timing.setText(f"Run: {summary.duration_display} ({summary.started_at_display})")
         self.home_passed_count.setText(str(summary.passed_count))
@@ -1175,18 +1157,20 @@ class HomePage(QWidget):
             # 7: Duration
             self.results_table.setItem(row_idx, 7, QTableWidgetItem(f"{res.duration_ms} ms"))
 
-            # 8: Action button
-            btn_details = QPushButton("Details...")
-            btn_details.setObjectName("SecondaryButton")
-            btn_details.setStyleSheet(
-                "padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 4px;"
-            )
-            btn_details.setCursor(Qt.CursorShape.PointingHandCursor)
-            # Capture res in default argument of lambda
-            btn_details.clicked.connect(lambda _, r=res: self._open_result_details(r))
-            self.results_table.setCellWidget(row_idx, 8, btn_details)
+            # 8: Action link item (crisp bold text, no floating widget glitch)
+            item_act = QTableWidgetItem("Details ➔")
+            item_act.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            font_act = item_act.font()
+            font_act.setBold(True)
+            item_act.setFont(font_act)
+            item_act.setForeground(QColor("#1668DC"))
+            self.results_table.setItem(row_idx, 8, item_act)
 
         self._apply_results_filter()
+
+    def _handle_table_clicked(self, row: int, col: int) -> None:
+        if col == 8:  # Clicked on Details column
+            self._handle_table_double_clicked(row, col)
 
     def _apply_results_filter(self) -> None:
         query = self.results_search_input.text().strip().lower()

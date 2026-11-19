@@ -436,6 +436,7 @@ class HistoryPage(QWidget):
         self.results_table.setSortingEnabled(True)
         apply_smooth_scrolling(self.results_table)
         self.results_table.cellDoubleClicked.connect(self._handle_result_double_clicked)
+        self.results_table.cellClicked.connect(self._handle_result_clicked)
         drawer_lay.addWidget(self.results_table)
 
         self.empty_results_label = QLabel("Select a run above to inspect individual rule outcomes.")
@@ -624,20 +625,22 @@ class HistoryPage(QWidget):
                 item_dur.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.results_table.setItem(r_idx, 7, item_dur)
 
-                # Col 8: Action button
-                item_act_btn = QTableWidgetItem()
+                # Col 8: Action link item (crisp bold text, no floating widget glitch)
+                item_act_btn = QTableWidgetItem("Details ➔")
+                item_act_btn.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                font_act = item_act_btn.font()
+                font_act.setBold(True)
+                item_act_btn.setFont(font_act)
+                item_act_btn.setForeground(QColor("#1668DC"))
                 self.results_table.setItem(r_idx, 8, item_act_btn)
-
-                btn = QPushButton("Details...")
-                btn.setObjectName("SecondaryButton")
-                btn.setStyleSheet("padding: 2px 8px; font-size: 11px;")
-                btn.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn.clicked.connect(lambda _, r=res: self._open_result_details(r))
-                self.results_table.setCellWidget(r_idx, 8, btn)
         finally:
             self.results_table.setSortingEnabled(True)
 
         self._apply_results_filters()
+
+    def _handle_result_clicked(self, row: int, col: int) -> None:
+        if col == 8:  # Clicked on Details column
+            self._handle_result_double_clicked(row, col)
 
     def _clear_drawer(self) -> None:
         self._active_run = None

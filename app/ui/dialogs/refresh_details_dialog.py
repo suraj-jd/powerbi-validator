@@ -70,6 +70,44 @@ def make_status_pill(status: RefreshStatus | str) -> QLabel:
     return lbl
 
 
+def update_refresh_status_pill(pill: QLabel, status: RefreshStatus | str) -> None:
+    """Update text and styling on an existing refresh status pill in place."""
+    val = status.value if isinstance(status, RefreshStatus) else str(status)
+    val_lower = val.lower()
+
+    if val_lower in ("completed", "success"):
+        bg = "#ECFDF5"
+        text_color = "#065F46"
+        border = "#A7F3D0"
+        label_text = "Completed"
+    elif val_lower in ("failed", "failure", "error"):
+        bg = "#FEF2F2"
+        text_color = "#991B1B"
+        border = "#FECACA"
+        label_text = "Failed"
+    elif val_lower in ("inprogress", "in progress", "running"):
+        bg = "#EFF6FF"
+        text_color = "#1D4ED8"
+        border = "#BFDBFE"
+        label_text = "In Progress"
+    elif val_lower in ("disabled",):
+        bg = "#FFFBEB"
+        text_color = "#92400E"
+        border = "#FDE68A"
+        label_text = "Disabled"
+    else:
+        bg = "#F1F5F9"
+        text_color = "#475569"
+        border = "#CBD5E1"
+        label_text = val.capitalize()
+
+    pill.setText(f" {label_text} ")
+    pill.setStyleSheet(
+        f"background-color: {bg}; color: {text_color}; border: 1px solid {border}; "
+        f"border-radius: 10px; font-size: 11px; font-weight: 700; padding: 2px 8px;"
+    )
+
+
 def make_refresh_status_table_item(status: RefreshStatus | str) -> QTableWidgetItem:
     """Create a crisp, bold, colorful table item for refresh status without widget shrink."""
     val = status.value if isinstance(status, RefreshStatus) else str(status)
