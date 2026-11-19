@@ -326,6 +326,7 @@ class SheetSettingsPage(QWidget):
             "  padding: 6px 8px; "
             "} "
             "QComboBox#SheetCellCombo { "
+            "  combobox-popup: 0; "
             "  border: 1px solid #E2E8F0; "
             "  border-radius: 4px; "
             "  background-color: #FFFFFF; "

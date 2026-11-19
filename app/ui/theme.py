@@ -216,6 +216,7 @@ QLineEdit:focus {
 
 QComboBox,
 QComboBox#FilterCombo {
+    combobox-popup: 0;
     background-color: #FFFFFF;
     border: 1px solid #CBD5E1;
     border-radius: 7px;

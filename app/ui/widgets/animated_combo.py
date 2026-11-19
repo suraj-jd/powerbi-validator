@@ -26,7 +26,8 @@ class AnimatedComboBox(QComboBox):
         list_view.setObjectName("ModernComboView")
         list_view.setUniformItemSizes(True)
         list_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        apply_smooth_scrolling(list_view)
+        list_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        list_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setView(list_view)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -56,6 +57,12 @@ class AnimatedComboBox(QComboBox):
         popup = self.view().window()
         if popup is None:
             return
+
+        # Ensure Qt's internal top/bottom scroller buttons are hidden
+        for child in popup.findChildren(QWidget):
+            if child is not self.view() and "scroller" in child.__class__.__name__.lower():
+                child.hide()
+                child.setFixedHeight(0)
 
         if self._anim_group is not None and self._anim_group.state() == QParallelAnimationGroup.State.Running:
             self._anim_group.stop()
