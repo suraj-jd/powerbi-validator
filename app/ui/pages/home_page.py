@@ -33,7 +33,11 @@ from app.integrations.powerbi.models import (
     PowerBIWorkspace,
 )
 from app.ui.dialogs.refresh_details_dialog import RefreshDetailsDialog, make_status_pill
-from app.ui.dialogs.result_details_dialog import ResultDetailsDialog, make_validation_status_pill
+from app.ui.dialogs.result_details_dialog import (
+    ResultDetailsDialog,
+    make_status_table_item,
+    make_validation_status_pill,
+)
 from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.auth_banner import AuthBanner
 from app.ui.widgets.notification_banner import NotificationBanner
@@ -919,14 +923,26 @@ class HomePage(QWidget):
             "Duration",
             "Action",
         ])
-        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.results_table.horizontalHeader().setStretchLastSection(False)
-        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header = self.results_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setMinimumSectionSize(70)
+
+        self.results_table.setColumnWidth(0, 110)  # Status (bold colorful text)
+        self.results_table.setColumnWidth(1, 230)  # Rule Name
+        self.results_table.setColumnWidth(2, 160)  # Target
+        self.results_table.setColumnWidth(3, 130)  # Check Type
+        self.results_table.setColumnWidth(4, 120)  # Actual Value
+        self.results_table.setColumnWidth(5, 120)  # Expected Value
+        self.results_table.setColumnWidth(6, 100)  # Deviation
+        self.results_table.setColumnWidth(7, 90)   # Duration
+        self.results_table.setColumnWidth(8, 90)   # Action
+
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
         self.results_table.verticalHeader().setVisible(False)
+        self.results_table.verticalHeader().setDefaultSectionSize(34)
         self.results_table.setMinimumHeight(240)
         apply_smooth_scrolling(self.results_table)
         self.results_table.cellDoubleClicked.connect(self._handle_table_double_clicked)
@@ -1138,14 +1154,10 @@ class HomePage(QWidget):
         self.results_table.setRowCount(len(results))
 
         for row_idx, res in enumerate(results):
-            # 0: Status Pill
-            pill = make_validation_status_pill(res.status)
-            w = QWidget()
-            wl = QHBoxLayout(w)
-            wl.setContentsMargins(4, 2, 4, 2)
-            wl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            wl.addWidget(pill)
-            self.results_table.setCellWidget(row_idx, 0, w)
+            # 0: Status (Native bold colorful text, no shrinked widget)
+            item_status = make_status_table_item(res.status)
+            item_status.setData(Qt.ItemDataRole.UserRole, res.id)
+            self.results_table.setItem(row_idx, 0, item_status)
 
             # 1: Rule Name
             item_name = QTableWidgetItem(res.rule_name)

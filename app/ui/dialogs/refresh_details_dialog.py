@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -67,6 +68,43 @@ def make_status_pill(status: RefreshStatus | str) -> QLabel:
         f"border-radius: 10px; font-size: 11px; font-weight: 700; padding: 2px 8px;"
     )
     return lbl
+
+
+def make_refresh_status_table_item(status: RefreshStatus | str) -> QTableWidgetItem:
+    """Create a crisp, bold, colorful table item for refresh status without widget shrink."""
+    val = status.value if isinstance(status, RefreshStatus) else str(status)
+    val_lower = val.lower()
+
+    if val_lower in ("completed", "success"):
+        label_text = "Completed"
+        fg = "#15803D"
+        bg = "#DCFCE7"
+    elif val_lower in ("failed", "failure", "error"):
+        label_text = "Failed"
+        fg = "#B91C1C"
+        bg = "#FEE2E2"
+    elif val_lower in ("inprogress", "in progress", "running"):
+        label_text = "In Progress"
+        fg = "#1D4ED8"
+        bg = "#DBEAFE"
+    elif val_lower in ("disabled",):
+        label_text = "Disabled"
+        fg = "#B45309"
+        bg = "#FEF3C7"
+    else:
+        label_text = val.capitalize()
+        fg = "#475569"
+        bg = "#F1F5F9"
+
+    item = QTableWidgetItem(label_text)
+    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+    font = item.font()
+    font.setBold(True)
+    font.setPointSize(10)
+    item.setFont(font)
+    item.setForeground(QColor(fg))
+    item.setBackground(QColor(bg))
+    return item
 
 
 class RefreshDetailsDialog(QDialog):
@@ -223,6 +261,7 @@ class RefreshDetailsDialog(QDialog):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(34)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -352,14 +391,8 @@ class RefreshDetailsDialog(QDialog):
         self.lbl_table_count.setText(f"{len(self._records)} records persisted")
 
         for row, rec in enumerate(self._records):
-            # Column 0: Status Pill
-            pill = make_status_pill(rec.status)
-            container = QWidget()
-            c_layout = QHBoxLayout(container)
-            c_layout.setContentsMargins(6, 4, 6, 4)
-            c_layout.addWidget(pill)
-            c_layout.addStretch(1)
-            self.table.setCellWidget(row, 0, container)
+            # Column 0: Status (Bold colorful text, no widget shrink)
+            self.table.setItem(row, 0, make_refresh_status_table_item(rec.status))
 
             # Column 1: Start Time
             item_start = QTableWidgetItem(rec.start_time_display)

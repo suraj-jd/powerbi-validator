@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -56,6 +58,42 @@ def make_validation_status_pill(status: ValidationStatus | str) -> QLabel:
         "border-radius: 4px; font-weight: 700; font-size: 11px; padding: 2px 6px;"
     )
     return pill
+
+
+def make_status_table_item(status: ValidationStatus | str | None) -> QTableWidgetItem:
+    """Create a crisp, bold, colorful QTableWidgetItem for validation status without widget shrink."""
+    if not status:
+        item = QTableWidgetItem("—")
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        item.setForeground(QColor("#94A3B8"))
+        item.setData(Qt.ItemDataRole.UserRole, "")
+        return item
+
+    st_val = status.value if isinstance(status, ValidationStatus) else str(status).upper()
+    item = QTableWidgetItem(st_val)
+    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+    font = item.font()
+    font.setBold(True)
+    font.setPointSize(10)
+    item.setFont(font)
+    item.setData(Qt.ItemDataRole.UserRole, st_val)
+
+    if st_val == "PASS":
+        item.setForeground(QColor("#15803D"))
+        item.setBackground(QColor("#DCFCE7"))
+    elif st_val == "FAIL":
+        item.setForeground(QColor("#B91C1C"))
+        item.setBackground(QColor("#FEE2E2"))
+    elif st_val == "WARNING":
+        item.setForeground(QColor("#B45309"))
+        item.setBackground(QColor("#FEF3C7"))
+    elif st_val == "ERROR":
+        item.setForeground(QColor("#7E22CE"))
+        item.setBackground(QColor("#F3E8FF"))
+    else:
+        item.setForeground(QColor("#475569"))
+        item.setBackground(QColor("#F1F5F9"))
+    return item
 
 
 class ResultDetailsDialog(QDialog):
