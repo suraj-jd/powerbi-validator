@@ -461,7 +461,8 @@ class HistoryPage(QWidget):
                 self.runs_table.setItem(row_idx, 2, item_dur)
 
                 # Col 3: Overall Status Pill
-                item_st = NumericTableWidgetItem(run.overall_status.value)
+                item_st = NumericTableWidgetItem("")
+                item_st.setForeground(Qt.GlobalColor.transparent)
                 item_st.setData(Qt.ItemDataRole.UserRole, run.overall_status.value)
                 self.runs_table.setItem(row_idx, 3, item_st)
 
@@ -556,8 +557,8 @@ class HistoryPage(QWidget):
 
             for r_idx, res in enumerate(run.results):
                 # Col 0: Status Pill
-                item_st = QTableWidgetItem(res.status.value)
-                item_st.setData(Qt.ItemDataRole.EditRole, res.status.value)
+                item_st = NumericTableWidgetItem("")
+                item_st.setForeground(Qt.GlobalColor.transparent)
                 item_st.setData(Qt.ItemDataRole.UserRole, res.id)
                 self.results_table.setItem(r_idx, 0, item_st)
 
