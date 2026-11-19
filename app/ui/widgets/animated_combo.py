@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QParallelAnimationGroup, QPropertyAnimation, QRect, Qt
-from PySide6.QtWidgets import QComboBox, QListView, QWidget
+from PySide6.QtGui import QWheelEvent
+from PySide6.QtWidgets import QAbstractItemView, QComboBox, QListView, QWidget
+
+from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 
 
 class AnimatedComboBox(QComboBox):
@@ -11,6 +14,8 @@ class AnimatedComboBox(QComboBox):
 
     - Uses a dedicated QListView viewport to ensure full Qt stylesheet rendering.
     - Animate window opacity and subtle vertical slide upon opening (120ms OutCubic).
+    - Enables smooth deceleration scrolling for long option lists.
+    - Forwards wheel events to parent table when closed, preventing accidental changes and ensuring smooth scrolling.
     - Auto-updates tooltips for long item text.
     - Provides smooth cursor feedback and immediate responsiveness.
     """
@@ -21,11 +26,23 @@ class AnimatedComboBox(QComboBox):
         list_view.setObjectName("ModernComboView")
         list_view.setUniformItemSizes(True)
         list_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        apply_smooth_scrolling(list_view)
         self.setView(list_view)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self._anim_group: QParallelAnimationGroup | None = None
         self.currentIndexChanged.connect(self._handle_index_changed)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        """Prevent accidental dropdown value changes during table/page scrolling.
+
+        Only scrolls through combobox options when the dropdown popup view is active.
+        When closed, forwards wheel events to the parent table or scroll container.
+        """
+        if self.view().isVisible():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
 
     def _handle_index_changed(self, index: int) -> None:
         if index >= 0:

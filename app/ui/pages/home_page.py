@@ -37,6 +37,7 @@ from app.ui.dialogs.result_details_dialog import ResultDetailsDialog, make_valid
 from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.auth_banner import AuthBanner
 from app.ui.widgets.notification_banner import NotificationBanner
+from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 
 if TYPE_CHECKING:
     from app.services.orchestrator_service import (
@@ -927,6 +928,7 @@ class HomePage(QWidget):
         self.results_table.setAlternatingRowColors(True)
         self.results_table.verticalHeader().setVisible(False)
         self.results_table.setMinimumHeight(240)
+        apply_smooth_scrolling(self.results_table)
         self.results_table.cellDoubleClicked.connect(self._handle_table_double_clicked)
         self.results_table.hide()
         layout.addWidget(self.results_table)

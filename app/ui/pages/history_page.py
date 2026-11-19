@@ -41,6 +41,7 @@ from app.ui.dialogs.result_details_dialog import (
     ResultDetailsDialog,
     make_validation_status_pill,
 )
+from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 from app.ui.dialogs.run_comparison_dialog import RunComparisonDialog
 from app.ui.widgets.notification_banner import NotificationBanner
 
@@ -221,6 +222,7 @@ class HistoryPage(QWidget):
         self.runs_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.runs_table.setAlternatingRowColors(True)
         self.runs_table.verticalHeader().setVisible(False)
+        apply_smooth_scrolling(self.runs_table)
         self.runs_table.itemSelectionChanged.connect(self._on_run_selection_changed)
         runs_lay.addWidget(self.runs_table)
 
@@ -262,6 +264,7 @@ class HistoryPage(QWidget):
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
         self.results_table.verticalHeader().setVisible(False)
+        apply_smooth_scrolling(self.results_table)
         self.results_table.cellDoubleClicked.connect(self._handle_result_double_clicked)
         drawer_lay.addWidget(self.results_table)
 

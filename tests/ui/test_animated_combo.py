@@ -49,3 +49,45 @@ def test_animated_combo_popup_show_and_hide(qtbot) -> None:
     # Trigger hidePopup stops any running animation cleanly
     combo.hidePopup()
     assert combo._anim_group is None or not combo._anim_group.state().value
+
+
+def test_animated_combo_wheel_event_ignored_when_popup_closed(qtbot) -> None:
+    from PySide6.QtCore import QPoint
+    from PySide6.QtGui import QWheelEvent
+
+    combo = AnimatedComboBox()
+    qtbot.addWidget(combo)
+    combo.show()
+    combo.addItems(["First", "Second", "Third"])
+    assert combo.currentIndex() == 0
+
+    # Simulate wheel event while popup is closed
+    wheel_ev = QWheelEvent(
+        QPoint(10, 10),
+        QPoint(10, 10),
+        QPoint(0, 0),
+        QPoint(0, -120),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    combo.wheelEvent(wheel_ev)
+
+    # Event was ignored so it passes to parent table, and index is unchanged
+    assert not wheel_ev.isAccepted()
+    assert combo.currentIndex() == 0
+
+
+def test_smooth_scrolling_on_table(qtbot) -> None:
+    from PySide6.QtWidgets import QAbstractItemView, QTableWidget
+    from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
+
+    table = QTableWidget(50, 5)
+    qtbot.addWidget(table)
+    apply_smooth_scrolling(table)
+
+    assert table.verticalScrollMode() == QAbstractItemView.ScrollMode.ScrollPerPixel
+    assert table.horizontalScrollMode() == QAbstractItemView.ScrollMode.ScrollPerPixel
+    assert table.verticalScrollBar().singleStep() == 20
+

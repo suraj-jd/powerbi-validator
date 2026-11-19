@@ -59,6 +59,7 @@ from app.ui.dialogs.sheet_rule_config_dialog import SheetRuleConfigDialog
 from app.ui.theme import CHEVRON_ACTIVE_PATH, CHEVRON_DOWN_PATH
 from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.notification_banner import NotificationBanner
+from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +298,7 @@ class SheetSettingsPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.verticalHeader().setDefaultSectionSize(32)
+        apply_smooth_scrolling(table)
         table.setStyleSheet(
             "QTableWidget#SheetTable { "
             "  background-color: #FFFFFF; "
