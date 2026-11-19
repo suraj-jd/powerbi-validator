@@ -131,6 +131,13 @@ def test_run_comparison_dialog_ui(qtbot):
     assert "Run #1 vs Run #2" in dialog.windowTitle()
     assert dialog.diff_table.rowCount() == 1
     assert dialog.diff_table.item(0, 1).text() == "Sales Null Check"
+    assert dialog.diff_table.verticalHeader().defaultSectionSize() >= 34
+    assert dialog.diff_table.item(0, 0).text() == "REGRESSION"
+    assert dialog.diff_table.item(0, 0).font().bold() is True
+    assert dialog.diff_table.item(0, 3).text() == "PASS"
+    assert dialog.diff_table.item(0, 3).font().bold() is True
+    assert dialog.diff_table.item(0, 4).text() == "FAIL"
+    assert dialog.diff_table.item(0, 4).font().bold() is True
 
 
 def test_backup_maintenance_dialog_ui(qtbot, tmp_path):
