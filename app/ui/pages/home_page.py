@@ -34,6 +34,7 @@ from app.integrations.powerbi.models import (
 )
 from app.ui.dialogs.refresh_details_dialog import RefreshDetailsDialog, make_status_pill
 from app.ui.dialogs.result_details_dialog import ResultDetailsDialog, make_validation_status_pill
+from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.auth_banner import AuthBanner
 from app.ui.widgets.notification_banner import NotificationBanner
 
@@ -728,7 +729,7 @@ class HomePage(QWidget):
         lbl_model.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569; margin-left: 12px;")
         card_header.addWidget(lbl_model)
 
-        self.model_selector_combo = QComboBox()
+        self.model_selector_combo = AnimatedComboBox()
         self.model_selector_combo.setObjectName("FilterCombo")
         self.model_selector_combo.setMinimumWidth(260)
         self.model_selector_combo.setMaximumWidth(420)
@@ -900,7 +901,7 @@ class HomePage(QWidget):
         self.results_search_input.textChanged.connect(lambda _: self._apply_results_filter())
         filter_row.addWidget(self.results_search_input, stretch=1)
 
-        self.results_status_filter = QComboBox()
+        self.results_status_filter = AnimatedComboBox()
         self.results_status_filter.setObjectName("FilterCombo")
         self.results_status_filter.addItems([
             "All Check Outcomes",

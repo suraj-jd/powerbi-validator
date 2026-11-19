@@ -56,6 +56,8 @@ from app.services.sheet_service import (
     format_rule_conditions_summary,
 )
 from app.ui.dialogs.sheet_rule_config_dialog import SheetRuleConfigDialog
+from app.ui.theme import CHEVRON_ACTIVE_PATH, CHEVRON_DOWN_PATH
+from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.notification_banner import NotificationBanner
 
 logger = logging.getLogger(__name__)
@@ -322,17 +324,17 @@ class SheetSettingsPage(QWidget):
             "  padding: 6px 8px; "
             "} "
             "QComboBox#SheetCellCombo { "
-            "  border: 1px solid transparent; "
-            "  border-radius: 0px; "
-            "  background-color: transparent; "
-            "  padding: 2px 6px; "
-            "  margin: 1px; "
+            "  border: 1px solid #E2E8F0; "
+            "  border-radius: 4px; "
+            "  background-color: #FFFFFF; "
+            "  padding: 2px 20px 2px 7px; "
+            "  margin: 1px 2px; "
             "  font-size: 12px; "
             "  color: #0F172A; "
             "} "
             "QComboBox#SheetCellCombo:hover { "
-            "  border: 1px solid #94A3B8; "
-            "  background-color: #FFFFFF; "
+            "  border: 1.5px solid #1668DC; "
+            "  background-color: #F8FAFC; "
             "} "
             "QComboBox#SheetCellCombo:focus { "
             "  border: 1.5px solid #1668DC; "
@@ -341,9 +343,16 @@ class SheetSettingsPage(QWidget):
             "QComboBox#SheetCellCombo::drop-down { "
             "  subcontrol-origin: padding; "
             "  subcontrol-position: top right; "
-            "  width: 16px; "
+            "  width: 18px; "
             "  border-left: none; "
             "} "
+            f"QComboBox#SheetCellCombo::down-arrow {{ "
+            f"  image: url('{CHEVRON_DOWN_PATH}'); "
+            f"  width: 9px; height: 9px; "
+            f"}} "
+            f"QComboBox#SheetCellCombo::down-arrow:hover, QComboBox#SheetCellCombo::down-arrow:focus {{ "
+            f"  image: url('{CHEVRON_ACTIVE_PATH}'); "
+            f"}} "
             "QLineEdit#SheetCellInput { "
             "  border: 1px solid transparent; "
             "  border-radius: 0px; "
@@ -462,13 +471,13 @@ class SheetSettingsPage(QWidget):
         self.sheet_table.setCellWidget(row_idx, 1, chk_widget)
 
         # Col 2: Workspace Dropdown
-        ws_combo = QComboBox()
+        ws_combo = AnimatedComboBox()
         ws_combo.setObjectName("SheetCellCombo")
         self._populate_workspace_combo(ws_combo, selected_id=dto.workspace_id, selected_name=dto.workspace_name)
         self.sheet_table.setCellWidget(row_idx, 2, ws_combo)
 
         # Col 3: Report / Dataset Dropdown
-        ds_combo = QComboBox()
+        ds_combo = AnimatedComboBox()
         ds_combo.setObjectName("SheetCellCombo")
         self._populate_dataset_combo(
             ds_combo,
@@ -487,7 +496,7 @@ class SheetSettingsPage(QWidget):
         )
 
         # Col 4: Test to Do Dropdown
-        test_combo = QComboBox()
+        test_combo = AnimatedComboBox()
         test_combo.setObjectName("SheetCellCombo")
         for key, friendly in FRIENDLY_TEST_NAMES.items():
             test_combo.addItem(friendly, key)

@@ -39,6 +39,7 @@ from app.services.rule_service import (
     VALIDATION_TYPES,
 )
 from app.services.sheet_service import FRIENDLY_TEST_NAMES
+from app.ui.widgets.animated_combo import AnimatedComboBox
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,7 @@ class SheetRuleConfigDialog(QDialog):
             form.addRow("", self.date_disallow_future)
 
         elif vtype == VALIDATION_TYPE_ROW_COUNT:
-            self.row_method = QComboBox()
+            self.row_method = AnimatedComboBox()
             self.row_method.addItems([
                 "Minimum row count threshold",
                 "Fixed expected count",
@@ -235,7 +236,7 @@ class SheetRuleConfigDialog(QDialog):
             form.addRow("Allowed Deviation %:", self.row_dev_pct)
 
         elif vtype == VALIDATION_TYPE_REFRESH:
-            self.ref_status = QComboBox()
+            self.ref_status = AnimatedComboBox()
             self.ref_status.addItems(["Completed", "In Progress", "Any"])
             cur_st = self._config.get("expected_status", "Completed")
             idx = self.ref_status.findText(cur_st)
@@ -249,7 +250,7 @@ class SheetRuleConfigDialog(QDialog):
             self.ref_max_age.setSuffix(" hours")
             form.addRow("Max Age Since Refresh:", self.ref_max_age)
 
-            self.ref_definition = QComboBox()
+            self.ref_definition = AnimatedComboBox()
             self.ref_definition.addItem("Latest refresh attempt must succeed", "latest_attempt")
             self.ref_definition.addItem("At least one successful refresh within window", "latest_success")
             cur_def = self._config.get("definition", "latest_attempt")
@@ -272,7 +273,7 @@ class SheetRuleConfigDialog(QDialog):
             form.addRow("Allowed Deviation %:", self.dax_dev_pct)
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
-            self.anom_lookback = QComboBox()
+            self.anom_lookback = AnimatedComboBox()
             self.anom_lookback.addItem("7 Days Lookback", 7)
             self.anom_lookback.addItem("15 Days Lookback", 15)
             self.anom_lookback.addItem("30 Days Lookback (Recommended)", 30)
@@ -283,7 +284,7 @@ class SheetRuleConfigDialog(QDialog):
             self.anom_lookback.setCurrentIndex(lb_idx)
             form.addRow("Historical Baseline:", self.anom_lookback)
 
-            self.anom_sensitivity = QComboBox()
+            self.anom_sensitivity = AnimatedComboBox()
             self.anom_sensitivity.addItem("Standard (Z-Score ±2.5)", "z_score")
             self.anom_sensitivity.addItem("High Sensitivity (Z-Score ±2.0)", "z_score_high")
             self.anom_sensitivity.addItem("Tolerant (Z-Score ±3.0)", "z_score_tolerant")

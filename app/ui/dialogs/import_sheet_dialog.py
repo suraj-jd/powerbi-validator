@@ -41,6 +41,7 @@ from app.services.rule_service import (
     VALIDATION_TYPE_ROW_COUNT,
 )
 from app.services.sheet_service import FRIENDLY_TEST_NAMES, SheetRowDTO, SheetService
+from app.ui.widgets.animated_combo import AnimatedComboBox
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +189,7 @@ class ImportSheetDialog(QDialog):
         settings_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         # Test to Perform Dropdown
-        self.test_selector_combo = QComboBox()
+        self.test_selector_combo = AnimatedComboBox()
         self.test_selector_combo.setObjectName("FilterCombo")
         self.test_selector_combo.addItem("Auto-Detect from 'Test to Do' column in file", "auto")
         for key, name in FRIENDLY_TEST_NAMES.items():

@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.ui.widgets.animated_combo import AnimatedComboBox
+
 from app.services.rule_service import (
     VALIDATION_TYPE_ANOMALY,
     VALIDATION_TYPE_DAX_MEASURE,
@@ -176,7 +178,7 @@ class AdvancedSettingsDialog(QDialog):
             self.spin_max_age.setValue(float(self._config.get("max_age_hours", 24.0)))
             form.addRow(self._make_label("Max Allowed Age:"), self.spin_max_age)
 
-            self.combo_tz = QComboBox()
+            self.combo_tz = AnimatedComboBox()
             self.combo_tz.addItems(["UTC", "Local Machine Time", "America/New_York", "Europe/London", "Asia/Kolkata"])
             saved_tz = self._config.get("timezone", "UTC")
             idx = self.combo_tz.findText(saved_tz)
@@ -189,7 +191,7 @@ class AdvancedSettingsDialog(QDialog):
             form.addRow("", self.chk_allow_future)
 
         elif vtype == VALIDATION_TYPE_ROW_COUNT:
-            self.combo_baseline_method = QComboBox()
+            self.combo_baseline_method = AnimatedComboBox()
             self.combo_baseline_method.addItems([
                 "Fixed Count",
                 "Previous Successful Run",
@@ -223,7 +225,7 @@ class AdvancedSettingsDialog(QDialog):
             form.addRow(self._make_label("Max Hard Limit:"), self.spin_max_count)
 
         elif vtype == VALIDATION_TYPE_DAX_MEASURE:
-            self.combo_exp_method = QComboBox()
+            self.combo_exp_method = AnimatedComboBox()
             self.combo_exp_method.addItems([
                 "Fixed Baseline",
                 "Min / Max Range",
@@ -263,7 +265,7 @@ class AdvancedSettingsDialog(QDialog):
             form.addRow(self._make_label("DAX Filter Context:"), self.edit_filter)
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
-            self.combo_agg = QComboBox()
+            self.combo_agg = AnimatedComboBox()
             self.combo_agg.addItems(["MEASURE", "SUM", "COUNT", "DISTINCTCOUNT", "AVERAGE", "MIN", "MAX"])
             agg_idx = self.combo_agg.findText(self._config.get("aggregation", "MEASURE"))
             if agg_idx >= 0:
@@ -274,7 +276,7 @@ class AdvancedSettingsDialog(QDialog):
             self.edit_date_col.setPlaceholderText("e.g. OrderDate or Calendar[Date]")
             form.addRow(self._make_label("Time / Date Column:"), self.edit_date_col)
 
-            self.combo_comp_method = QComboBox()
+            self.combo_comp_method = AnimatedComboBox()
             self.combo_comp_method.addItems([
                 "Z-Score (Standard Deviation)",
                 "Historical Median",
@@ -308,7 +310,7 @@ class AdvancedSettingsDialog(QDialog):
             self.chk_ignore_weekends.setChecked(self._config.get("ignore_weekends", True))
             form.addRow("", self.chk_ignore_weekends)
 
-            self.combo_direction = QComboBox()
+            self.combo_direction = AnimatedComboBox()
             self.combo_direction.addItems(["Both (Increase or Decrease)", "Increase Only", "Decrease Only"])
             dir_idx = {"both": 0, "increase_only": 1, "decrease_only": 2}.get(
                 self._config.get("direction", "both"), 0
@@ -316,7 +318,7 @@ class AdvancedSettingsDialog(QDialog):
             self.combo_direction.setCurrentIndex(dir_idx)
             form.addRow(self._make_label("Flag Direction:"), self.combo_direction)
 
-            self.combo_missing = QComboBox()
+            self.combo_missing = AnimatedComboBox()
             self.combo_missing.addItems(["Warning (continue run)", "Fail (flag rule failed)", "Skip Rule"])
             miss_idx = {"warning": 0, "fail": 1, "skip": 2}.get(
                 self._config.get("missing_history_behavior", "warning"), 0
@@ -325,7 +327,7 @@ class AdvancedSettingsDialog(QDialog):
             form.addRow(self._make_label("Missing History Action:"), self.combo_missing)
 
         elif vtype == VALIDATION_TYPE_REFRESH:
-            self.combo_definition = QComboBox()
+            self.combo_definition = AnimatedComboBox()
             self.combo_definition.addItems([
                 "Latest Refresh Attempt",
                 "Latest Successful Refresh",
@@ -335,7 +337,7 @@ class AdvancedSettingsDialog(QDialog):
             self.combo_definition.setCurrentIndex(def_map.get(self._config.get("definition", "latest_attempt"), 0))
             form.addRow(self._make_label("Evaluation Target:"), self.combo_definition)
 
-            self.combo_status = QComboBox()
+            self.combo_status = AnimatedComboBox()
             self.combo_status.addItems(["Completed", "Success", "Any Active"])
             s_idx = self.combo_status.findText(self._config.get("expected_status", "Completed"))
             if s_idx >= 0:

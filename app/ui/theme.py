@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
+
+ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
+CHEVRON_DOWN_PATH = (ASSETS_DIR / "chevron_down.svg").as_posix()
+CHEVRON_ACTIVE_PATH = (ASSETS_DIR / "chevron_down_active.svg").as_posix()
 
 APP_STYLESHEET = """
 QMainWindow {
@@ -194,9 +200,7 @@ QPushButton#DangerButton:hover {
 
 /* Shared Inputs & Enterprise Table */
 QLineEdit#SearchInput,
-QLineEdit,
-QComboBox,
-QComboBox#FilterCombo {
+QLineEdit {
     background-color: #FFFFFF;
     border: 1px solid #CBD5E1;
     border-radius: 7px;
@@ -206,10 +210,31 @@ QComboBox#FilterCombo {
 }
 
 QLineEdit#SearchInput:focus,
-QLineEdit:focus,
+QLineEdit:focus {
+    border-color: #1668DC;
+}
+
+QComboBox,
+QComboBox#FilterCombo {
+    background-color: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 7px;
+    padding: 5px 28px 5px 10px;
+    color: #0F172A;
+    min-height: 20px;
+    font-size: 12px;
+}
+
+QComboBox:hover,
+QComboBox#FilterCombo:hover {
+    border-color: #94A3B8;
+    background-color: #F8FAFC;
+}
+
 QComboBox:focus,
 QComboBox#FilterCombo:focus {
-    border-color: #1668DC;
+    border: 1.5px solid #1668DC;
+    background-color: #FFFFFF;
 }
 
 QComboBox::drop-down {
@@ -217,16 +242,82 @@ QComboBox::drop-down {
     subcontrol-position: top right;
     width: 24px;
     border-left: none;
+    border-top-right-radius: 7px;
+    border-bottom-right-radius: 7px;
 }
 
+QComboBox::down-arrow {
+    image: url("__CHEVRON_DOWN__");
+    width: 10px;
+    height: 10px;
+}
+
+QComboBox::down-arrow:hover,
+QComboBox::down-arrow:focus {
+    image: url("__CHEVRON_ACTIVE__");
+}
+
+/* Modern Dropdown Popup View */
+QListView#ModernComboView,
 QComboBox QAbstractItemView {
     background-color: #FFFFFF;
     border: 1px solid #CBD5E1;
-    border-radius: 6px;
-    selection-background-color: #EBF3FF;
-    selection-color: #0F172A;
-    color: #0F172A;
+    border-radius: 8px;
     padding: 4px;
+    outline: none;
+    font-size: 12px;
+    selection-background-color: transparent;
+}
+
+QListView#ModernComboView::item,
+QComboBox QAbstractItemView::item {
+    padding: 6px 10px;
+    min-height: 24px;
+    border-radius: 5px;
+    color: #0F172A;
+    margin: 1px 2px;
+}
+
+QListView#ModernComboView::item:hover,
+QComboBox QAbstractItemView::item:hover {
+    background-color: #F1F5F9;
+    color: #1668DC;
+}
+
+QListView#ModernComboView::item:selected,
+QComboBox QAbstractItemView::item:selected {
+    background-color: #EBF3FF;
+    color: #1668DC;
+    font-weight: 600;
+}
+
+/* Slim scrollbars for dropdown popups */
+QListView#ModernComboView QScrollBar:vertical,
+QComboBox QAbstractItemView QScrollBar:vertical {
+    width: 6px;
+    background: transparent;
+    margin: 4px 1px 4px 0px;
+    border: none;
+}
+
+QListView#ModernComboView QScrollBar::handle:vertical,
+QComboBox QAbstractItemView QScrollBar::handle:vertical {
+    background: #CBD5E1;
+    border-radius: 3px;
+    min-height: 20px;
+}
+
+QListView#ModernComboView QScrollBar::handle:vertical:hover,
+QComboBox QAbstractItemView QScrollBar::handle:vertical:hover {
+    background: #94A3B8;
+}
+
+QListView#ModernComboView QScrollBar::add-line:vertical,
+QListView#ModernComboView QScrollBar::sub-line:vertical,
+QComboBox QAbstractItemView QScrollBar::add-line:vertical,
+QComboBox QAbstractItemView QScrollBar::sub-line:vertical {
+    height: 0px;
+    border: none;
 }
 
 QTableView#EnterpriseTableView,
@@ -295,7 +386,7 @@ QLabel#DialogTitle {
     font-size: 16px;
     font-weight: 700;
 }
-"""
+""".replace("__CHEVRON_DOWN__", CHEVRON_DOWN_PATH).replace("__CHEVRON_ACTIVE__", CHEVRON_ACTIVE_PATH)
 
 _NAV_SVGS: dict[str, str] = {
     "home": (
