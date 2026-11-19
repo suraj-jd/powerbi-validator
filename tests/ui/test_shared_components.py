@@ -102,7 +102,7 @@ def test_confirm_dialog_accept_and_reject(qtbot) -> None:
 
 
 def test_about_page_shared_component_demo(qtbot, tmp_path: Path) -> None:
-    page = AboutPage(logs_dir=tmp_path / "logs")
+    page = AboutPage(logs_dir=tmp_path / "logs", db_path=tmp_path / "data" / "validation_tool.db")
     qtbot.addWidget(page)
     page.show()
 
@@ -112,6 +112,16 @@ def test_about_page_shared_component_demo(qtbot, tmp_path: Path) -> None:
     qtbot.mouseClick(page.demo_notify_btn, Qt.MouseButton.LeftButton)
     assert page.demo_banner.isVisible()
     assert page.demo_banner.current_level == NotificationLevel.INFO
+
+    # Verify tabs and structure
+    assert page.tabs.count() == 4
+    tab_titles = [page.tabs.tabText(i) for i in range(page.tabs.count())]
+    assert any("User Guide" in t for t in tab_titles)
+    assert any("Sections" in t for t in tab_titles)
+    assert any("Validation Tests" in t for t in tab_titles)
+    assert any("Diagnostics" in t for t in tab_titles)
+    assert page.open_logs_button is not None
+    assert page.open_db_button is not None
 
 
 def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_path: Path) -> None:
