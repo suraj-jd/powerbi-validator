@@ -6,7 +6,90 @@ A local-first Windows desktop application for automating Power BI semantic model
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6%20(Qt%206)-41CD52.svg)](https://www.qt.io/)
 [![Database](https://img.shields.io/badge/database-SQLite%20%2B%20Alembic-003B57.svg)](https://www.sqlalchemy.org/)
 [![Version](https://img.shields.io/badge/version-1.0.0-success.svg)](docs/RELEASE_NOTES_v1.0.0.md)
-[![Tests](https://img.shields.io/badge/tests-168%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-198%20passed-brightgreen.svg)](tests/)
+
+---
+
+## 📸 Application Tour & Interface Showcase
+
+Explore the application screens and core capabilities below:
+
+### 1. 📊 Executive Dashboard & Live Model Health Monitor
+> **Real-time validation dashboard with Microsoft Entra ID authentication, multi-metric KPI summary cards, rule-level execution table, and background dataset refresh tracking.**
+
+![Dashboard & Health Monitor](docs/screenshots/01_dashboard_home.png)
+
+* **Enterprise Entra ID Sign-In**: Zero-trust authentication with tenant selection, account switching, and DPAPI session protection.
+* **Model Health Overview**: Instant KPI metrics displaying overall status (`PASS`, `WARNING`, `FAIL`, `ERROR`), passed count, anomalies, and runtime duration.
+* **Detailed Execution Table**: Interactive results grid with colorful bold status badges, expected vs. actual values, percentage deviations, and single-click diagnostic details.
+* **Power BI Refresh Monitoring**: Background tracking of scheduled refresh history, distinguishing latest attempts from successful completions with duration and reliability rates.
+
+---
+
+### 2. 📝 Validation Sheet — Spreadsheet-Style Test Designer
+> **Configure, parameterize, and manage all your validation tests in an intuitive Excel-style spreadsheet interface.**
+
+![Validation Sheet](docs/screenshots/02_validation_sheet.png)
+
+* **Familiar Spreadsheet Grid**: Add rows, toggle test enablement, and select workspaces, semantic models, and check types directly from dropdowns.
+* **Supported Validation Check Types**:
+  * 🔍 **Null / Blank Check**: Detects missing or empty primary/foreign keys with count and percentage thresholds.
+  * 🔁 **Duplicate Check**: Enforces uniqueness across single or composite primary key columns.
+  * 📅 **Latest Date Freshness**: Verifies transaction freshness SLAs (e.g. 24h) and detects future date anomalies.
+  * 🧮 **DAX Measure Check**: Evaluates measures directly against Power BI semantic models with baseline deviations.
+  * 📈 **Row Count Check**: Validates table scale against fixed bounds or previous execution baselines.
+  * ⏱️ **Refresh SLA Check**: Asserts Power BI service dataset refresh completion within expected SLA windows.
+* **Ribbon Actions**: One-click actions to `Add Row`, `Delete Row`, `Save Sheet`, `Export Sheet` to CSV/XLSX, `Import Tests`, and `Sync PBI` catalog.
+
+---
+
+### 3. 📜 Historical Audit Trail & Run Explorer
+> **Comprehensive historical run archive with Excel-style multi-column filtering, universal search, and per-check diagnostic drawer.**
+
+![History Explorer](docs/screenshots/03_history_explorer.png)
+
+* **Execution Runs Log**: Complete chronology of every validation execution with ID, timestamp, duration, overall status, and check pass/fail ratios.
+* **Excel-Style Filters**: Universal text search, status dropdown filters (`Failed Only`, `Passed Only`), and date range pickers.
+* **Result Drawer**: Select any run to instantly inspect all individual rule outcomes in the lower drawer without leaving the page.
+* **Export Actions**: Export runs to styled Excel workbooks (`.xlsx`), raw CSV, or sanitized diagnostic text reports.
+
+---
+
+### 4. ⚖️ Side-by-Side Run Comparison & Regression Diff
+> **Pinpoint regressions, resolved checks, and rule additions between any two validation execution runs.**
+
+![Run Comparison](docs/screenshots/04_run_comparison.png)
+
+* **Interactive Run Selectors**: Live dropdowns for **Baseline Run (A)** and **Target Run (B)** with a `⇄ Swap Runs` button for instant re-comparison.
+* **Diff Classification Cards**: Filterable KPI cards for **REGRESSIONS** (worsened checks), **IMPROVEMENTS** (resolved checks), **UNCHANGED**, and **NEW / REMOVED RULES**.
+* **Filterable Diff Table**: Universal text search by rule name or target, change type filter, and generous interactive column widths.
+* **Diff Export**: One-click **`📥 Export Diff to CSV`** button for team reviews and audit documentation.
+
+---
+
+### 5. 🗄️ Database Health & Storage Maintenance
+> **Full visibility into local SQLite database metrics with compaction, live backups, integrity checks, and retention pruning.**
+
+![Database Maintenance](docs/screenshots/05_database_maintenance.png)
+
+* **Storage Health Overview**: Live database path, file size in KB/MB, total stored runs, results, rules, and active date range.
+* **Compaction (VACUUM)**: Reclaim unused storage and defragment database pages on demand.
+* **Transaction-Safe Backups**: Online SQLite snapshot creation without stopping active validations or the user interface.
+* **Windows-Safe Restoration**: Safely replaces and validates database files while managing connection pools and WAL logs.
+* **Interactive Retention Pruning**: Live preview of eligible runs older than $N$ days before permanent deletion.
+
+---
+
+### 6. 📘 Integrated Architecture & User Manual (About Page)
+> **Comprehensive application guide, architectural specifications, and real-time environment diagnostics.**
+
+![About Page](docs/screenshots/06_about_page.png)
+
+* **Architecture & Zero-Trust Cloud Specs**: Details on local-only query evaluation, DPAPI secret encryption, and security policies.
+* **Step-by-Step User Manual**: Interactive guides for setting up Azure Entra ID, creating validation sheets, inspecting DAX queries, and automating tests.
+* **Live System Diagnostics**: Real-time validation of SQLite connection, DPAPI protection, log paths, and Power BI REST connectivity.
+
+---
 
 ---
 
