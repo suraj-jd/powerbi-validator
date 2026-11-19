@@ -286,3 +286,54 @@ def test_import_sheet_dialog_structure_and_template(qtbot, tmp_path: Path) -> No
     assert dto_forced.validation_type == VALIDATION_TYPE_NULL
 
 
+def test_sheet_settings_page_populates_live_workspaces_and_cascades_datasets(qtbot, db: DatabaseManager) -> None:
+    from app.integrations.powerbi.models import PowerBIDataset, PowerBIReport, PowerBIWorkspace
+
+    mock_pbi = MagicMock(spec=PowerBIService)
+    mock_pbi.is_busy = False
+    mock_pbi.cached_workspaces = []
+
+    page = SheetSettingsPage(db=db, powerbi_service=mock_pbi)
+    qtbot.addWidget(page)
+    page.show()
+
+    ws1 = PowerBIWorkspace(id="ws-1111", name="Finance WS")
+    ws2 = PowerBIWorkspace(id="ws-2222", name="Marketing WS")
+    page._on_workspaces_loaded([ws1, ws2])
+
+    ds1 = PowerBIDataset(id="ds-1111", name="P&L Model")
+    rpt1 = PowerBIReport(id="rpt-1111", name="Income Statement", datasetId="ds-1111")
+    page._on_workspace_assets_loaded(ws1.id, [ds1], [rpt1])
+
+    ds2 = PowerBIDataset(id="ds-2222", name="Campaign Model")
+    rpt2 = PowerBIReport(id="rpt-2222", name="Ad Performance", datasetId="ds-2222")
+    page._on_workspace_assets_loaded(ws2.id, [ds2], [rpt2])
+
+    # Click Add Row
+    qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
+    assert page.sheet_table.rowCount() == 1
+
+    ws_combo = page.sheet_table.cellWidget(0, 2)
+    ds_combo = page.sheet_table.cellWidget(0, 3)
+    assert isinstance(ws_combo, QComboBox)
+    assert isinstance(ds_combo, QComboBox)
+
+    # Check that both workspaces are available in the dropdown
+    assert ws_combo.count() == 2
+    assert "Finance WS" in ws_combo.itemText(0)
+    assert "Marketing WS" in ws_combo.itemText(1)
+
+    # By default, first workspace is selected, so dataset combo has Finance report
+    assert "Income Statement" in ds_combo.itemText(0)
+
+    # Switch workspace combo to Marketing WS (index 1)
+    ws_combo.setCurrentIndex(1)
+    # Cascades to Marketing report
+    assert "Ad Performance" in ds_combo.itemText(0)
+
+    # Test Sync PBI button triggers sync
+    qtbot.mouseClick(page.btn_sync_pbi, Qt.MouseButton.LeftButton)
+    mock_pbi.sync_all_workspaces_and_assets_async.assert_called_once()
+
+
+

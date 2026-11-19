@@ -227,3 +227,39 @@ def test_home_page_model_selector_dropdown(qtbot):
     assert page.workspace_id_input.text() == "ws-fin"
     assert page.dataset_id_input.text() == "ds-fin"
 
+
+def test_home_page_populates_live_powerbi_models_in_dropdown(qtbot):
+    from app.integrations.powerbi.models import PowerBIDataset, PowerBIReport, PowerBIWorkspace
+    from app.services.powerbi_service import PowerBIService
+
+    mock_pbi = MagicMock(spec=PowerBIService)
+    mock_pbi.is_busy = False
+    mock_pbi.cached_workspaces = []
+
+    page = HomePage(powerbi_service=mock_pbi)
+    qtbot.addWidget(page)
+    page.show()
+
+    # Initially empty
+    assert "No semantic models" in page.model_selector_combo.itemText(0)
+
+    # Live Power BI workspaces loaded
+    ws = PowerBIWorkspace(id="ws-ops", name="Operations WS")
+    page.set_workspaces([ws])
+
+    # Live assets loaded
+    ds = PowerBIDataset(id="ds-ops", name="Inventory Model")
+    rpt = PowerBIReport(id="rpt-ops", name="Warehouse Dashboard", datasetId="ds-ops")
+    page.set_workspace_assets("ws-ops", [ds], [rpt])
+
+    # The dropdown now contains the live Power BI model
+    assert page.model_selector_combo.count() == 1
+    assert "Warehouse Dashboard (Operations WS)" in page.model_selector_combo.itemText(0)
+    assert page.workspace_id_input.text() == "ws-ops"
+    assert page.dataset_id_input.text() == "ds-ops"
+
+    # Click refresh button triggers sync
+    qtbot.mouseClick(page.refresh_models_button, Qt.MouseButton.LeftButton)
+    mock_pbi.sync_all_workspaces_and_assets_async.assert_called_once()
+
+

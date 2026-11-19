@@ -561,16 +561,24 @@ class SheetSettingsPage(QWidget):
 
         # Collect options from cached Power BI workspaces or registered registrations
         options: list[tuple[str, str]] = []  # (name, id)
-        for ws in self._cached_workspaces:
-            options.append((ws.name, ws.id))
+
+        workspaces_source = list(self._cached_workspaces)
+        if not workspaces_source and self._powerbi_service is not None:
+            workspaces_source = self._powerbi_service.cached_workspaces
+            if workspaces_source:
+                self._cached_workspaces = list(workspaces_source)
+
+        for ws in workspaces_source:
+            if not any(opt[1].lower() == ws.id.lower() for opt in options):
+                options.append((ws.name, ws.id))
 
         if self._registry_service is not None:
             regs = self._registry_service.list_registrations(active_only=False)
             for reg in regs:
-                if not any(opt[1] == reg.workspace_id for opt in options):
+                if not any(opt[1].lower() == reg.workspace_id.lower() for opt in options):
                     options.append((reg.workspace_name, reg.workspace_id))
 
-        if selected_id and not any(opt[1] == selected_id for opt in options):
+        if selected_id and not any(opt[1].lower() == selected_id.lower() for opt in options):
             options.append((selected_name or f"Workspace {selected_id[:8]}", selected_id))
 
         if not options:
@@ -580,7 +588,7 @@ class SheetSettingsPage(QWidget):
         for idx, (name, ws_id) in enumerate(options):
             label = f"{name} ({ws_id[:8]}...)" if ws_id else name
             combo.addItem(label, ws_id)
-            if selected_id and ws_id == selected_id:
+            if selected_id and ws_id.lower() == selected_id.lower():
                 select_idx = idx
 
         combo.setCurrentIndex(select_idx)
@@ -598,25 +606,36 @@ class SheetSettingsPage(QWidget):
         combo.clear()
 
         options: list[tuple[str, str, str]] = []  # (report_name, dataset_id, report_id)
+        ws_key = workspace_id.lower() if workspace_id else ""
 
         # Check cached assets for this workspace
-        if workspace_id in self._cached_assets:
-            datasets, reports = self._cached_assets[workspace_id]
+        if ws_key and ws_key in self._cached_assets:
+            datasets, reports = self._cached_assets[ws_key]
             for ds in datasets:
                 matching_rpt = next((r for r in reports if (r.dataset_id or "").lower() == ds.id.lower()), None)
                 rpt_title = matching_rpt.name if matching_rpt else ds.name
                 rpt_id = matching_rpt.id if matching_rpt else ""
                 options.append((rpt_title, ds.id, rpt_id))
+        elif ws_key and self._powerbi_service is not None:
+            datasets = self._powerbi_service.get_cached_datasets(workspace_id)
+            reports = self._powerbi_service.get_cached_reports(workspace_id)
+            if datasets or reports:
+                self._cached_assets[ws_key] = (list(datasets), list(reports))
+                for ds in datasets:
+                    matching_rpt = next((r for r in reports if (r.dataset_id or "").lower() == ds.id.lower()), None)
+                    rpt_title = matching_rpt.name if matching_rpt else ds.name
+                    rpt_id = matching_rpt.id if matching_rpt else ""
+                    options.append((rpt_title, ds.id, rpt_id))
 
         # Also check registrations in SQLite
         if self._registry_service is not None:
             regs = self._registry_service.list_registrations(active_only=False)
             for reg in regs:
                 if not workspace_id or reg.workspace_id.lower() == workspace_id.lower():
-                    if not any(opt[1] == reg.dataset_id for opt in options):
+                    if not any(opt[1].lower() == reg.dataset_id.lower() for opt in options):
                         options.append((reg.report_name, reg.dataset_id, reg.report_id or ""))
 
-        if selected_ds_id and not any(opt[1] == selected_ds_id for opt in options):
+        if selected_ds_id and not any(opt[1].lower() == selected_ds_id.lower() for opt in options):
             options.append((selected_report_name or f"Dataset {selected_ds_id[:8]}", selected_ds_id, ""))
 
         if not options:
@@ -626,7 +645,7 @@ class SheetSettingsPage(QWidget):
         for idx, (rpt_name, ds_id, rpt_id) in enumerate(options):
             label = f"{rpt_name} ({ds_id[:8]}...)" if ds_id else rpt_name
             combo.addItem(label, (ds_id, rpt_name, rpt_id))
-            if selected_ds_id and ds_id == selected_ds_id:
+            if selected_ds_id and ds_id.lower() == selected_ds_id.lower():
                 select_idx = idx
 
         combo.setCurrentIndex(select_idx)
@@ -643,7 +662,8 @@ class SheetSettingsPage(QWidget):
         self._on_row_dataset_changed(ds_combo, dto)
 
         # Trigger async fetch if assets not yet cached
-        if ws_id and ws_id not in self._cached_assets and self._powerbi_service is not None:
+        ws_key = ws_id.lower() if ws_id else ""
+        if ws_key and ws_key not in self._cached_assets and self._powerbi_service is not None:
             self._powerbi_service.list_workspace_assets_async(ws_id)
 
     def _on_row_dataset_changed(self, ds_combo: QComboBox, dto: SheetRowDTO) -> None:
@@ -733,11 +753,21 @@ class SheetSettingsPage(QWidget):
         def_ds_id = ""
         def_rpt_name = ""
 
-        if self._cached_workspaces:
-            def_ws_id = self._cached_workspaces[0].id
-            def_ws_name = self._cached_workspaces[0].name
-            if def_ws_id in self._cached_assets:
-                datasets, _ = self._cached_assets[def_ws_id]
+        workspaces_source = list(self._cached_workspaces)
+        if not workspaces_source and self._powerbi_service is not None:
+            workspaces_source = self._powerbi_service.cached_workspaces
+
+        if workspaces_source:
+            def_ws_id = workspaces_source[0].id
+            def_ws_name = workspaces_source[0].name
+            ws_key = def_ws_id.lower()
+            if ws_key in self._cached_assets:
+                datasets, _ = self._cached_assets[ws_key]
+                if datasets:
+                    def_ds_id = datasets[0].id
+                    def_rpt_name = datasets[0].name
+            elif self._powerbi_service is not None:
+                datasets = self._powerbi_service.get_cached_datasets(def_ws_id)
                 if datasets:
                     def_ds_id = datasets[0].id
                     def_rpt_name = datasets[0].name
@@ -931,7 +961,8 @@ class SheetSettingsPage(QWidget):
                 level=NotificationLevel.INFO,
                 title="Sync in Progress",
             )
-            self._powerbi_service.list_workspaces_async()
+            if not self._powerbi_service.is_busy:
+                self._powerbi_service.sync_all_workspaces_and_assets_async()
         else:
             self.banner.show_message(
                 "Power BI service is not configured. Please sign in via the top authentication banner.",
@@ -947,7 +978,7 @@ class SheetSettingsPage(QWidget):
 
     def _on_workspaces_loaded(self, workspaces: list[PowerBIWorkspace]) -> None:
         self.btn_sync_pbi.setEnabled(True)
-        self.btn_sync_pbi.setText("🔄  Sync Power BI")
+        self.btn_sync_pbi.setText("🔄 Sync PBI")
         self._cached_workspaces = list(workspaces)
 
         # Refresh all workspace combos across existing rows
@@ -969,11 +1000,11 @@ class SheetSettingsPage(QWidget):
         datasets: list[PowerBIDataset],
         reports: list[PowerBIReport],
     ) -> None:
-        self._cached_assets[workspace_id] = (list(datasets), list(reports))
+        self._cached_assets[workspace_id.lower()] = (list(datasets), list(reports))
 
         # Update dataset combos for rows targeting this workspace
         for row_idx in range(self.sheet_table.rowCount()):
-            if row_idx < len(self._rows) and self._rows[row_idx].workspace_id == workspace_id:
+            if row_idx < len(self._rows) and self._rows[row_idx].workspace_id.lower() == workspace_id.lower():
                 ds_combo = self.sheet_table.cellWidget(row_idx, 3)
                 if isinstance(ds_combo, QComboBox):
                     self._populate_dataset_combo(
@@ -985,7 +1016,7 @@ class SheetSettingsPage(QWidget):
 
     def _on_powerbi_error(self, err_msg: str) -> None:
         self.btn_sync_pbi.setEnabled(True)
-        self.btn_sync_pbi.setText("🔄  Sync Power BI")
+        self.btn_sync_pbi.setText("🔄 Sync PBI")
         self.banner.show_message(
             f"Power BI sync encountered an issue: {err_msg}",
             level=NotificationLevel.WARNING,

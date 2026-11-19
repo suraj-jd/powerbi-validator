@@ -126,6 +126,40 @@ class PowerBIService(QObject):
             on_success=self._emit_workspaces,
         )
 
+    def sync_all_workspaces_and_assets_async(self) -> None:
+        """Fetch all accessible workspaces and their datasets/reports in a single background worker."""
+        if self.is_busy:
+            logger.debug("Power BI operation already running; ignoring duplicate request.")
+            return
+
+        def _fetch_all() -> tuple[list[PowerBIWorkspace], dict[str, tuple[list[PowerBIDataset], list[PowerBIReport]]]]:
+            workspaces = self._workspace_client.list_workspaces()
+            assets: dict[str, tuple[list[PowerBIDataset], list[PowerBIReport]]] = {}
+            for ws in workspaces:
+                try:
+                    ds_list = self._dataset_client.list_datasets(ws.id)
+                except Exception as ex:
+                    logger.warning("Could not list datasets for workspace %s (%s): %s", ws.name, ws.id, ex)
+                    ds_list = []
+                try:
+                    rpt_list = self._workspace_client.list_reports(ws.id)
+                except Exception as ex:
+                    logger.warning("Could not list reports for workspace %s (%s): %s", ws.name, ws.id, ex)
+                    rpt_list = []
+                assets[ws.id] = (ds_list, rpt_list)
+            return workspaces, assets
+
+        def _on_success(payload: tuple[list[PowerBIWorkspace], dict[str, tuple[list[PowerBIDataset], list[PowerBIReport]]]]) -> None:
+            workspaces, assets = payload
+            self._cached_workspaces = list(workspaces)
+            self.workspaces_loaded.emit(list(workspaces))
+            for ws_id, (ds_list, rpt_list) in assets.items():
+                self._cached_datasets[ws_id.lower()] = list(ds_list)
+                self._cached_reports[ws_id.lower()] = list(rpt_list)
+                self.workspace_assets_loaded.emit(ws_id, list(ds_list), list(rpt_list))
+
+        self._start_worker(_fetch_all, on_success=_on_success)
+
     def list_workspace_assets_async(self, workspace_id: str) -> None:
         """Fetch datasets and reports inside a workspace in the background."""
 

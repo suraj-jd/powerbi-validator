@@ -107,6 +107,8 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_auth_service()
         self._connect_powerbi_service()
+        if self._auth_service and self._auth_service.state.status == AuthStatus.AUTHENTICATED:
+            self._auto_load_powerbi_catalog()
         self.navigate_to("home")
 
         logger.info("MainWindow initialized (%s v%s)", APP_NAME, APP_VERSION)
@@ -154,6 +156,7 @@ class MainWindow(QMainWindow):
             registry_service=self._registry_service,
             orchestrator_service=self._orchestrator_service,
             rule_service=self._rule_service,
+            powerbi_service=self._powerbi_service,
             parent=self,
         )
         self.sheet_settings_page = SheetSettingsPage(
@@ -307,19 +310,19 @@ class MainWindow(QMainWindow):
             return
 
         self.home_page.load_workspaces_requested.connect(
-            self._powerbi_service.list_workspaces_async
+            self._handle_load_workspaces_requested
         )
         self.home_page.load_workspace_assets_requested.connect(
             self._powerbi_service.list_workspace_assets_async
         )
         self.home_page.verify_access_requested.connect(self._handle_verify_access_requested)
         self.sheet_settings_page.sync_workspaces_requested.connect(
-            self._powerbi_service.list_workspaces_async
+            self._handle_load_workspaces_requested
         )
 
         self._powerbi_service.busy_changed.connect(self.home_page.set_connectivity_busy)
-        self._powerbi_service.workspaces_loaded.connect(self.home_page.set_workspaces)
-        self._powerbi_service.workspace_assets_loaded.connect(self.home_page.set_workspace_assets)
+        self._powerbi_service.workspaces_loaded.connect(self._handle_workspaces_loaded)
+        self._powerbi_service.workspace_assets_loaded.connect(self._handle_workspace_assets_loaded)
         self._powerbi_service.access_verified.connect(self._handle_access_verified)
         self._powerbi_service.error_occurred.connect(
             lambda msg: self.show_notification(
@@ -328,6 +331,28 @@ class MainWindow(QMainWindow):
                 title="Power BI Connectivity",
             )
         )
+
+    def _handle_load_workspaces_requested(self) -> None:
+        if self._powerbi_service is not None and not self._powerbi_service.is_busy:
+            self._powerbi_service.sync_all_workspaces_and_assets_async()
+
+    def _handle_workspaces_loaded(self, workspaces: list[PowerBIWorkspace]) -> None:
+        self.home_page.set_workspaces(workspaces)
+        self.sheet_settings_page._on_workspaces_loaded(workspaces)
+
+    def _handle_workspace_assets_loaded(
+        self,
+        workspace_id: str,
+        datasets: list[PowerBIDataset],
+        reports: list[PowerBIReport],
+    ) -> None:
+        self.home_page.set_workspace_assets(workspace_id, datasets, reports)
+        self.sheet_settings_page._on_workspace_assets_loaded(workspace_id, datasets, reports)
+
+    def _auto_load_powerbi_catalog(self) -> None:
+        if self._powerbi_service is not None and not self._powerbi_service.is_busy:
+            logger.info("Auto-loading live Power BI catalog...")
+            self._powerbi_service.sync_all_workspaces_and_assets_async()
 
     def _handle_verify_access_requested(
         self,
@@ -386,6 +411,7 @@ class MainWindow(QMainWindow):
             self._sidebar_user_name.setText(acct.display_name)
             self._sidebar_user_email.setText(acct.username or "Signed in")
             self._sign_out_button.setVisible(True)
+            self._auto_load_powerbi_catalog()
         else:
             self._avatar_label.setText("--")
             self._avatar_label.setStyleSheet(

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -43,9 +44,23 @@ if TYPE_CHECKING:
         ValidationRunSummaryDTO,
         ValidationWorker,
     )
+    from app.services.powerbi_service import PowerBIService
     from app.services.refresh_service import RefreshService
     from app.services.registry_service import RegistryService
     from app.services.rule_service import RuleService
+
+
+@dataclass
+class ModelOption:
+    """Option entry for semantic models discovered dynamically from Power BI."""
+
+    workspace_name: str
+    workspace_id: str
+    report_name: str
+    dataset_name: str
+    dataset_id: str
+    report_id: str | None = None
+    id: int | None = None
 
 
 class HomePage(QWidget):
@@ -63,15 +78,18 @@ class HomePage(QWidget):
         registry_service: RegistryService | None = None,
         orchestrator_service: OrchestratorService | None = None,
         rule_service: RuleService | None = None,
+        powerbi_service: PowerBIService | None = None,
     ) -> None:
         super().__init__(parent)
         self._refresh_service = refresh_service
         self._registry_service = registry_service
         self._orchestrator_service = orchestrator_service
         self._rule_service = rule_service
+        self._powerbi_service = powerbi_service
         self._validation_worker: ValidationWorker | None = None
         self._current_results: list[ValidationResultDTO] = []
         self._workspaces: list[PowerBIWorkspace] = []
+        self._workspace_assets: dict[str, tuple[list[PowerBIDataset], list[PowerBIReport]]] = {}
         self._datasets: list[PowerBIDataset] = []
         self._reports: list[PowerBIReport] = []
         self._build_ui()
@@ -83,24 +101,76 @@ class HomePage(QWidget):
         super().showEvent(event)
         self.reload_registered_models()
 
+    def _handle_refresh_models_clicked(self) -> None:
+        self.load_workspaces_requested.emit()
+        if self._powerbi_service is not None and not self._powerbi_service.is_busy:
+            self._powerbi_service.sync_all_workspaces_and_assets_async()
+        self.reload_registered_models()
+
     def reload_registered_models(self) -> None:
-        """Populate the active semantic model dropdown with all registered models."""
-        if self._registry_service is None:
-            return
+        """Populate the active semantic model dropdown with registered and live Power BI models."""
         current_ds_id = self.dataset_id_input.text().strip()
-        registrations = self._registry_service.list_registrations(active_only=True)
         self.model_selector_combo.blockSignals(True)
         self.model_selector_combo.clear()
-        if not registrations:
+
+        registered_keys: set[tuple[str, str]] = set()
+        items: list[tuple[str, Any]] = []
+
+        # 1. Models registered in SQLite
+        if self._registry_service is not None:
+            registrations = self._registry_service.list_registrations(active_only=True)
+            for reg in registrations:
+                display = f"{reg.report_name} ({reg.workspace_name})"
+                items.append((display, reg))
+                registered_keys.add((reg.workspace_id.lower(), reg.dataset_id.lower()))
+
+        # 2. Live Power BI workspaces and datasets/reports
+        workspaces_to_check = list(self._workspaces)
+        if not workspaces_to_check and self._powerbi_service is not None:
+            workspaces_to_check = self._powerbi_service.cached_workspaces
+
+        for ws in workspaces_to_check:
+            ws_key = ws.id.lower()
+            if ws_key in self._workspace_assets:
+                datasets, reports = self._workspace_assets[ws_key]
+            elif self._powerbi_service is not None:
+                datasets = self._powerbi_service.get_cached_datasets(ws.id)
+                reports = self._powerbi_service.get_cached_reports(ws.id)
+            else:
+                datasets, reports = [], []
+
+            for ds in datasets:
+                pair = (ws.id.lower(), ds.id.lower())
+                if pair not in registered_keys:
+                    matching_rpt = next(
+                        (r for r in reports if (r.dataset_id or "").lower() == ds.id.lower()),
+                        None,
+                    )
+                    rpt_name = matching_rpt.name if matching_rpt else ds.name
+                    rpt_id = matching_rpt.id if matching_rpt else None
+                    display = f"{rpt_name} ({ws.name})"
+                    opt = ModelOption(
+                        workspace_name=ws.name,
+                        workspace_id=ws.id,
+                        report_name=rpt_name,
+                        dataset_name=ds.name,
+                        dataset_id=ds.id,
+                        report_id=rpt_id,
+                    )
+                    items.append((display, opt))
+                    registered_keys.add(pair)
+
+        if not items:
             self.model_selector_combo.addItem("No semantic models registered yet", None)
         else:
             select_idx = 0
-            for idx, reg in enumerate(registrations):
-                display = f"{reg.report_name} ({reg.workspace_name})"
-                self.model_selector_combo.addItem(display, reg)
-                if current_ds_id and reg.dataset_id.lower() == current_ds_id.lower():
+            for idx, (display, data) in enumerate(items):
+                self.model_selector_combo.addItem(display, data)
+                ds_id = getattr(data, "dataset_id", "")
+                if current_ds_id and ds_id and ds_id.lower() == current_ds_id.lower():
                     select_idx = idx
             self.model_selector_combo.setCurrentIndex(select_idx)
+
         self.model_selector_combo.blockSignals(False)
         self._on_model_selector_changed(self.model_selector_combo.currentIndex())
 
@@ -157,31 +227,6 @@ class HomePage(QWidget):
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
 
         layout.addLayout(header_row)
-
-        # Active Semantic Model Selector Card (Simplified Home Dashboard)
-        selector_card = QFrame(container)
-        selector_card.setObjectName("Card")
-        selector_layout = QHBoxLayout(selector_card)
-        selector_layout.setContentsMargins(20, 14, 20, 14)
-        selector_layout.setSpacing(14)
-
-        lbl_select = QLabel("Active Semantic Model / Report:")
-        lbl_select.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
-        selector_layout.addWidget(lbl_select)
-
-        self.model_selector_combo = QComboBox()
-        self.model_selector_combo.setObjectName("FilterCombo")
-        self.model_selector_combo.setMinimumWidth(340)
-        self.model_selector_combo.currentIndexChanged.connect(self._on_model_selector_changed)
-        selector_layout.addWidget(self.model_selector_combo, stretch=1)
-
-        self.refresh_models_button = QPushButton("↻ Refresh Models")
-        self.refresh_models_button.setObjectName("SecondaryButton")
-        self.refresh_models_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.refresh_models_button.clicked.connect(self.reload_registered_models)
-        selector_layout.addWidget(self.refresh_models_button)
-
-        layout.addWidget(selector_card)
 
         # Internal/backward-compatible widgets (kept hidden to support APIs and test fixtures)
         self.workspace_id_input = QLineEdit(container)
@@ -245,6 +290,7 @@ class HomePage(QWidget):
             level=NotificationLevel.INFO,
             title="Workspaces Loaded",
         )
+        self.reload_registered_models()
 
     def set_workspace_assets(
         self,
@@ -252,6 +298,7 @@ class HomePage(QWidget):
         datasets: list[PowerBIDataset],
         reports: list[PowerBIReport],
     ) -> None:
+        self._workspace_assets[workspace_id.lower()] = (list(datasets), list(reports))
         self._datasets = list(datasets)
         self._reports = list(reports)
 
@@ -267,6 +314,7 @@ class HomePage(QWidget):
             level=NotificationLevel.INFO,
             title="Assets Loaded",
         )
+        self.reload_registered_models()
 
     def display_verification_result(self, result: AccessVerificationResult) -> None:
         """Render the verified permission summary and update the top AuthBanner."""
@@ -669,11 +717,36 @@ class HomePage(QWidget):
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(12)
 
-        # Header with Run Validation and Cancel buttons
+        # Header with Model Selector and Run Validation button
         card_header = QHBoxLayout()
+        card_header.setSpacing(10)
         section_title = QLabel("Semantic Model Validation & Health Check")
         section_title.setObjectName("SectionTitle")
-        card_header.addWidget(section_title, stretch=1)
+        card_header.addWidget(section_title)
+
+        lbl_model = QLabel("Model:")
+        lbl_model.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569; margin-left: 12px;")
+        card_header.addWidget(lbl_model)
+
+        self.model_selector_combo = QComboBox()
+        self.model_selector_combo.setObjectName("FilterCombo")
+        self.model_selector_combo.setMinimumWidth(260)
+        self.model_selector_combo.setMaximumWidth(420)
+        self.model_selector_combo.setToolTip("Select active Power BI semantic model to validate")
+        self.model_selector_combo.currentIndexChanged.connect(self._on_model_selector_changed)
+        card_header.addWidget(self.model_selector_combo)
+
+        self.refresh_models_button = QPushButton("↻")
+        self.refresh_models_button.setObjectName("SecondaryButton")
+        self.refresh_models_button.setToolTip("Reload workspaces and semantic models from Power BI")
+        self.refresh_models_button.setStyleSheet(
+            "padding: 5px 10px; font-size: 13px; font-weight: 700; border-radius: 6px;"
+        )
+        self.refresh_models_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_models_button.clicked.connect(self._handle_refresh_models_clicked)
+        card_header.addWidget(self.refresh_models_button)
+
+        card_header.addStretch(1)
 
         self.cancel_validation_button = QPushButton("✕ Cancel")
         self.cancel_validation_button.setObjectName("SecondaryButton")
