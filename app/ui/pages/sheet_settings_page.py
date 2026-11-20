@@ -65,6 +65,7 @@ from app.services.sheet_service import (
 from app.ui.dialogs.sheet_rule_config_dialog import SheetRuleConfigDialog
 from app.ui.theme import CHEVRON_ACTIVE_PATH, CHEVRON_DOWN_PATH
 from app.ui.widgets.animated_combo import AnimatedComboBox, EditableCellCombo
+from app.ui.widgets.filter_cell_widget import FilterCellWidget
 from app.ui.widgets.notification_banner import NotificationBanner
 from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 
@@ -595,19 +596,19 @@ class SheetSettingsPage(QWidget):
         self.sheet_table.setCellWidget(row_idx, 6, col_combo)
 
         # Cols 7-10: Filter 1, Filter 2, Filter 3, Filter 4
-        filter_edits: list[QLineEdit] = []
+        filter_edits: list[FilterCellWidget] = []
         for f_idx, col_num in enumerate(range(7, 11), start=1):
             prop_name = f"filter_{f_idx}"
             cur_val = getattr(dto, prop_name, "") or dto.config.get(prop_name, "") or ""
-            f_edit = QLineEdit(str(cur_val))
-            f_edit.setObjectName(f"FilterInput_{f_idx}")
-            f_edit.setPlaceholderText(f"Filter {f_idx} (Optional)")
-            f_edit.setToolTip(f"Optional DAX filter condition {f_idx} for CALCULATE (e.g. 'Dates'[Year] = 2024). Leave blank if not needed.")
-            f_edit.setStyleSheet(
-                "QLineEdit { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 3px; "
-                "padding: 2px 5px; font-size: 11px; font-family: Consolas, 'Courier New', monospace; color: #0F172A; } "
-                "QLineEdit:focus { border: 1px solid #1668DC; background: #F8FAFC; } "
-                "QLineEdit:disabled { background: #F1F5F9; color: #94A3B8; border-color: #E2E8F0; }"
+            f_edit = FilterCellWidget(
+                str(cur_val),
+                filter_index=f_idx,
+                get_context_callback=lambda d=dto: {
+                    "workspace_id": d.workspace_id,
+                    "dataset_id": d.dataset_id,
+                    "table_name": d.table_name,
+                    "metadata_service": self._metadata_service,
+                },
             )
             f_edit.textChanged.connect(
                 lambda txt, r=dto, p=prop_name: self._on_row_filter_changed(txt, r, p)
@@ -1040,7 +1041,7 @@ class SheetSettingsPage(QWidget):
         test_combo: QComboBox,
         tbl_combo: QWidget,
         col_combo: QWidget,
-        filter_edits: list[QLineEdit] | None,
+        filter_edits: list[FilterCellWidget] | list[QLineEdit] | None,
         btn_gear: QPushButton,
         dto: SheetRowDTO,
     ) -> None:
@@ -1076,7 +1077,7 @@ class SheetSettingsPage(QWidget):
         vtype: str,
         tbl_input: QWidget,
         col_input: QWidget,
-        filter_edits: list[QLineEdit] | None = None,
+        filter_edits: list[FilterCellWidget] | list[QLineEdit] | None = None,
     ) -> None:
         if vtype == VALIDATION_TYPE_REFRESH:
             tbl_input.setEnabled(False)
