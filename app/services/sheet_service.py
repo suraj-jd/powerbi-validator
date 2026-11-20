@@ -42,7 +42,7 @@ FRIENDLY_TEST_NAMES: dict[str, str] = {
     VALIDATION_TYPE_ROW_COUNT: "Row Count Check",
     VALIDATION_TYPE_REFRESH: "Power BI Refresh SLA",
     VALIDATION_TYPE_DAX_MEASURE: "DAX Measure Check",
-    VALIDATION_TYPE_ANOMALY: "Historical Anomaly Check",
+    VALIDATION_TYPE_ANOMALY: "Baseline & % Change Check",
 }
 
 TEST_TYPE_TOOLTIPS: dict[str, str] = {
@@ -52,10 +52,17 @@ TEST_TYPE_TOOLTIPS: dict[str, str] = {
     VALIDATION_TYPE_ROW_COUNT: "Checks if the total number of rows in a table meets your expected count.",
     VALIDATION_TYPE_REFRESH: "Verifies whether the Power BI dataset refreshed successfully within the allowed hours.",
     VALIDATION_TYPE_DAX_MEASURE: "Evaluates a Power BI DAX measure and compares the value against expected thresholds.",
-    VALIDATION_TYPE_ANOMALY: "Compares today's metric against previous runs to flag unexpected baseline breaches or spikes.",
+    VALIDATION_TYPE_ANOMALY: "Checks minimum or maximum baseline limits and flags unexpected percentage changes from previous runs.",
 }
 
 TEST_NAME_TO_TYPE: dict[str, str] = {v.lower(): k for k, v in FRIENDLY_TEST_NAMES.items()}
+# Also support historical aliases
+TEST_NAME_TO_TYPE["historical anomaly check"] = VALIDATION_TYPE_ANOMALY
+TEST_NAME_TO_TYPE["historical anomaly"] = VALIDATION_TYPE_ANOMALY
+TEST_NAME_TO_TYPE["baseline & % change"] = VALIDATION_TYPE_ANOMALY
+TEST_NAME_TO_TYPE["baseline & % change check"] = VALIDATION_TYPE_ANOMALY
+TEST_NAME_TO_TYPE["baseline check"] = VALIDATION_TYPE_ANOMALY
+TEST_NAME_TO_TYPE["baseline & drift check"] = VALIDATION_TYPE_ANOMALY
 # Also support raw keys
 for k, v in FRIENDLY_TEST_NAMES.items():
     TEST_NAME_TO_TYPE[k.lower()] = k

@@ -771,18 +771,18 @@ class AboutPage(QWidget):
             )
         )
 
-        # 6. Historical Anomaly Check
+        # 6. Baseline & % Change Check
         layout.addWidget(
             self._create_test_card(
                 icon="📈",
-                test_name="Historical Anomaly Check (anomaly_check)",
+                test_name="Baseline & % Change Check (anomaly_check)",
                 target_scope="Measure ([Measure]) or Column ('Table'[Col])",
                 scope_color="#FFF7ED",
                 scope_text_color="#C2410C",
-                protocol="⚡ DAX + Local Statistical & Baseline Engine",
-                definition="Verifies numeric metric integrity using fast-fail baseline thresholds (Min Floor / Max Ceiling), followed by secondary anomaly checks (± % change from baseline/previous run, ± historical median, or ± standard deviation Z-score).",
-                scenario="Detecting sudden metric drops (e.g. falling below 1,000 orders), irregular transaction volume spikes, run-over-run percentage deviations, or statistical outliers.",
-                config_summary="Optional Min Floor and Max Ceiling baseline thresholds, plus secondary detection mode (Fixed Baseline ± %, Previous Run ± %, Median ± %, or Z-Score).",
+                protocol="⚡ DAX + Local Baseline & Comparison Engine",
+                definition="Verifies numeric metric integrity using baseline thresholds (Min Floor / Max Ceiling), followed by percentage change checks (± % change from fixed baseline or previous run).",
+                scenario="Detecting sudden metric drops (e.g. falling below 1,000 orders), irregular transaction volume spikes, or run-over-run percentage deviations.",
+                config_summary="Optional Min Floor and Max Ceiling baseline thresholds, plus secondary detection mode (Fixed Baseline ± %, Previous Run ± %, or historical comparison).",
                 formula_dax=(
                     "-- If Target is a DAX Measure:\n"
                     "EVALUATE ROW(\"Value\", [Measure Name])\n\n"
@@ -790,12 +790,11 @@ class AboutPage(QWidget):
                     "EVALUATE ROW(\"Value\", SUMX('TableName', 'TableName'[ColumnName]))"
                 ),
                 formula_logic=(
-                    "• Fast-fail Baseline Floor: If Actual < Min_Baseline -> FAIL (Immediate Anomaly)\n"
-                    "• Fast-fail Baseline Ceiling: If Actual > Max_Baseline -> FAIL (Immediate Anomaly)\n"
+                    "• Fast-fail Baseline Floor: If Actual < Min_Baseline -> FAIL (Below minimum baseline)\n"
+                    "• Fast-fail Baseline Ceiling: If Actual > Max_Baseline -> FAIL (Above maximum baseline)\n"
                     "• Fixed Baseline ± %: Deviation = |Actual - Baseline| / Baseline * 100% (FAIL if > Allowed %)\n"
                     "• Previous Run ± %: Deviation = |Actual - PrevRun| / PrevRun * 100% (FAIL if > Allowed %)\n"
                     "• Historical Median: Deviation = |Actual - Median| / Median * 100% (FAIL if > Allowed %)\n"
-                    "• Standard Deviation (Z-Score): Z = |Actual - Rolling_Mean| / StdDev (FAIL if Z > Threshold σ)\n"
                     "• PASS: Value satisfies baseline floor/ceiling and secondary check tolerance"
                 ),
             )
@@ -876,7 +875,7 @@ class AboutPage(QWidget):
             ("Latest Date Freshness", "Table + Date Col", "(Current UTC - MAX('Table'[DateCol])) / 3600s", "Age <= max_age_hours (24h)"),
             ("Row Count Check", "Table Name", "COUNTROWS('Table')", "Within range or +/- deviation %"),
             ("DAX Measure Check", "[Measure Name]", "EVALUATE ROW(\"Value\", [Measure Name])", "Matches target or within +/- dev %"),
-            ("Historical Anomaly", "Measure or Column", "Min/Max Baseline or Z = |Val - μ| / σ", "Satisfies baseline floor/ceiling or ±% / Z-Score"),
+            ("Baseline & % Change", "Measure or Column", "Min/Max Baseline or ±% change", "Satisfies baseline floor/ceiling or allowed % change"),
             ("Power BI Refresh", "Semantic Model", "REST API /refreshes?$top=1 (Status & EndTime)", "Status == 'Completed' & age <= SLA"),
         ]
 

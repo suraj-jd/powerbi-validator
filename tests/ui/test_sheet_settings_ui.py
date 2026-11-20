@@ -116,7 +116,7 @@ def test_sheet_rule_config_dialog_anomaly_check(qtbot) -> None:
     qtbot.addWidget(dialog)
     dialog.show()
 
-    assert "Historical Anomaly Check" in dialog.windowTitle()
+    assert "Baseline & % Change Check" in dialog.windowTitle()
     assert dialog.anom_chk_min.isChecked() is True
     assert dialog.anom_spin_min.value() == 1000.0
     assert dialog.anom_chk_max.isChecked() is True

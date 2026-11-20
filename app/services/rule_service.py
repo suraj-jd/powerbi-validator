@@ -29,7 +29,7 @@ VALIDATION_TYPES: dict[str, str] = {
     VALIDATION_TYPE_LATEST_DATE: "Latest Date Check",
     VALIDATION_TYPE_ROW_COUNT: "Row Count Check",
     VALIDATION_TYPE_DAX_MEASURE: "DAX Measure Check",
-    VALIDATION_TYPE_ANOMALY: "Historical Anomaly Check",
+    VALIDATION_TYPE_ANOMALY: "Baseline & % Change Check",
     VALIDATION_TYPE_REFRESH: "Power BI Refresh Check",
 }
 
