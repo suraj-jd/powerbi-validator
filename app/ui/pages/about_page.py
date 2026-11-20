@@ -608,26 +608,46 @@ class AboutPage(QWidget):
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 16, 20, 20)
-        layout.setSpacing(14)
+        layout.setSpacing(16)
 
         intro_lbl = QLabel(
-            "Comprehensive catalog of all 7 built-in validation test types, explaining their target scope, "
-            "business scenarios, and configurable settings."
+            "Comprehensive catalog and formula manual for all 7 validation tests configured via the 'Test to Do' "
+            "column in your Validation Sheet. Below are the exact DAX queries, Power BI REST API calls, "
+            "and mathematical evaluation formulas executed by the tool."
         )
-        intro_lbl.setStyleSheet("font-size: 13px; font-weight: 600; color: #1E293B;")
+        intro_lbl.setStyleSheet("font-size: 13px; font-weight: 600; color: #1E293B; line-height: 1.4;")
+        intro_lbl.setWordWrap(True)
         layout.addWidget(intro_lbl)
+
+        # Quick Reference Summary Card
+        layout.addWidget(self._build_catalog_cheat_sheet())
 
         # 1. Null / Blank Check
         layout.addWidget(
             self._create_test_card(
                 icon="🚫",
-                test_name="Null / Blank Check",
-                target_scope="Column Level",
+                test_name="Null / Blank Check (null_check)",
+                target_scope="Column Level ('Table'[Column])",
                 scope_color="#EFF6FF",
                 scope_text_color="#1668DC",
-                definition="Verifies that critical columns do not contain NULL, empty, or whitespace-only records.",
-                scenario="Ensuring primary keys, foreign keys, or mandatory business dimensions (e.g. CustomerID, OrderDate, Amount) are 100% populated.",
-                config_summary="Allowed blank count (default 0), and an option to treat whitespace-only / empty strings as blanks.",
+                protocol="⚡ DAX Engine (/executeQueries)",
+                definition="Verifies that critical columns do not contain NULL values, empty strings (\"\"), or whitespace-only records.",
+                scenario="Guarding primary keys, foreign keys, or mandatory dimension attributes (e.g. CustomerID, OrderDate, Amount) against unpopulated records.",
+                config_summary="Allowed blank count (default 0), allowed blank percentage (default 0.0%), and options to include empty strings or whitespace.",
+                formula_dax=(
+                    "EVALUATE ROW(\n"
+                    "    \"TotalRows\", COUNTROWS('TableName'),\n"
+                    "    \"BlankCount\", COUNTROWS(FILTER('TableName', ISBLANK('TableName'[ColumnName]) || 'TableName'[ColumnName] = \"\"))\n"
+                    ")\n"
+                    "-- If a custom filter is configured in Settings:\n"
+                    "-- Evaluates FILTER('TableName', <FilterCondition>)"
+                ),
+                formula_logic=(
+                    "• Blank Ratio % = (BlankCount / TotalRows) × 100%\n"
+                    "• PASS: BlankCount <= allowed_blank_count (0) AND Blank Ratio % <= allowed_blank_percentage (0.0%)\n"
+                    "• FAIL: BlankCount > allowed_blank_count OR Blank Ratio % > allowed_blank_percentage\n"
+                    "• WARNING: TotalRows = 0 (Empty dataset returned by model)"
+                ),
             )
         )
 
@@ -635,87 +655,247 @@ class AboutPage(QWidget):
         layout.addWidget(
             self._create_test_card(
                 icon="👥",
-                test_name="Duplicate Check",
-                target_scope="Column Level",
+                test_name="Duplicate Check (duplicate_check)",
+                target_scope="Column Level (or Composite Keys)",
                 scope_color="#EFF6FF",
                 scope_text_color="#1668DC",
+                protocol="⚡ DAX Engine (/executeQueries)",
                 definition="Ensures that unique identifier columns contain strictly distinct records and no repeated keys.",
-                scenario="Guarding entity tables against duplicate entries (e.g. EmployeeID, TransactionID, or InvoiceNumber) caused by faulty joins.",
-                config_summary="Allowed duplicate threshold (default 0). Fails if any value occurs more than once.",
+                scenario="Guarding entity dimension tables against duplicate entries (e.g. EmployeeID, TransactionID, InvoiceNumber) caused by faulty joins or ETL fan-outs.",
+                config_summary="Allowed duplicate threshold (default 0), allowed percentage, and optional comma-separated composite key columns.",
+                formula_dax=(
+                    "-- Single Key Column:\n"
+                    "EVALUATE ROW(\n"
+                    "    \"TotalRows\", COUNTROWS('TableName'),\n"
+                    "    \"DistinctKeys\", COUNTROWS(SUMMARIZE('TableName', 'TableName'[KeyColumn]))\n"
+                    ")\n\n"
+                    "-- Composite Key Columns (configured in ⚙️ Settings):\n"
+                    "EVALUATE ROW(\n"
+                    "    \"TotalRows\", COUNTROWS('TableName'),\n"
+                    "    \"DistinctKeys\", COUNTROWS(SUMMARIZE('TableName', 'TableName'[ColA], 'TableName'[ColB]))\n"
+                    ")"
+                ),
+                formula_logic=(
+                    "• Duplicate Count = TotalRows - DistinctKeys\n"
+                    "• Duplicate Ratio % = (Duplicate Count / TotalRows) × 100%\n"
+                    "• PASS: Duplicate Count <= allowed_duplicate_count (default 0)\n"
+                    "• FAIL: Duplicate Count > allowed_duplicate_count (duplicates detected)\n"
+                    "• WARNING: TotalRows = 0 (Empty table)"
+                ),
             )
         )
 
-        # 3. Freshness / Latest Date Check
+        # 3. Latest Date Freshness
         layout.addWidget(
             self._create_test_card(
                 icon="⏱️",
-                test_name="Freshness / Latest Date Check",
+                test_name="Latest Date Freshness (latest_date_check)",
                 target_scope="Date / Timestamp Column",
                 scope_color="#FEF3C7",
                 scope_text_color="#B45309",
-                definition="Evaluates MAX(date_column) against current UTC time to ensure pipelines haven't stalled.",
-                scenario="Catching delayed overnight ETL jobs before executive morning briefings or dashboards look at stale daily sales.",
-                config_summary="Maximum allowable age in hours (e.g. 24h, 36h) relative to current system time.",
+                protocol="⚡ DAX Engine (/executeQueries)",
+                definition="Evaluates MAX(date_column) against current UTC system time to verify data pipeline freshness SLA and detect future date anomalies.",
+                scenario="Catching stalled overnight batch pipelines or failed data syncs before morning executive dashboards present stale daily metrics.",
+                config_summary="Maximum allowable data age in hours (e.g. 24h, 36h) or days, and toggle to disallow future timestamps.",
+                formula_dax=(
+                    "EVALUATE ROW(\n"
+                    "    \"LatestDate\", MAX('TableName'[DateColumn]),\n"
+                    "    \"EarliestDate\", MIN('TableName'[DateColumn]),\n"
+                    "    \"TotalRows\", COUNTROWS('TableName')\n"
+                    ")"
+                ),
+                formula_logic=(
+                    "• Data Age (Hours) = (Current UTC Timestamp - LatestDate) / 3600 seconds\n"
+                    "• PASS: Data Age <= max_age_hours AND (allow_future OR LatestDate <= Current UTC + future_tolerance)\n"
+                    "• FAIL (Stale): Data Age > max_age_hours (Pipeline refresh SLA breached)\n"
+                    "• FAIL (Future Anomaly): LatestDate > Current UTC + tolerance (Corrupted future transaction timestamps)\n"
+                    "• WARNING: TotalRows = 0 or column values are entirely NULL"
+                ),
             )
         )
 
-        # 4. Row Count Baseline Check
+        # 4. Row Count Check
         layout.addWidget(
             self._create_test_card(
                 icon="📊",
-                test_name="Row Count Baseline Check",
-                target_scope="Table Level",
+                test_name="Row Count Check (row_count_check)",
+                target_scope="Table Level ('TableName')",
                 scope_color="#F3E8FF",
                 scope_text_color="#7E22CE",
-                definition="Validates that total table record count meets a minimum threshold or stays within an expected baseline percentage.",
-                scenario="Guarding against catastrophic table drops, missing partition loads, or unexpected upstream filter drops.",
-                config_summary="Minimum expected row count (e.g. >= 10,000) or maximum percentage deviation from historical baseline.",
+                protocol="⚡ DAX Engine (/executeQueries)",
+                definition="Validates that total table volume satisfies minimum expected row counts or matches historical baseline rows within tolerance.",
+                scenario="Preventing silent table drops, missing partitions, truncated extracts, or unintended Cartesian joins causing volume spikes.",
+                config_summary="Fixed thresholds (min_rows, max_rows) or Baseline Percentage Deviation (e.g. +/- 5% of historical baseline).",
+                formula_dax=(
+                    "-- Full Table Record Count:\n"
+                    "EVALUATE ROW(\"RowCount\", COUNTROWS('TableName'))\n\n"
+                    "-- With Custom Filter Condition (configured in ⚙️ Settings):\n"
+                    "EVALUATE ROW(\"RowCount\", COUNTROWS(FILTER('TableName', <FilterCondition>)))"
+                ),
+                formula_logic=(
+                    "• Fixed Range Method:\n"
+                    "    PASS if min_row_count <= RowCount <= max_row_count; FAIL otherwise.\n"
+                    "• Baseline Deviation Method:\n"
+                    "    Deviation % = (|RowCount - Baseline Row Count| / Baseline Row Count) × 100%\n"
+                    "    PASS: Deviation % <= allowed_deviation_pct (default 5.0%)\n"
+                    "    FAIL: Deviation % > allowed_deviation_pct"
+                ),
             )
         )
 
-        # 5. Dataset Refresh SLA Check
-        layout.addWidget(
-            self._create_test_card(
-                icon="🔄",
-                test_name="Dataset Refresh SLA Check",
-                target_scope="Semantic Model Level",
-                scope_color="#ECFDF5",
-                scope_text_color="#059669",
-                definition="Queries Power BI REST API to confirm that the scheduled model refresh completed successfully within its SLA window.",
-                scenario="Alerting teams when a cloud gateway refresh failed with an error or exceeded maximum allowed runtime.",
-                config_summary="Expected refresh status ('Completed') and maximum allowable hours since last successful refresh.",
-            )
-        )
-
-        # 6. DAX Measure Check
+        # 5. DAX Measure Check
         layout.addWidget(
             self._create_test_card(
                 icon="📐",
-                test_name="DAX Measure Evaluation Check",
+                test_name="DAX Measure Check (dax_measure_check)",
                 target_scope="Measure Level ([Measure Name])",
                 scope_color="#FDF2F8",
                 scope_text_color="#BE185D",
-                definition="Executes DAX measures directly in the semantic model engine and compares results against expected criteria.",
-                scenario="Validating calculated business KPIs (e.g. [Gross Margin %] >= 0.15, [Total Revenue] > 0, or [Net Churn] < 0.05).",
-                config_summary="Comparison operators (=, >, <, >=, <=, between) and expected target values or tolerances.",
+                protocol="⚡ DAX Engine (/executeQueries)",
+                definition="Executes DAX measures directly inside the semantic model calculation engine and validates numeric or boolean outputs against business criteria.",
+                scenario="Validating calculated business KPIs (e.g. [Net Profit Margin %] >= 0.15, [Total Revenue USD] > 0, [Daily Churn Rate] < 0.05).",
+                config_summary="Expected value, comparison operators (=, >, <, >=, <=, between), and allowable percentage or absolute deviation tolerances.",
+                formula_dax=(
+                    "-- Standard Measure Evaluation:\n"
+                    "EVALUATE ROW(\"Value\", [Measure Name])\n\n"
+                    "-- With Filter Context (configured in ⚙️ Settings):\n"
+                    "EVALUATE ROW(\"Value\", CALCULATE([Measure Name], 'Dates'[Year] = 2024))"
+                ),
+                formula_logic=(
+                    "• Baseline Deviation % = ((Actual Value - Expected Value) / Expected Value) × 100%\n"
+                    "• PASS: |Deviation %| <= allowed_deviation_pct (or operator condition evaluates to True)\n"
+                    "• FAIL: |Deviation %| > allowed_deviation_pct (or operator condition is False)\n"
+                    "• FAIL: Measure evaluates to BLANK() when non-blank is expected"
+                ),
             )
         )
 
-        # 7. Historical Anomaly Check
+        # 6. Historical Anomaly Check
         layout.addWidget(
             self._create_test_card(
                 icon="📈",
-                test_name="Historical Anomaly Check",
-                target_scope="Metric / Measure Level",
+                test_name="Historical Anomaly Check (anomaly_check)",
+                target_scope="Measure ([Measure]) or Column ('Table'[Col])",
                 scope_color="#FFF7ED",
                 scope_text_color="#C2410C",
-                definition="Compares current metric values against a 30-day moving average and standard deviation to detect statistical outliers.",
-                scenario="Detecting irregular transaction spikes, fraudulent activity, or sudden plunge in daily active users.",
-                config_summary="Rolling lookback window (default 30 days) and standard deviation sensitivity (default 2.5 sigma).",
+                protocol="⚡ DAX + Local Statistical Engine",
+                definition="Computes a rolling Gaussian distribution (mean and standard deviation) over historical audit runs to automatically detect statistical anomalies without manual threshold maintenance.",
+                scenario="Detecting irregular transaction volume spikes, fraudulent spikes, revenue anomalies, or sudden drops in daily active users.",
+                config_summary="Rolling lookback window (default 30 days) and standard deviation sensitivity threshold (default 2.5 sigma).",
+                formula_dax=(
+                    "-- If Target is a DAX Measure:\n"
+                    "EVALUATE ROW(\"Value\", [Measure Name])\n\n"
+                    "-- If Target is a Column (SUM, AVERAGE, MIN, MAX aggregation):\n"
+                    "EVALUATE ROW(\"Value\", SUMX('TableName', 'TableName'[ColumnName]))"
+                ),
+                formula_logic=(
+                    "• Rolling Mean: μ = (1 / N) × Σ(x_i)  for past N validation runs in lookback window\n"
+                    "• Standard Deviation: σ = sqrt( (1 / (N - 1)) × Σ(x_i - μ)² )\n"
+                    "• Z-Score Distance: Z = |x_current - μ| / σ\n"
+                    "• PASS: Z <= sensitivity_threshold (default Z <= 2.5σ, within normal variance)\n"
+                    "• WARNING: Z > sensitivity_threshold (Statistically significant outlier detected)\n"
+                    "• PASS (Info): Insufficient historical runs (N < 3 runs recorded)"
+                ),
+            )
+        )
+
+        # 7. Power BI Refresh Check
+        layout.addWidget(
+            self._create_test_card(
+                icon="🔄",
+                test_name="Power BI Refresh Check (refresh_check)",
+                target_scope="Semantic Model / Dataset Level",
+                scope_color="#ECFDF5",
+                scope_text_color="#059669",
+                protocol="🌐 Power BI REST API (/refreshes)",
+                definition="Queries the official Power BI REST API to verify scheduled cloud dataset refresh status, completion duration, and SLA freshness.",
+                scenario="Alerting engineering teams when cloud gateway refreshes fail with timeout errors or exceed maximum SLA runtime.",
+                config_summary="Expected refresh status ('Completed') and maximum allowable elapsed hours since last successful refresh (e.g. 24h).",
+                formula_dax=(
+                    "GET https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/refreshes?$top=1\n"
+                    "Headers:\n"
+                    "    Authorization: Bearer <OAuth2_Delegated_Token>\n"
+                    "    Accept: application/json"
+                ),
+                formula_logic=(
+                    "• Refresh Age (Hours) = (Current UTC Timestamp - Refresh EndTime) / 3600 seconds\n"
+                    "• PASS: Latest Refresh Status == 'Completed' AND Refresh Age <= max_age_hours\n"
+                    "• FAIL: Latest Refresh Status == 'Failed' (Cloud refresh error or gateway timeout)\n"
+                    "• FAIL: Refresh Age > max_age_hours (Refresh SLA breached)\n"
+                    "• WARNING: Status == 'Unknown' OR Status == 'InProgress' (Refresh currently executing)"
+                ),
             )
         )
 
         return self._wrap_in_scroll_area(container)
+
+    def _build_catalog_cheat_sheet(self) -> QFrame:
+        card = QFrame()
+        card.setObjectName("Card")
+        card.setStyleSheet(
+            "QFrame#Card { background-color: #F8FAFC; border: 1px solid #CBD5E1; "
+            "border-radius: 8px; padding: 14px 18px; }"
+        )
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(10)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+        c_icon = QLabel("⚡")
+        c_icon.setStyleSheet("font-size: 16px;")
+        title_row.addWidget(c_icon)
+        c_title = QLabel("Quick Formula Reference — 'Test to Do' in Validation Sheet")
+        c_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        title_row.addWidget(c_title)
+        title_row.addStretch(1)
+        layout.addLayout(title_row)
+
+        desc = QLabel(
+            "The table below maps each test option selectable in the Validation Sheet dropdown to its underlying formula and execution protocol."
+        )
+        desc.setStyleSheet("font-size: 11px; color: #64748B;")
+        layout.addWidget(desc)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(6)
+        grid.setContentsMargins(2, 4, 2, 4)
+
+        headers = ["Test to Do", "Target Object", "Underlying Execution Formula", "Pass SLA"]
+        for c_idx, h in enumerate(headers):
+            h_lbl = QLabel(h)
+            h_lbl.setStyleSheet("font-size: 11px; font-weight: 700; color: #1E293B; border-bottom: 2px solid #E2E8F0; padding-bottom: 3px;")
+            grid.addWidget(h_lbl, 0, c_idx)
+
+        rows = [
+            ("Null / Blank Check", "Table + Column", "COUNTROWS(FILTER('Table', ISBLANK([Col]) || [Col] = \"\"))", "Blank Count <= allowed (0)"),
+            ("Duplicate Check", "Table + Column(s)", "TotalRows - COUNTROWS(SUMMARIZE('Table', [Col]))", "Duplicate Count <= allowed (0)"),
+            ("Latest Date Freshness", "Table + Date Col", "(Current UTC - MAX('Table'[DateCol])) / 3600s", "Age <= max_age_hours (24h)"),
+            ("Row Count Check", "Table Name", "COUNTROWS('Table')", "Within range or +/- deviation %"),
+            ("DAX Measure Check", "[Measure Name]", "EVALUATE ROW(\"Value\", [Measure Name])", "Matches target or within +/- dev %"),
+            ("Historical Anomaly", "Measure or Column", "Z = |Current - Rolling Mean| / Standard Deviation", "Z-Score <= 2.5σ (within bounds)"),
+            ("Power BI Refresh", "Semantic Model", "REST API /refreshes?$top=1 (Status & EndTime)", "Status == 'Completed' & age <= SLA"),
+        ]
+
+        for r_idx, (t_name, t_tgt, t_dax, t_sla) in enumerate(rows, start=1):
+            lbl_name = QLabel(t_name)
+            lbl_name.setStyleSheet("font-size: 11px; font-weight: 600; color: #1668DC;")
+            lbl_tgt = QLabel(t_tgt)
+            lbl_tgt.setStyleSheet("font-size: 11px; color: #475569;")
+            lbl_dax = QLabel(t_dax)
+            lbl_dax.setStyleSheet("font-family: Consolas, monospace; font-size: 10px; color: #0F172A;")
+            lbl_sla = QLabel(t_sla)
+            lbl_sla.setStyleSheet("font-size: 11px; color: #059669; font-weight: 500;")
+
+            grid.addWidget(lbl_name, r_idx, 0)
+            grid.addWidget(lbl_tgt, r_idx, 1)
+            grid.addWidget(lbl_dax, r_idx, 2)
+            grid.addWidget(lbl_sla, r_idx, 3)
+
+        grid.setColumnStretch(2, 1)
+        layout.addLayout(grid)
+        return card
 
     def _create_test_card(
         self,
@@ -728,23 +908,26 @@ class AboutPage(QWidget):
         definition: str,
         scenario: str,
         config_summary: str,
+        formula_dax: str | None = None,
+        formula_logic: str | None = None,
+        protocol: str = "⚡ DAX Engine (/executeQueries)",
     ) -> QFrame:
         card = QFrame()
         card.setObjectName("Card")
         card.setStyleSheet(
             "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; "
-            "border-radius: 8px; padding: 14px 18px; } "
+            "border-radius: 8px; padding: 16px 20px; } "
             "QFrame#Card:hover { border-color: #CBD5E1; }"
         )
         layout = QVBoxLayout(card)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(6)
+        layout.setSpacing(10)
 
         header = QHBoxLayout()
         header.setSpacing(8)
 
         i_lbl = QLabel(icon)
-        i_lbl.setStyleSheet("font-size: 16px;")
+        i_lbl.setStyleSheet("font-size: 18px;")
         header.addWidget(i_lbl)
 
         t_lbl = QLabel(test_name)
@@ -757,6 +940,13 @@ class AboutPage(QWidget):
             "padding: 2px 8px; border-radius: 10px; font-size: 10px;"
         )
         header.addWidget(s_lbl)
+
+        p_lbl = QLabel(protocol)
+        p_lbl.setStyleSheet(
+            "background-color: #F1F5F9; color: #475569; font-weight: 600; "
+            "padding: 2px 8px; border-radius: 10px; font-size: 10px; border: 1px solid #E2E8F0;"
+        )
+        header.addWidget(p_lbl)
         header.addStretch(1)
         layout.addLayout(header)
 
@@ -791,6 +981,50 @@ class AboutPage(QWidget):
 
         grid.setColumnStretch(1, 1)
         layout.addLayout(grid)
+
+        # Executed Query / Formula Code Frame
+        if formula_dax:
+            code_frame = QFrame()
+            code_frame.setStyleSheet(
+                "background-color: #0F172A; border: 1px solid #1E293B; border-radius: 6px; padding: 10px 14px;"
+            )
+            code_layout = QVBoxLayout(code_frame)
+            code_layout.setContentsMargins(0, 0, 0, 0)
+            code_layout.setSpacing(4)
+
+            code_title = QLabel("💻  UNDERLYING FORMULA / EXECUTED DAX QUERY:")
+            code_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #94A3B8; letter-spacing: 0.5px;")
+            code_layout.addWidget(code_title)
+
+            code_body = QLabel(formula_dax)
+            code_body.setStyleSheet(
+                "font-family: Consolas, 'Cascadia Code', 'Courier New', monospace; font-size: 11px; "
+                "color: #38BDF8; line-height: 1.45; background-color: transparent;"
+            )
+            code_body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            code_layout.addWidget(code_body)
+            layout.addWidget(code_frame)
+
+        # Evaluation & Pass/Fail Criteria Box
+        if formula_logic:
+            eval_frame = QFrame()
+            eval_frame.setStyleSheet(
+                "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 3px solid #1668DC; "
+                "border-radius: 4px; padding: 8px 12px;"
+            )
+            eval_layout = QVBoxLayout(eval_frame)
+            eval_layout.setContentsMargins(0, 0, 0, 0)
+            eval_layout.setSpacing(4)
+
+            eval_title = QLabel("⚖️  EVALUATION FORMULA & PASS / FAIL CRITERIA:")
+            eval_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #1E293B; letter-spacing: 0.5px;")
+            eval_layout.addWidget(eval_title)
+
+            eval_body = QLabel(formula_logic)
+            eval_body.setStyleSheet("font-size: 11px; color: #334155; line-height: 1.45;")
+            eval_body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            eval_layout.addWidget(eval_body)
+            layout.addWidget(eval_frame)
 
         return card
 

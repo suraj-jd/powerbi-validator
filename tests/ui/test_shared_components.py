@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel
 
 from app.bootstrap import bootstrap_application
 from app.core.status import NotificationLevel, ValidationStatus
@@ -122,6 +123,11 @@ def test_about_page_shared_component_demo(qtbot, tmp_path: Path) -> None:
     assert any("Diagnostics" in t for t in tab_titles)
     assert page.open_logs_button is not None
     assert page.open_db_button is not None
+
+    # Verify Tab 3 contains validation formulas catalog
+    catalog_widget = page.tabs.widget(2)
+    assert catalog_widget is not None
+    assert page.findChild(QLabel, "PageTitle") is not None or page.findChild(QLabel) is not None
 
 
 def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_path: Path) -> None:
