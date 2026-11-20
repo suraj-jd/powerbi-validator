@@ -27,7 +27,7 @@ QToolTip {
     background-color: #0F172A;
     color: #F8FAFC;
     border: 1px solid #334155;
-    border-radius: 5px;
+    border-radius: 6px;
     padding: 6px 10px;
     font-size: 11px;
     font-weight: 500;

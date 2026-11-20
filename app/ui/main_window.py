@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
         self._avatar_label = QLabel("--")
         self._avatar_label.setFixedSize(34, 34)
         self._avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._avatar_label.setToolTip("Your Microsoft profile avatar.")
         self._avatar_label.setStyleSheet(
             "background-color: #243E66; color: #FFFFFF; border-radius: 17px; "
             "font-weight: 700; font-size: 12px;"
@@ -248,10 +249,12 @@ class MainWindow(QMainWindow):
         account_text_col = QVBoxLayout()
         account_text_col.setSpacing(1)
         self._sidebar_user_name = QLabel("Not signed in")
+        self._sidebar_user_name.setToolTip("Current signed-in user account.")
         self._sidebar_user_name.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: 600;")
         account_text_col.addWidget(self._sidebar_user_name)
 
         self._sidebar_user_email = QLabel("Microsoft Entra ID")
+        self._sidebar_user_email.setToolTip("Account email address or organization directory.")
         self._sidebar_user_email.setStyleSheet("color: #94A3B8; font-size: 10px;")
         account_text_col.addWidget(self._sidebar_user_email)
 
@@ -264,7 +267,7 @@ class MainWindow(QMainWindow):
         self._sign_out_button.setIcon(make_nav_icon("exit", color="#CBD5E1"))
         self._sign_out_button.setIconSize(QSize(16, 16))
         self._sign_out_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._sign_out_button.setToolTip("Sign out of your Microsoft Entra account.")
+        self._sign_out_button.setToolTip("Sign out of your account.")
         self._sign_out_button.clicked.connect(self._handle_sign_out_requested)
         self._sign_out_button.setVisible(False)
         layout.addWidget(self._sign_out_button)
@@ -489,10 +492,10 @@ class MainWindow(QMainWindow):
         button.setIconSize(QSize(18, 18))
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         nav_tooltips = {
-            "home": "Go to Home dashboard to run validations and view today's test results.",
-            "sheet_settings": "Configure validation rules, target tables, and columns in the spreadsheet view.",
-            "history": "View historical execution runs, compare past runs, and export audit reports.",
-            "about": "View application version, database status, diagnostic logs, and environment details.",
+            "home": "Go to Home to run validations and view today's results.",
+            "sheet_settings": "Set up validation rules and target tables in the sheet.",
+            "history": "View past test runs, compare results, and export reports.",
+            "about": "View app info, system status, and logs.",
         }
         button.setToolTip(nav_tooltips.get(key, f"Go to {label} page."))
         button.clicked.connect(lambda _checked=False, target=key: self.navigate_to(target))

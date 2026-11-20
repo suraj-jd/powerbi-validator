@@ -84,6 +84,7 @@ class AuthBanner(QFrame):
         self._status_circle = QLabel("i")
         self._status_circle.setFixedSize(34, 34)
         self._status_circle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._status_circle.setToolTip("Microsoft account connection status.")
         layout.addWidget(self._status_circle, alignment=Qt.AlignmentFlag.AlignVCenter)
 
         text_col = QVBoxLayout()
@@ -91,11 +92,13 @@ class AuthBanner(QFrame):
 
         self.headline_label = QLabel()
         self.headline_label.setWordWrap(True)
+        self.headline_label.setToolTip("Microsoft sign-in status.")
         text_col.addWidget(self.headline_label)
 
         self.details_label = QLabel()
         self.details_label.setWordWrap(True)
         self.details_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.details_label.setToolTip("Signed-in account name and Power BI workspace access.")
         text_col.addWidget(self.details_label)
 
         layout.addLayout(text_col, stretch=1)
@@ -106,28 +109,28 @@ class AuthBanner(QFrame):
         self.configure_button = QPushButton("Configure Entra App")
         self.configure_button.setObjectName("SecondaryButton")
         self.configure_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.configure_button.setToolTip("Open settings to enter or update your Microsoft Entra application details.")
+        self.configure_button.setToolTip("Open settings to enter your Microsoft login details.")
         self.configure_button.clicked.connect(self.configure_requested.emit)
         actions_row.addWidget(self.configure_button)
 
         self.sign_in_button = QPushButton("Sign In with Microsoft")
         self.sign_in_button.setObjectName("PrimaryButton")
         self.sign_in_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sign_in_button.setToolTip("Sign in with your Microsoft Entra work or school account.")
+        self.sign_in_button.setToolTip("Sign in with your work or school account.")
         self.sign_in_button.clicked.connect(self.sign_in_requested.emit)
         actions_row.addWidget(self.sign_in_button)
 
         self.switch_account_button = QPushButton("Switch Account")
         self.switch_account_button.setObjectName("SecondaryButton")
         self.switch_account_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.switch_account_button.setToolTip("Sign in using a different Microsoft work or school account.")
+        self.switch_account_button.setToolTip("Sign in using a different work or school account.")
         self.switch_account_button.clicked.connect(self.switch_account_requested.emit)
         actions_row.addWidget(self.switch_account_button)
 
         self.sign_out_button = QPushButton("Sign Out")
         self.sign_out_button.setObjectName("SecondaryButton")
         self.sign_out_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sign_out_button.setToolTip("Sign out of your active Microsoft account.")
+        self.sign_out_button.setToolTip("Sign out of your active account.")
         self.sign_out_button.clicked.connect(self.sign_out_requested.emit)
         actions_row.addWidget(self.sign_out_button)
 
@@ -197,9 +200,9 @@ class AuthBanner(QFrame):
         self.sign_in_button.setVisible(not is_authenticated)
         self.sign_in_button.setEnabled(not is_busy)
         self.sign_in_button.setToolTip(
-            ""
+            "Sign in with your work or school account to load your Power BI models."
             if is_configured
-            else "Click to configure your Microsoft Entra Client ID and sign in."
+            else "Click to enter your Microsoft login settings first."
         )
         self.sign_in_button.setText(
             "Signing In..."

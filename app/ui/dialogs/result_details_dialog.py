@@ -165,11 +165,13 @@ class ResultDetailsDialog(QDialog):
         header_row.addLayout(title_col, stretch=1)
 
         pill = make_validation_status_pill(self._result.status)
+        pill.setToolTip(f"Validation outcome: {self._result.status.value if hasattr(self._result.status, 'value') else str(self._result.status)}")
         header_row.addWidget(pill, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header_row)
 
         # Summary box
         summary_frame = QFrame()
+        summary_frame.setToolTip("Summary of what was checked and what was found.")
         summary_frame.setStyleSheet(
             "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px;"
         )
@@ -193,6 +195,7 @@ class ResultDetailsDialog(QDialog):
 
         # Expected
         c_exp = QFrame()
+        c_exp.setToolTip("The expected threshold or value for this test.")
         c_exp.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px;")
         lay_exp = QVBoxLayout(c_exp)
         lay_exp.setContentsMargins(6, 6, 6, 6)
@@ -208,6 +211,7 @@ class ResultDetailsDialog(QDialog):
 
         # Actual
         c_act = QFrame()
+        c_act.setToolTip("The actual value found in your Power BI data.")
         c_act.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px;")
         lay_act = QVBoxLayout(c_act)
         lay_act.setContentsMargins(6, 6, 6, 6)
@@ -223,6 +227,7 @@ class ResultDetailsDialog(QDialog):
 
         # Deviation
         c_dev = QFrame()
+        c_dev.setToolTip("The difference between actual and expected values.")
         c_dev.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px;")
         lay_dev = QVBoxLayout(c_dev)
         lay_dev.setContentsMargins(6, 6, 6, 6)
@@ -242,6 +247,7 @@ class ResultDetailsDialog(QDialog):
         timings_label = QLabel(
             f"Evaluated in {self._result.duration_ms} ms  •  Started: {self._result.started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )
+        timings_label.setToolTip("How long this check took to run in milliseconds.")
         timings_label.setStyleSheet("font-size: 11px; color: #64748B;")
         layout.addWidget(timings_label)
 
@@ -252,6 +258,7 @@ class ResultDetailsDialog(QDialog):
 
         self.details_box = QTextEdit()
         self.details_box.setReadOnly(True)
+        self.details_box.setToolTip("Full diagnostic query logs, DAX details, and technical messages.")
         self.details_box.setStyleSheet(
             "font-family: Consolas, 'Courier New', monospace; font-size: 11px; "
             "background-color: #0F172A; color: #F1F5F9; border-radius: 6px; padding: 10px;"
@@ -265,7 +272,7 @@ class ResultDetailsDialog(QDialog):
         btn_copy = QPushButton("Copy Diagnostics")
         btn_copy.setObjectName("SecondaryButton")
         btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_copy.setToolTip("Copy the diagnostic text and execution summary to your clipboard.")
+        btn_copy.setToolTip("Copy test details and results to your clipboard.")
         btn_copy.clicked.connect(self._copy_diagnostics)
         btn_row.addWidget(btn_copy)
 
@@ -274,7 +281,7 @@ class ResultDetailsDialog(QDialog):
         btn_close = QPushButton("Close")
         btn_close.setObjectName("PrimaryButton")
         btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_close.setToolTip("Close this diagnostics dialog.")
+        btn_close.setToolTip("Close this diagnostics window.")
         btn_close.clicked.connect(self.accept)
         btn_row.addWidget(btn_close)
 
