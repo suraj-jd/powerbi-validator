@@ -206,7 +206,7 @@ class HomePage(QWidget):
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
 
-        container = QWidget()
+        container = QWidget(scroll_area)
         container.setObjectName("PageContainer")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(28, 20, 28, 24)
@@ -244,7 +244,7 @@ class HomePage(QWidget):
 
         header_row.addLayout(title_block, stretch=1)
 
-        badge = QLabel("Stage 13 — Health Dashboard Active")
+        badge = QLabel("Stage 13 — Health Dashboard Active", container)
         badge.setObjectName("StageBadge")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)

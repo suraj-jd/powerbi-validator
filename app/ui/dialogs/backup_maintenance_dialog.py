@@ -58,7 +58,7 @@ class BackupMaintenanceDialog(QDialog):
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
 
-        container = QWidget()
+        container = QWidget(scroll_area)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)

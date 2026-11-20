@@ -134,7 +134,7 @@ class HistoryPage(QWidget):
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
 
-        container = QWidget()
+        container = QWidget(scroll_area)
         container.setObjectName("PageContainer")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(28, 20, 28, 24)
@@ -157,7 +157,7 @@ class HistoryPage(QWidget):
         title_block.addWidget(subtitle_label)
         header_row.addLayout(title_block, stretch=1)
 
-        badge = QLabel("Stage 14 — History & Export Active")
+        badge = QLabel("Stage 14 — History & Export Active", container)
         badge.setObjectName("StageBadge")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
