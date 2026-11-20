@@ -106,24 +106,28 @@ class AuthBanner(QFrame):
         self.configure_button = QPushButton("Configure Entra App")
         self.configure_button.setObjectName("SecondaryButton")
         self.configure_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.configure_button.setToolTip("Open settings to enter or update your Microsoft Entra application details.")
         self.configure_button.clicked.connect(self.configure_requested.emit)
         actions_row.addWidget(self.configure_button)
 
         self.sign_in_button = QPushButton("Sign In with Microsoft")
         self.sign_in_button.setObjectName("PrimaryButton")
         self.sign_in_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sign_in_button.setToolTip("Sign in with your Microsoft Entra work or school account.")
         self.sign_in_button.clicked.connect(self.sign_in_requested.emit)
         actions_row.addWidget(self.sign_in_button)
 
         self.switch_account_button = QPushButton("Switch Account")
         self.switch_account_button.setObjectName("SecondaryButton")
         self.switch_account_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.switch_account_button.setToolTip("Sign in using a different Microsoft work or school account.")
         self.switch_account_button.clicked.connect(self.switch_account_requested.emit)
         actions_row.addWidget(self.switch_account_button)
 
         self.sign_out_button = QPushButton("Sign Out")
         self.sign_out_button.setObjectName("SecondaryButton")
         self.sign_out_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sign_out_button.setToolTip("Sign out of your active Microsoft account.")
         self.sign_out_button.clicked.connect(self.sign_out_requested.emit)
         actions_row.addWidget(self.sign_out_button)
 

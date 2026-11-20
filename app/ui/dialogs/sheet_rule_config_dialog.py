@@ -131,6 +131,7 @@ class SheetRuleConfigDialog(QDialog):
         self.rule_name_input.setObjectName("SearchInput")
         self.rule_name_input.setText(self._initial_rule_name)
         self.rule_name_input.setPlaceholderText("Leave blank to use auto-generated name")
+        self.rule_name_input.setToolTip("Custom descriptive label for this rule. Leave blank for auto-generated name.")
         name_form.addRow("Rule Label (Optional):", self.rule_name_input)
         card_layout.addLayout(name_form)
 
@@ -144,6 +145,7 @@ class SheetRuleConfigDialog(QDialog):
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.setObjectName("SecondaryButton")
         self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_button.setToolTip("Discard changes and close this dialog.")
         self.cancel_button.clicked.connect(self.reject)
         btn_row.addWidget(self.cancel_button)
 
@@ -153,6 +155,7 @@ class SheetRuleConfigDialog(QDialog):
             "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 8px 18px; border-radius: 6px;"
         )
         self.apply_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.apply_button.setToolTip("Apply and save these settings for the validation check.")
         self.apply_button.setDefault(True)
         self.apply_button.clicked.connect(self._apply_and_close)
         btn_row.addWidget(self.apply_button)
@@ -169,6 +172,7 @@ class SheetRuleConfigDialog(QDialog):
             self.null_max_count = QSpinBox()
             self.null_max_count.setRange(0, 10_000_000)
             self.null_max_count.setValue(int(self._config.get("allowed_blank_count", 0)))
+            self.null_max_count.setToolTip("Maximum number of blank rows permitted before the test fails.")
             form.addRow("Allowed Blank Rows:", self.null_max_count)
 
             self.null_max_pct = QDoubleSpinBox()
@@ -177,20 +181,24 @@ class SheetRuleConfigDialog(QDialog):
             self.null_max_pct.setSuffix(" %")
             pct_val = self._config.get("allowed_blank_percentage")
             self.null_max_pct.setValue(float(pct_val) if pct_val is not None else 0.0)
+            self.null_max_pct.setToolTip("Maximum percentage of blank rows permitted (0 to 100%).")
             form.addRow("Allowed Blank %:", self.null_max_pct)
 
             self.null_chk_empty = QCheckBox('Count empty text ("" and spaces) as blanks')
             self.null_chk_empty.setChecked(self._config.get("include_empty_string", True))
+            self.null_chk_empty.setToolTip('When checked, empty strings and spaces are treated as blank values.')
             form.addRow("", self.null_chk_empty)
 
         elif vtype == VALIDATION_TYPE_DUPLICATE:
             self.dup_max_count = QSpinBox()
             self.dup_max_count.setRange(0, 10_000_000)
             self.dup_max_count.setValue(int(self._config.get("allowed_duplicate_count", 0)))
+            self.dup_max_count.setToolTip("Maximum number of duplicate values permitted before the test fails.")
             form.addRow("Allowed Duplicates:", self.dup_max_count)
 
             self.dup_case_sensitive = QCheckBox("Case-sensitive text comparison")
             self.dup_case_sensitive.setChecked(self._config.get("case_sensitive", False))
+            self.dup_case_sensitive.setToolTip("When checked, comparisons distinguish between uppercase and lowercase letters.")
             form.addRow("", self.dup_case_sensitive)
 
         elif vtype == VALIDATION_TYPE_LATEST_DATE:
@@ -198,20 +206,29 @@ class SheetRuleConfigDialog(QDialog):
             self.date_max_age.setRange(1, 8760)
             self.date_max_age.setValue(int(self._config.get("max_age_hours", 24)))
             self.date_max_age.setSuffix(" hours")
+            self.date_max_age.setToolTip("Maximum hours allowed since the newest recorded date before flagging stale data.")
             form.addRow("Freshness SLA (Max Age):", self.date_max_age)
 
             self.date_disallow_future = QCheckBox("Fail if future dates are present")
             self.date_disallow_future.setChecked(not self._config.get("allow_future_dates", False))
+            self.date_disallow_future.setToolTip("When checked, marks the test as failed if dates from tomorrow or beyond are found.")
             form.addRow("", self.date_disallow_future)
 
         elif vtype == VALIDATION_TYPE_ROW_COUNT:
             self.row_method = AnimatedComboBox()
-            self.row_method.addItems([
-                "Minimum row count threshold",
-                "Fixed expected count",
-                "Range [Min - Max]",
-                "Compare with previous run",
-            ])
+            row_methods = [
+                ("Minimum row count threshold", "Fails if total rows fall below this number."),
+                ("Fixed expected count", "Checks if total row count matches an exact expected number."),
+                ("Range [Min to Max]", "Checks if total row count stays within lower and upper bounds."),
+                ("Compare with previous run", "Compares table row count against the last validation run."),
+            ]
+            for text, tip in row_methods:
+                self.row_method.addItem(text)
+                self.row_method.setItemData(self.row_method.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+            self.row_method.setToolTip("Evaluation method used to check the table row count.")
+            self.row_method.currentIndexChanged.connect(
+                lambda idx: self.row_method.setToolTip(self.row_method.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Evaluation method used to check the table row count.")
+            )
             cur_meth = self._config.get("method", "min_threshold")
             if cur_meth == "fixed":
                 self.row_method.setCurrentIndex(1)
@@ -226,6 +243,7 @@ class SheetRuleConfigDialog(QDialog):
             self.row_baseline = QSpinBox()
             self.row_baseline.setRange(0, 1_000_000_000)
             self.row_baseline.setValue(int(self._config.get("min_rows", self._config.get("expected_rows", 1))))
+            self.row_baseline.setToolTip("Threshold or expected number of rows for this table.")
             form.addRow("Threshold / Expected Rows:", self.row_baseline)
 
             self.row_dev_pct = QDoubleSpinBox()
@@ -233,11 +251,23 @@ class SheetRuleConfigDialog(QDialog):
             self.row_dev_pct.setDecimals(1)
             self.row_dev_pct.setSuffix(" %")
             self.row_dev_pct.setValue(float(self._config.get("allowed_deviation_pct", 5.0)))
+            self.row_dev_pct.setToolTip("Allowed percentage deviation before the row count test fails.")
             form.addRow("Allowed Deviation %:", self.row_dev_pct)
 
         elif vtype == VALIDATION_TYPE_REFRESH:
             self.ref_status = AnimatedComboBox()
-            self.ref_status.addItems(["Completed", "In Progress", "Any"])
+            ref_status_items = [
+                ("Completed", "Requires the dataset refresh to be completed successfully."),
+                ("In Progress", "Accepts a refresh that is currently running."),
+                ("Any", "Accepts any recorded refresh status."),
+            ]
+            for text, tip in ref_status_items:
+                self.ref_status.addItem(text)
+                self.ref_status.setItemData(self.ref_status.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+            self.ref_status.setToolTip("Required status of the Power BI dataset refresh.")
+            self.ref_status.currentIndexChanged.connect(
+                lambda idx: self.ref_status.setToolTip(self.ref_status.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Required status of the Power BI dataset refresh.")
+            )
             cur_st = self._config.get("expected_status", "Completed")
             idx = self.ref_status.findText(cur_st)
             if idx >= 0:
@@ -248,11 +278,18 @@ class SheetRuleConfigDialog(QDialog):
             self.ref_max_age.setRange(1, 720)
             self.ref_max_age.setValue(int(self._config.get("max_age_hours", 24)))
             self.ref_max_age.setSuffix(" hours")
+            self.ref_max_age.setToolTip("Maximum allowed hours since the dataset was refreshed.")
             form.addRow("Max Age Since Refresh:", self.ref_max_age)
 
             self.ref_definition = AnimatedComboBox()
             self.ref_definition.addItem("Latest refresh attempt must succeed", "latest_attempt")
+            self.ref_definition.setItemData(0, "Fails if the most recent refresh attempt resulted in an error.", Qt.ItemDataRole.ToolTipRole)
             self.ref_definition.addItem("At least one successful refresh within window", "latest_success")
+            self.ref_definition.setItemData(1, "Passes if any refresh finished successfully within the max age window.", Qt.ItemDataRole.ToolTipRole)
+            self.ref_definition.setToolTip("Rule criteria for verifying dataset refresh health.")
+            self.ref_definition.currentIndexChanged.connect(
+                lambda idx: self.ref_definition.setToolTip(self.ref_definition.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Rule criteria for verifying dataset refresh health.")
+            )
             cur_def = self._config.get("definition", "latest_attempt")
             idx = 1 if cur_def == "latest_success" else 0
             self.ref_definition.setCurrentIndex(idx)
@@ -263,6 +300,7 @@ class SheetRuleConfigDialog(QDialog):
             self.dax_expected.setRange(-1_000_000_000.0, 1_000_000_000.0)
             self.dax_expected.setDecimals(2)
             self.dax_expected.setValue(float(self._config.get("expected_value", 0.0)))
+            self.dax_expected.setToolTip("The expected numerical target value that this DAX measure should return.")
             form.addRow("Expected Measure Value:", self.dax_expected)
 
             self.dax_dev_pct = QDoubleSpinBox()
@@ -270,15 +308,18 @@ class SheetRuleConfigDialog(QDialog):
             self.dax_dev_pct.setDecimals(2)
             self.dax_dev_pct.setSuffix(" %")
             self.dax_dev_pct.setValue(float(self._config.get("allowed_deviation_pct", 0.0)))
+            self.dax_dev_pct.setToolTip("Allowed percentage difference from the expected measure value.")
             form.addRow("Allowed Deviation %:", self.dax_dev_pct)
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
             # 1. Baseline Floor (Min)
             self.anom_chk_min = QCheckBox("Enable Minimum Baseline (Floor):")
             self.anom_chk_min.setStyleSheet("font-weight: 600; color: #1E293B;")
+            self.anom_chk_min.setToolTip("Turn on a minimum lower bound. Any value below this number is flagged as an anomaly.")
             self.anom_spin_min = QDoubleSpinBox()
             self.anom_spin_min.setRange(-1e12, 1e12)
             self.anom_spin_min.setDecimals(2)
+            self.anom_spin_min.setToolTip("Minimum allowed numerical value (floor).")
             has_min = self._config.get("min_baseline") is not None or self._config.get("min_value") is not None
             cur_min = float(self._config.get("min_baseline") if self._config.get("min_baseline") is not None else self._config.get("min_value", 0.0))
             self.anom_spin_min.setValue(cur_min)
@@ -294,9 +335,11 @@ class SheetRuleConfigDialog(QDialog):
             # 2. Baseline Ceiling (Max)
             self.anom_chk_max = QCheckBox("Enable Maximum Baseline (Ceiling):")
             self.anom_chk_max.setStyleSheet("font-weight: 600; color: #1E293B;")
+            self.anom_chk_max.setToolTip("Turn on a maximum upper bound. Any value above this number is flagged as an anomaly.")
             self.anom_spin_max = QDoubleSpinBox()
             self.anom_spin_max.setRange(-1e12, 1e12)
             self.anom_spin_max.setDecimals(2)
+            self.anom_spin_max.setToolTip("Maximum allowed numerical value (ceiling).")
             has_max = self._config.get("max_baseline") is not None or self._config.get("max_value") is not None
             cur_max = float(self._config.get("max_baseline") if self._config.get("max_baseline") is not None else self._config.get("max_value", 0.0))
             self.anom_spin_max.setValue(cur_max)
@@ -311,11 +354,20 @@ class SheetRuleConfigDialog(QDialog):
 
             # 3. Secondary Anomaly Detection Check Method
             self.anom_method_combo = AnimatedComboBox()
-            self.anom_method_combo.addItem("Baseline Thresholds Only (Min / Max)", "threshold_only")
-            self.anom_method_combo.addItem("± % Change from Fixed Baseline", "percentage")
-            self.anom_method_combo.addItem("± % Change from Previous Run", "previous_run")
-            self.anom_method_combo.addItem("± % from Historical Median", "median")
-            self.anom_method_combo.addItem("± Standard Deviation (Z-Score)", "z_score")
+            anom_method_items = [
+                ("Baseline Thresholds Only (Min / Max)", "threshold_only", "Only checks against minimum floor and maximum ceiling limits."),
+                ("± % Change from Fixed Baseline", "percentage", "Flags values that differ by more than a percentage from a fixed target."),
+                ("± % Change from Previous Run", "previous_run", "Flags values that jump or drop significantly compared to the last run."),
+                ("± % from Historical Median", "median", "Flags values that deviate from the historical median across past runs."),
+                ("± Standard Deviation (Z-Score)", "z_score", "Flags statistical outliers using rolling mean and standard deviation."),
+            ]
+            for text, val, tip in anom_method_items:
+                self.anom_method_combo.addItem(text, val)
+                self.anom_method_combo.setItemData(self.anom_method_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+            self.anom_method_combo.setToolTip("Method used to detect statistical anomalies.")
+            self.anom_method_combo.currentIndexChanged.connect(
+                lambda idx: self.anom_method_combo.setToolTip(self.anom_method_combo.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Method used to detect statistical anomalies.")
+            )
 
             cur_m = str(self._config.get("comparison_method", "z_score")).strip().lower()
             if cur_m in ("threshold_only", "baseline_only", "none"):
@@ -338,6 +390,7 @@ class SheetRuleConfigDialog(QDialog):
             self.anom_fixed_baseline.setRange(-1e12, 1e12)
             self.anom_fixed_baseline.setDecimals(2)
             self.anom_fixed_baseline.setValue(float(self._config.get("baseline_value", 0.0)))
+            self.anom_fixed_baseline.setToolTip("Fixed baseline target value to calculate percentage deviation against.")
             self.anom_fixed_baseline_row_lbl = QLabel("Fixed Baseline Value:")
             form.addRow(self.anom_fixed_baseline_row_lbl, self.anom_fixed_baseline)
 
@@ -347,14 +400,24 @@ class SheetRuleConfigDialog(QDialog):
             self.anom_dev_pct.setDecimals(1)
             self.anom_dev_pct.setSuffix(" %")
             self.anom_dev_pct.setValue(float(self._config.get("allowed_deviation_pct", 10.0)))
+            self.anom_dev_pct.setToolTip("Maximum allowed percentage change before flagging an anomaly.")
             self.anom_dev_pct_row_lbl = QLabel("Allowed Deviation %:")
             form.addRow(self.anom_dev_pct_row_lbl, self.anom_dev_pct)
 
             # Sensitivity (for "z_score")
             self.anom_sensitivity = AnimatedComboBox()
-            self.anom_sensitivity.addItem("Standard (Z-Score ±2.5)", "z_score")
-            self.anom_sensitivity.addItem("High Sensitivity (Z-Score ±2.0)", "z_score_high")
-            self.anom_sensitivity.addItem("Tolerant (Z-Score ±3.0)", "z_score_tolerant")
+            anom_sens_items = [
+                ("Standard (Z-Score ±2.5)", "z_score", "Flags values more than 2.5 standard deviations from the average."),
+                ("High Sensitivity (Z-Score ±2.0)", "z_score_high", "Flags smaller variations for earlier warning (more alerts)."),
+                ("Tolerant (Z-Score ±3.0)", "z_score_tolerant", "Only flags extreme outliers (fewer alerts)."),
+            ]
+            for text, val, tip in anom_sens_items:
+                self.anom_sensitivity.addItem(text, val)
+                self.anom_sensitivity.setItemData(self.anom_sensitivity.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+            self.anom_sensitivity.setToolTip("Statistical sensitivity threshold for outlier detection.")
+            self.anom_sensitivity.currentIndexChanged.connect(
+                lambda idx: self.anom_sensitivity.setToolTip(self.anom_sensitivity.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Statistical sensitivity threshold for outlier detection.")
+            )
             cur_z = self._config.get("z_score_threshold", 2.5)
             z_code = "z_score_high" if cur_z == 2.0 else ("z_score_tolerant" if cur_z == 3.0 else "z_score")
             sm_idx = next((i for i in range(self.anom_sensitivity.count()) if self.anom_sensitivity.itemData(i) == z_code), 0)
@@ -364,11 +427,20 @@ class SheetRuleConfigDialog(QDialog):
 
             # Lookback Window (for "median", "z_score")
             self.anom_lookback = AnimatedComboBox()
-            self.anom_lookback.addItem("7 Days Lookback", 7)
-            self.anom_lookback.addItem("15 Days Lookback", 15)
-            self.anom_lookback.addItem("30 Days Lookback (Recommended)", 30)
-            self.anom_lookback.addItem("60 Days Lookback", 60)
-            self.anom_lookback.addItem("90 Days Lookback", 90)
+            anom_lookback_items = [
+                ("7 Days Lookback", 7, "Calculate historical average using the past 7 days of runs."),
+                ("15 Days Lookback", 15, "Calculate historical average using the past 15 days of runs."),
+                ("30 Days Lookback (Recommended)", 30, "Calculate historical average using the past 30 days of runs."),
+                ("60 Days Lookback", 60, "Calculate historical average using the past 60 days of runs."),
+                ("90 Days Lookback", 90, "Calculate historical average using the past 90 days of runs."),
+            ]
+            for text, val, tip in anom_lookback_items:
+                self.anom_lookback.addItem(text, val)
+                self.anom_lookback.setItemData(self.anom_lookback.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+            self.anom_lookback.setToolTip("Lookback window used to compute historical averages.")
+            self.anom_lookback.currentIndexChanged.connect(
+                lambda idx: self.anom_lookback.setToolTip(self.anom_lookback.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Lookback window used to compute historical averages.")
+            )
             cur_lb = self._config.get("lookback_days", 30)
             lb_idx = next((i for i in range(self.anom_lookback.count()) if self.anom_lookback.itemData(i) == cur_lb), 2)
             self.anom_lookback.setCurrentIndex(lb_idx)

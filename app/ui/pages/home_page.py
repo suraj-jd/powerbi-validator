@@ -401,6 +401,7 @@ class HomePage(QWidget):
         self.fetch_refresh_button = QPushButton("↻  Fetch Live Refresh History")
         self.fetch_refresh_button.setObjectName("SecondaryButton")
         self.fetch_refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.fetch_refresh_button.setToolTip("Retrieve the latest refresh history from Power BI for this dataset.")
         self.fetch_refresh_button.clicked.connect(self._handle_fetch_refresh)
         card_header.addWidget(self.fetch_refresh_button)
 
@@ -410,6 +411,7 @@ class HomePage(QWidget):
             "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 7px 14px; border-radius: 6px;"
         )
         self.view_refresh_details_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.view_refresh_details_button.setToolTip("Open detailed refresh history logs and diagnostics.")
         self.view_refresh_details_button.clicked.connect(self._handle_view_refresh_details)
         card_header.addWidget(self.view_refresh_details_button)
         layout.addLayout(card_header)
@@ -735,6 +737,7 @@ class HomePage(QWidget):
         self.cancel_validation_button = QPushButton("✕ Cancel")
         self.cancel_validation_button.setObjectName("SecondaryButton")
         self.cancel_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_validation_button.setToolTip("Stop the current validation run.")
         self.cancel_validation_button.clicked.connect(self._cancel_validation)
         self.cancel_validation_button.hide()
         card_header.addWidget(self.cancel_validation_button)
@@ -746,6 +749,7 @@ class HomePage(QWidget):
             "padding: 8px 18px; border-radius: 6px;"
         )
         self.run_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.run_validation_button.setToolTip("Execute all enabled validation checks against your Power BI models.")
         self.run_validation_button.clicked.connect(self._run_validation)
         card_header.addWidget(self.run_validation_button)
         layout.addLayout(card_header)
@@ -901,18 +905,26 @@ class HomePage(QWidget):
         self.results_search_input = QLineEdit()
         self.results_search_input.setObjectName("SearchInput")
         self.results_search_input.setPlaceholderText("Filter checks by rule name, target, or outcome...")
+        self.results_search_input.setToolTip("Type to filter results by rule name, target, or outcome.")
         self.results_search_input.textChanged.connect(lambda _: self._apply_results_filter())
         filter_row.addWidget(self.results_search_input, stretch=1)
 
         self.results_status_filter = AnimatedComboBox()
         self.results_status_filter.setObjectName("FilterCombo")
-        self.results_status_filter.addItems([
-            "All Check Outcomes",
-            "Failed Only",
-            "Warnings Only",
-            "Errors Only",
-            "Passed Only",
-        ])
+        results_status_items = [
+            ("All Check Outcomes", "Show all test outcomes."),
+            ("Failed Only", "Show only tests that failed."),
+            ("Warnings Only", "Show tests with warnings or anomalies."),
+            ("Errors Only", "Show tests that stopped because of query or connection errors."),
+            ("Passed Only", "Show only tests that passed successfully."),
+        ]
+        for text, tip in results_status_items:
+            self.results_status_filter.addItem(text)
+            self.results_status_filter.setItemData(self.results_status_filter.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+        self.results_status_filter.setToolTip("Filter results table by validation outcome status.")
+        self.results_status_filter.currentIndexChanged.connect(
+            lambda idx: self.results_status_filter.setToolTip(self.results_status_filter.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Filter results table by validation outcome status.")
+        )
         self.results_status_filter.currentIndexChanged.connect(lambda _: self._apply_results_filter())
         filter_row.addWidget(self.results_status_filter)
         layout.addLayout(filter_row)

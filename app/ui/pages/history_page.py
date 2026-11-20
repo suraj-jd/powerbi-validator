@@ -175,12 +175,14 @@ class HistoryPage(QWidget):
 
         self.btn_refresh = QPushButton("↻  Refresh History")
         self.btn_refresh.setObjectName("SecondaryButton")
+        self.btn_refresh.setToolTip("Reload execution runs and audit history from the database.")
         self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_refresh.clicked.connect(self.refresh_history)
         action_layout.addWidget(self.btn_refresh)
 
         self.btn_compare = QPushButton("⚖  Compare Runs...")
         self.btn_compare.setObjectName("SecondaryButton")
+        self.btn_compare.setToolTip("Compare up to 4 validation runs side-by-side to highlight changes and regressions.")
         self.btn_compare.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_compare.clicked.connect(self._handle_compare_runs)
         action_layout.addWidget(self.btn_compare)
@@ -189,18 +191,21 @@ class HistoryPage(QWidget):
 
         self.btn_export_csv = QPushButton("Export CSV...")
         self.btn_export_csv.setObjectName("SecondaryButton")
+        self.btn_export_csv.setToolTip("Export the execution history list to a CSV spreadsheet.")
         self.btn_export_csv.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export_csv.clicked.connect(self._handle_export_csv)
         action_layout.addWidget(self.btn_export_csv)
 
         self.btn_export_xlsx = QPushButton("Export Excel...")
         self.btn_export_xlsx.setObjectName("SecondaryButton")
+        self.btn_export_xlsx.setToolTip("Export execution history to an Excel (.xlsx) file.")
         self.btn_export_xlsx.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export_xlsx.clicked.connect(self._handle_export_xlsx)
         action_layout.addWidget(self.btn_export_xlsx)
 
         self.btn_export_logs = QPushButton("Diagnostic Logs...")
         self.btn_export_logs.setObjectName("SecondaryButton")
+        self.btn_export_logs.setToolTip("Open diagnostic execution logs for debugging and review.")
         self.btn_export_logs.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export_logs.clicked.connect(self._handle_export_logs)
         action_layout.addWidget(self.btn_export_logs)
@@ -208,6 +213,7 @@ class HistoryPage(QWidget):
         if self._db is not None:
             self.btn_backup = QPushButton("Database Maintenance...")
             self.btn_backup.setObjectName("PrimaryButton")
+            self.btn_backup.setToolTip("Open database backup, retention policy, and maintenance options.")
             self.btn_backup.setStyleSheet(
                 "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 6px 12px; border-radius: 6px;"
             )
@@ -234,6 +240,7 @@ class HistoryPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setObjectName("SearchInput")
         self.search_input.setPlaceholderText("Search runs by ID, date, status, duration, version...")
+        self.search_input.setToolTip("Search runs by run ID, execution date, status, duration, or app version.")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(lambda _: self._apply_filters())
         filter_row.addWidget(self.search_input, stretch=2)
@@ -244,13 +251,17 @@ class HistoryPage(QWidget):
 
         self.status_filter_combo = QComboBox()
         self.status_filter_combo.setObjectName("FilterCombo")
-        self.status_filter_combo.addItems([
-            "All Run Statuses",
-            "Failed Runs Only",
-            "Passed Runs Only",
-            "Warning Runs Only",
-            "Error Runs Only",
-        ])
+        status_opts = [
+            ("All Run Statuses", "Show all execution runs regardless of status."),
+            ("Failed Runs Only", "Show only runs containing failed validation checks."),
+            ("Passed Runs Only", "Show only runs where every validation check passed."),
+            ("Warning Runs Only", "Show only runs containing warnings."),
+            ("Error Runs Only", "Show only runs that encountered execution or connection errors."),
+        ]
+        for text, tip in status_opts:
+            self.status_filter_combo.addItem(text)
+            self.status_filter_combo.setItemData(self.status_filter_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+        self.status_filter_combo.setToolTip("Filter execution runs by outcome.")
         self.status_filter_combo.currentIndexChanged.connect(lambda _: self._apply_filters())
         filter_row.addWidget(self.status_filter_combo, stretch=1)
 
@@ -260,17 +271,22 @@ class HistoryPage(QWidget):
 
         self.date_filter_combo = QComboBox()
         self.date_filter_combo.setObjectName("FilterCombo")
-        self.date_filter_combo.addItems([
-            "All Time",
-            "Today (Last 24h)",
-            "Last 7 Days",
-            "Last 30 Days",
-        ])
+        date_opts = [
+            ("All Time", "Show execution runs from all recorded dates."),
+            ("Today (Last 24h)", "Show only execution runs completed within the last 24 hours."),
+            ("Last 7 Days", "Show execution runs completed in the past 7 days."),
+            ("Last 30 Days", "Show execution runs completed in the past 30 days."),
+        ]
+        for text, tip in date_opts:
+            self.date_filter_combo.addItem(text)
+            self.date_filter_combo.setItemData(self.date_filter_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+        self.date_filter_combo.setToolTip("Filter execution runs by date range.")
         self.date_filter_combo.currentIndexChanged.connect(lambda _: self._apply_filters())
         filter_row.addWidget(self.date_filter_combo, stretch=1)
 
         self.btn_clear_filters = QPushButton("✕ Clear Filters")
         self.btn_clear_filters.setObjectName("SecondaryButton")
+        self.btn_clear_filters.setToolTip("Clear search query and reset status and date filters.")
         self.btn_clear_filters.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear_filters.setStyleSheet("padding: 5px 12px; font-size: 12px;")
         self.btn_clear_filters.clicked.connect(self._handle_clear_filters)

@@ -23,6 +23,16 @@ QWidget {
     color: #0F172A;
 }
 
+QToolTip {
+    background-color: #0F172A;
+    color: #F8FAFC;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
 /* Dark Navy Sidebar */
 QFrame#Sidebar {
     background-color: #13294B;

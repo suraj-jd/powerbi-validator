@@ -265,6 +265,7 @@ class ResultDetailsDialog(QDialog):
         btn_copy = QPushButton("Copy Diagnostics")
         btn_copy.setObjectName("SecondaryButton")
         btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_copy.setToolTip("Copy the diagnostic text and execution summary to your clipboard.")
         btn_copy.clicked.connect(self._copy_diagnostics)
         btn_row.addWidget(btn_copy)
 
@@ -273,6 +274,7 @@ class ResultDetailsDialog(QDialog):
         btn_close = QPushButton("Close")
         btn_close.setObjectName("PrimaryButton")
         btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setToolTip("Close this diagnostics dialog.")
         btn_close.clicked.connect(self.accept)
         btn_row.addWidget(btn_close)
 

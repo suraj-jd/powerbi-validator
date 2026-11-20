@@ -60,6 +60,7 @@ from app.services.sheet_service import (
     SheetRowDTO,
     SheetService,
     TEST_NAME_TO_TYPE,
+    TEST_TYPE_TOOLTIPS,
     format_rule_conditions_summary,
 )
 from app.ui.dialogs.sheet_rule_config_dialog import SheetRuleConfigDialog
@@ -211,7 +212,7 @@ class SheetSettingsPage(QWidget):
         # Group 1: Sheet Actions
         self.btn_add_row = QPushButton("➕ Add Row")
         self.btn_add_row.setObjectName("PrimaryButton")
-        self.btn_add_row.setToolTip("Add a new validation rule row")
+        self.btn_add_row.setToolTip("Add a new validation check row to this sheet.")
         self.btn_add_row.setStyleSheet(
             "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 5px 10px; border-radius: 5px; font-size: 12px;"
         )
@@ -221,7 +222,7 @@ class SheetSettingsPage(QWidget):
 
         self.btn_delete_row = QPushButton("🗑️ Delete")
         self.btn_delete_row.setObjectName("SecondaryButton")
-        self.btn_delete_row.setToolTip("Delete the selected validation row")
+        self.btn_delete_row.setToolTip("Delete the selected validation rows from this sheet.")
         self.btn_delete_row.setStyleSheet(
             "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
         )
@@ -231,7 +232,7 @@ class SheetSettingsPage(QWidget):
 
         self.btn_save_sheet = QPushButton("💾 Save Sheet")
         self.btn_save_sheet.setObjectName("PrimaryButton")
-        self.btn_save_sheet.setToolTip("Save all validation rules to local database")
+        self.btn_save_sheet.setToolTip("Save all validation rules to the database.")
         self.btn_save_sheet.setStyleSheet(
             "background-color: #10B981; color: #FFFFFF; font-weight: 700; padding: 5px 12px; border-radius: 5px; font-size: 12px;"
         )
@@ -244,7 +245,7 @@ class SheetSettingsPage(QWidget):
         # Group 2: Power BI Sync
         self.btn_sync_pbi = QPushButton("🔄 Sync PBI")
         self.btn_sync_pbi.setObjectName("SecondaryButton")
-        self.btn_sync_pbi.setToolTip("Fetch accessible workspaces and datasets from Power BI")
+        self.btn_sync_pbi.setToolTip("Sync accessible workspaces, datasets, and tables from Power BI.")
         self.btn_sync_pbi.setStyleSheet(
             "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
         )
@@ -257,7 +258,7 @@ class SheetSettingsPage(QWidget):
         # Group 3: File Transfer
         self.btn_import = QPushButton("📥 Import...")
         self.btn_import.setObjectName("SecondaryButton")
-        self.btn_import.setToolTip("Import validation rules from Excel or CSV with template support")
+        self.btn_import.setToolTip("Import validation rules from an Excel (.xlsx) or CSV file.")
         self.btn_import.setStyleSheet(
             "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
         )
@@ -267,7 +268,7 @@ class SheetSettingsPage(QWidget):
 
         self.btn_export = QPushButton("📤 Export...")
         self.btn_export.setObjectName("SecondaryButton")
-        self.btn_export.setToolTip("Export validation sheet to Excel (.xlsx) or CSV")
+        self.btn_export.setToolTip("Export the current validation sheet rules to an Excel (.xlsx) file.")
         self.btn_export.setStyleSheet(
             "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
         )
@@ -281,6 +282,7 @@ class SheetSettingsPage(QWidget):
         self.search_filter = QLineEdit()
         self.search_filter.setObjectName("RibbonSearch")
         self.search_filter.setPlaceholderText("🔍 Filter...")
+        self.search_filter.setToolTip("Filter visible sheet rows by table name, column, measure, or test type.")
         self.search_filter.setMinimumWidth(80)
         self.search_filter.setMaximumWidth(150)
         self.search_filter.setStyleSheet(
@@ -536,6 +538,7 @@ class SheetSettingsPage(QWidget):
         chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         chk = QCheckBox()
         chk.setChecked(dto.enabled)
+        chk.setToolTip("Enable or disable this validation check.")
         chk.toggled.connect(lambda state, r=dto: self._on_row_enabled_changed(state, r))
         chk_layout.addWidget(chk)
         self.sheet_table.setCellWidget(row_idx, 1, chk_widget)
@@ -543,12 +546,14 @@ class SheetSettingsPage(QWidget):
         # Col 2: Workspace Dropdown
         ws_combo = AnimatedComboBox()
         ws_combo.setObjectName("SheetCellCombo")
+        ws_combo.setToolTip("Select the Power BI workspace containing your dataset.")
         self._populate_workspace_combo(ws_combo, selected_id=dto.workspace_id, selected_name=dto.workspace_name)
         self.sheet_table.setCellWidget(row_idx, 2, ws_combo)
 
         # Col 3: Report / Dataset Dropdown
         ds_combo = AnimatedComboBox()
         ds_combo.setObjectName("SheetCellCombo")
+        ds_combo.setToolTip("Select the Power BI semantic model / dataset to test.")
         self._populate_dataset_combo(
             ds_combo,
             workspace_id=dto.workspace_id,
@@ -561,18 +566,28 @@ class SheetSettingsPage(QWidget):
         test_combo = AnimatedComboBox()
         test_combo.setObjectName("SheetCellCombo")
         for key, friendly in FRIENDLY_TEST_NAMES.items():
+            tip = TEST_TYPE_TOOLTIPS.get(key, "")
             test_combo.addItem(friendly, key)
+            if tip:
+                test_combo.setItemData(test_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
         # Select matching
         cur_test_idx = next(
             (i for i in range(test_combo.count()) if test_combo.itemData(i) == dto.validation_type),
             0,
         )
         test_combo.setCurrentIndex(cur_test_idx)
+        cur_tip = test_combo.itemData(cur_test_idx, Qt.ItemDataRole.ToolTipRole)
+        if cur_tip:
+            test_combo.setToolTip(str(cur_tip))
+        test_combo.currentIndexChanged.connect(
+            lambda idx, tc=test_combo: tc.setToolTip(tc.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "")
+        )
         self.sheet_table.setCellWidget(row_idx, 4, test_combo)
 
         # Col 5: Table Name Dropdown
         tbl_combo = EditableCellCombo()
         tbl_combo.setObjectName("SheetCellCombo")
+        tbl_combo.setToolTip("Select or enter the table name to validate.")
         self._populate_table_combo(
             tbl_combo,
             workspace_id=dto.workspace_id,
@@ -584,6 +599,7 @@ class SheetSettingsPage(QWidget):
         # Col 6: Column or Measure Dropdown
         col_combo = EditableCellCombo()
         col_combo.setObjectName("SheetCellCombo")
+        col_combo.setToolTip("Select or enter the column name or [Measure] to evaluate.")
         selected_target = dto.measure_name if dto.measure_name else (dto.column_name or "")
         self._populate_column_measure_combo(
             col_combo,
@@ -619,6 +635,7 @@ class SheetSettingsPage(QWidget):
         # Col 11: ⚙️ Gear Rule Configuration Button
         btn_gear = QPushButton(f"⚙️  {dto.conditions_summary}")
         btn_gear.setObjectName("SheetCellGear")
+        btn_gear.setToolTip("Configure thresholds, tolerances, and expected values for this check.")
         btn_gear.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_gear.clicked.connect(
             lambda _, b=btn_gear, r=dto: self._open_gear_dialog(b, r)
@@ -628,7 +645,7 @@ class SheetSettingsPage(QWidget):
         # Col 12: Action Delete Button
         btn_del = QPushButton("🗑️")
         btn_del.setObjectName("SheetCellDelete")
-        btn_del.setToolTip("Delete this rule row")
+        btn_del.setToolTip("Delete this validation rule row from the sheet.")
         btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_del.clicked.connect(lambda _, r=dto, idx=row_idx: self._handle_delete_row(r, idx))
         self.sheet_table.setCellWidget(row_idx, 12, btn_del)

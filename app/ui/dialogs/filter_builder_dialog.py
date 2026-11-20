@@ -53,6 +53,19 @@ OPERATOR_CHOICES: list[tuple[str, str]] = [
     ("IS NOT BLANK (Has value)", OPERATOR_IS_NOT_BLANK),
 ]
 
+OPERATOR_TOOLTIPS: dict[str, str] = {
+    OPERATOR_EQUALS: "Matches rows where column equals this value.",
+    OPERATOR_NOT_EQUALS: "Matches rows where column does not equal this value.",
+    OPERATOR_GREATER_THAN: "Matches rows where column is strictly greater than this value.",
+    OPERATOR_GREATER_EQUAL: "Matches rows where column is greater than or equal to this value.",
+    OPERATOR_LESS_THAN: "Matches rows where column is strictly less than this value.",
+    OPERATOR_LESS_EQUAL: "Matches rows where column is less than or equal to this value.",
+    OPERATOR_IN: 'Matches rows where column is in a list of values (e.g. "US", "UK").',
+    OPERATOR_NOT_IN: "Matches rows where column is not in a list of values.",
+    OPERATOR_IS_BLANK: "Matches rows where column has no value or is empty.",
+    OPERATOR_IS_NOT_BLANK: "Matches rows where column contains a non-blank value.",
+}
+
 
 def escape_dax_table(table_name: str) -> str:
     """Escape a table name for DAX expressions wrapped in single quotes."""
@@ -328,6 +341,7 @@ class FilterBuilderDialog(QDialog):
         self.combo_table = QComboBox()
         self.combo_table.setEditable(True)
         self.combo_table.setPlaceholderText("Select or enter table")
+        self.combo_table.setToolTip("Select or type the table name to apply this filter to.")
         self.combo_table.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
             "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
@@ -340,6 +354,7 @@ class FilterBuilderDialog(QDialog):
         self.combo_column = QComboBox()
         self.combo_column.setEditable(True)
         self.combo_column.setPlaceholderText("Select or enter column")
+        self.combo_column.setToolTip("Select or type the column name to filter.")
         self.combo_column.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
             "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
@@ -357,18 +372,23 @@ class FilterBuilderDialog(QDialog):
         lbl_op.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
         self.combo_operator = QComboBox()
         for label, op_code in OPERATOR_CHOICES:
+            tip = OPERATOR_TOOLTIPS.get(op_code, "")
             self.combo_operator.addItem(label, op_code)
+            if tip:
+                self.combo_operator.setItemData(self.combo_operator.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
         self.combo_operator.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
             "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
             "QComboBox:focus { border-color: #1668DC; }"
         )
+        self.combo_operator.setToolTip(OPERATOR_TOOLTIPS.get(OPERATOR_EQUALS, ""))
         self.combo_operator.currentIndexChanged.connect(self._on_operator_changed)
 
         self.lbl_value = QLabel("Filter Value:")
         self.lbl_value.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
         self.input_value = QLineEdit()
         self.input_value.setPlaceholderText("e.g. Completed or 2024")
+        self.input_value.setToolTip("Enter the filter value. Text is automatically quoted; numbers stay bare.")
         self.input_value.setStyleSheet(
             "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
             "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
@@ -391,6 +411,7 @@ class FilterBuilderDialog(QDialog):
         c_layout.setSpacing(4)
 
         self.chk_custom_dax = QCheckBox("Custom DAX expression")
+        self.chk_custom_dax.setToolTip("Switch to freeform DAX editing mode to write custom filter expressions.")
         self.chk_custom_dax.setStyleSheet(
             "QCheckBox { font-size: 11px; font-weight: 500; color: #475569; } "
             "QCheckBox::indicator { width: 13px; height: 13px; }"
@@ -400,6 +421,7 @@ class FilterBuilderDialog(QDialog):
 
         self.input_custom_dax = QLineEdit()
         self.input_custom_dax.setPlaceholderText("Write DAX expression (e.g. 'Dates'[Year] = 2024)")
+        self.input_custom_dax.setToolTip("Write any valid Power BI DAX filter expression (e.g. 'Dates'[Year] = 2024).")
         self.input_custom_dax.setStyleSheet(
             "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
             "padding: 4px 7px; font-size: 11px; font-family: Consolas, monospace; color: #0F172A; } "
@@ -441,6 +463,7 @@ class FilterBuilderDialog(QDialog):
 
         self.btn_clear = QPushButton("Clear Filter")
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear.setToolTip("Remove this filter condition and leave the cell blank.")
         self.btn_clear.setStyleSheet(
             "QPushButton { background: #FFFFFF; color: #DC2626; border: 1px solid #FCA5A5; "
             "border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: 600; } "
@@ -453,6 +476,7 @@ class FilterBuilderDialog(QDialog):
 
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancel.setToolTip("Discard changes and close this dialog.")
         self.btn_cancel.setStyleSheet(
             "QPushButton { background: #FFFFFF; color: #475569; border: 1px solid #CBD5E1; "
             "border-radius: 4px; padding: 5px 14px; font-size: 11px; font-weight: 500; } "
@@ -463,6 +487,7 @@ class FilterBuilderDialog(QDialog):
 
         self.btn_apply = QPushButton("Apply Filter")
         self.btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_apply.setToolTip("Apply this filter expression to the validation rule.")
         self.btn_apply.setStyleSheet(
             "QPushButton { background: #1668DC; color: #FFFFFF; border: 1px solid #1668DC; "
             "border-radius: 4px; padding: 5px 16px; font-size: 11px; font-weight: 700; } "
@@ -594,6 +619,9 @@ class FilterBuilderDialog(QDialog):
 
     def _on_operator_changed(self, _: int) -> None:
         op = str(self.combo_operator.currentData() or OPERATOR_EQUALS)
+        tip = OPERATOR_TOOLTIPS.get(op, "")
+        if tip:
+            self.combo_operator.setToolTip(tip)
         if op in (OPERATOR_IS_BLANK, OPERATOR_IS_NOT_BLANK):
             self.input_value.setEnabled(False)
             self.input_value.setPlaceholderText("(Not required for blank checks)")

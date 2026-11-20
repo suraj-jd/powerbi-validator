@@ -202,13 +202,14 @@ class RunComparisonDialog(QDialog):
 
         self.combo_run_a = QComboBox()
         self.combo_run_a.setMinimumWidth(220)
+        self.combo_run_a.setToolTip("Select the baseline validation run to compare from.")
         self.combo_run_a.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row1.addWidget(self.combo_run_a)
 
         self.btn_swap = QPushButton("⇄ Swap 1 & 2")
         self.btn_swap.setObjectName("SecondaryButton")
         self.btn_swap.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_swap.setToolTip("Swap Run 1 (Baseline) and Run 2 (Target)")
+        self.btn_swap.setToolTip("Swap Run 1 (Baseline) and Run 2 (Target).")
         self.btn_swap.clicked.connect(self._handle_swap_runs)
         row1.addWidget(self.btn_swap)
 
@@ -218,6 +219,7 @@ class RunComparisonDialog(QDialog):
 
         self.combo_run_b = QComboBox()
         self.combo_run_b.setMinimumWidth(220)
+        self.combo_run_b.setToolTip("Select the target validation run to compare against.")
         self.combo_run_b.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row1.addWidget(self.combo_run_b)
 
@@ -234,6 +236,7 @@ class RunComparisonDialog(QDialog):
 
         self.combo_run_c = QComboBox()
         self.combo_run_c.setMinimumWidth(220)
+        self.combo_run_c.setToolTip("Optional third validation run to track changes across 3 runs.")
         self.combo_run_c.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row2.addWidget(self.combo_run_c)
 
@@ -243,13 +246,14 @@ class RunComparisonDialog(QDialog):
 
         self.combo_run_d = QComboBox()
         self.combo_run_d.setMinimumWidth(220)
+        self.combo_run_d.setToolTip("Optional fourth validation run to track changes across 4 runs.")
         self.combo_run_d.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row2.addWidget(self.combo_run_d)
 
         self.btn_clear_optional = QPushButton("✕ Reset (3 & 4)")
         self.btn_clear_optional.setObjectName("SecondaryButton")
         self.btn_clear_optional.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clear_optional.setToolTip("Reset optional Run 3 and Run 4 to None")
+        self.btn_clear_optional.setToolTip("Reset optional Run 3 and Run 4 to None.")
         self.btn_clear_optional.clicked.connect(self._handle_clear_optional)
         row2.addWidget(self.btn_clear_optional)
 
@@ -466,6 +470,7 @@ class RunComparisonDialog(QDialog):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍  Search rules, tables, or measures...")
+        self.search_input.setToolTip("Filter comparison table by rule name, table, column, or measure.")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.setStyleSheet("padding: 6px 10px; font-size: 12px; border-radius: 6px; border: 1px solid #CBD5E1;")
         self.search_input.textChanged.connect(self._on_search_text_changed)
@@ -477,18 +482,25 @@ class RunComparisonDialog(QDialog):
 
         self.combo_filter = QComboBox()
         self.combo_filter.setStyleSheet("padding: 5px 8px; font-size: 12px;")
-        self.combo_filter.addItem("All Changes", "ALL")
-        self.combo_filter.addItem("Worsened Only", "REGRESSION")
-        self.combo_filter.addItem("Improvements Only", "IMPROVEMENT")
-        self.combo_filter.addItem("New Rules Only", "NEW")
-        self.combo_filter.addItem("Removed Rules Only", "REMOVED")
-        self.combo_filter.addItem("Unchanged Only", "UNCHANGED")
+        filter_options = [
+            ("All Changes", "ALL", "Show all comparison rows across the selected runs."),
+            ("Worsened Only", "REGRESSION", "Show only checks that degraded (passed previously, now failed/errored)."),
+            ("Improvements Only", "IMPROVEMENT", "Show only checks that improved (failed previously, now passed)."),
+            ("New Rules Only", "NEW", "Show only validation rules that were newly added."),
+            ("Removed Rules Only", "REMOVED", "Show only validation rules that were deleted."),
+            ("Unchanged Only", "UNCHANGED", "Show only checks whose status did not change."),
+        ]
+        for label, val, tip in filter_options:
+            self.combo_filter.addItem(label, val)
+            self.combo_filter.setItemData(self.combo_filter.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+        self.combo_filter.setToolTip("Filter comparison rows by change type.")
         self.combo_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_bar.addWidget(self.combo_filter, stretch=1)
 
         self.btn_clear_filters = QPushButton("Reset Filter")
         self.btn_clear_filters.setObjectName("SecondaryButton")
         self.btn_clear_filters.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear_filters.setToolTip("Reset search text and status filters to show all rules.")
         self.btn_clear_filters.clicked.connect(self._handle_reset_filters)
         filter_bar.addWidget(self.btn_clear_filters)
 

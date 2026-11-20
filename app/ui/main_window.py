@@ -264,6 +264,7 @@ class MainWindow(QMainWindow):
         self._sign_out_button.setIcon(make_nav_icon("exit", color="#CBD5E1"))
         self._sign_out_button.setIconSize(QSize(16, 16))
         self._sign_out_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._sign_out_button.setToolTip("Sign out of your Microsoft Entra account.")
         self._sign_out_button.clicked.connect(self._handle_sign_out_requested)
         self._sign_out_button.setVisible(False)
         layout.addWidget(self._sign_out_button)
@@ -273,6 +274,7 @@ class MainWindow(QMainWindow):
         self._exit_button.setIcon(make_nav_icon("exit", color="#CBD5E1"))
         self._exit_button.setIconSize(QSize(16, 16))
         self._exit_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._exit_button.setToolTip("Exit the application.")
         self._exit_button.clicked.connect(self.close)
         layout.addWidget(self._exit_button)
 
@@ -486,6 +488,13 @@ class MainWindow(QMainWindow):
         button.setIcon(make_nav_icon(key, color="#E2E8F0"))
         button.setIconSize(QSize(18, 18))
         button.setCursor(Qt.CursorShape.PointingHandCursor)
+        nav_tooltips = {
+            "home": "Go to Home dashboard to run validations and view today's test results.",
+            "sheet_settings": "Configure validation rules, target tables, and columns in the spreadsheet view.",
+            "history": "View historical execution runs, compare past runs, and export audit reports.",
+            "about": "View application version, database status, diagnostic logs, and environment details.",
+        }
+        button.setToolTip(nav_tooltips.get(key, f"Go to {label} page."))
         button.clicked.connect(lambda _checked=False, target=key: self.navigate_to(target))
 
         self._nav_group.addButton(button)
