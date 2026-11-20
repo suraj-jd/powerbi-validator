@@ -351,14 +351,15 @@ class RefreshDetailsDialog(QDialog):
         card = QFrame()
         card.setObjectName("Card")
         card.setStyleSheet(
-            "background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
         )
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(4)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(6)
 
         header = QLabel(title)
-        header.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        header.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         layout.addWidget(header)
         return card
 

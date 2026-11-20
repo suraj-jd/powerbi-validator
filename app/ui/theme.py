@@ -108,6 +108,11 @@ QFrame#Card {
     border-radius: 12px;
 }
 
+QFrame#Card QLabel {
+    border: none;
+    background-color: transparent;
+}
+
 QLabel#PageTitle {
     color: #0F172A;
     font-size: 22px;

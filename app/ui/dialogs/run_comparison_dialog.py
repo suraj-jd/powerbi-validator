@@ -231,76 +231,96 @@ class RunComparisonDialog(QDialog):
 
         # Regressions Card
         self.c_reg = QFrame()
+        self.c_reg.setObjectName("CardReg")
         self.c_reg.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.c_reg.setStyleSheet("background-color: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 6px;")
+        self.c_reg.setStyleSheet(
+            "QFrame#CardReg { background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; } "
+            "QFrame#CardReg:hover { background-color: #FEE2E2; border-color: #F87171; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_reg = QVBoxLayout(self.c_reg)
-        lay_reg.setContentsMargins(10, 8, 10, 8)
-        lay_reg.setSpacing(2)
+        lay_reg.setContentsMargins(14, 12, 14, 12)
+        lay_reg.setSpacing(4)
         lbl_r_t = QLabel("REGRESSIONS")
-        lbl_r_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #B91C1C;")
+        lbl_r_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #B91C1C; letter-spacing: 0.5px;")
         lay_reg.addWidget(lbl_r_t)
         self.lbl_r_c = QLabel(str(self._cmp.regressions_count))
-        self.lbl_r_c.setStyleSheet("font-size: 20px; font-weight: 700; color: #B91C1C;")
+        self.lbl_r_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #B91C1C;")
         lay_reg.addWidget(self.lbl_r_c)
         lbl_r_sub = QLabel("Worsened checks (Click to filter)")
-        lbl_r_sub.setStyleSheet("font-size: 10px; color: #991B1B;")
+        lbl_r_sub.setStyleSheet("font-size: 11px; color: #991B1B;")
         lay_reg.addWidget(lbl_r_sub)
         self.c_reg.mousePressEvent = lambda _e: self._filter_by_card("REGRESSION")
         kpi_row.addWidget(self.c_reg, stretch=1)
 
         # Improvements Card
         self.c_imp = QFrame()
+        self.c_imp.setObjectName("CardImp")
         self.c_imp.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.c_imp.setStyleSheet("background-color: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px; padding: 6px;")
+        self.c_imp.setStyleSheet(
+            "QFrame#CardImp { background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; } "
+            "QFrame#CardImp:hover { background-color: #DCFCE7; border-color: #4ADE80; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_imp = QVBoxLayout(self.c_imp)
-        lay_imp.setContentsMargins(10, 8, 10, 8)
-        lay_imp.setSpacing(2)
+        lay_imp.setContentsMargins(14, 12, 14, 12)
+        lay_imp.setSpacing(4)
         lbl_i_t = QLabel("IMPROVEMENTS")
-        lbl_i_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #15803D;")
+        lbl_i_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #15803D; letter-spacing: 0.5px;")
         lay_imp.addWidget(lbl_i_t)
         self.lbl_i_c = QLabel(str(self._cmp.improvements_count))
-        self.lbl_i_c.setStyleSheet("font-size: 20px; font-weight: 700; color: #15803D;")
+        self.lbl_i_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #15803D;")
         lay_imp.addWidget(self.lbl_i_c)
         lbl_i_sub = QLabel("Resolved checks (Click to filter)")
-        lbl_i_sub.setStyleSheet("font-size: 10px; color: #166534;")
+        lbl_i_sub.setStyleSheet("font-size: 11px; color: #166534;")
         lay_imp.addWidget(lbl_i_sub)
         self.c_imp.mousePressEvent = lambda _e: self._filter_by_card("IMPROVEMENT")
         kpi_row.addWidget(self.c_imp, stretch=1)
 
         # Unchanged Card
         self.c_unc = QFrame()
+        self.c_unc.setObjectName("CardUnc")
         self.c_unc.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.c_unc.setStyleSheet("background-color: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px; padding: 6px;")
+        self.c_unc.setStyleSheet(
+            "QFrame#CardUnc { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#CardUnc:hover { background-color: #F8FAFC; border-color: #CBD5E1; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_unc = QVBoxLayout(self.c_unc)
-        lay_unc.setContentsMargins(10, 8, 10, 8)
-        lay_unc.setSpacing(2)
+        lay_unc.setContentsMargins(14, 12, 14, 12)
+        lay_unc.setSpacing(4)
         lbl_u_t = QLabel("UNCHANGED")
-        lbl_u_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #475569;")
+        lbl_u_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.5px;")
         lay_unc.addWidget(lbl_u_t)
         self.lbl_u_c = QLabel(str(self._cmp.unchanged_count))
-        self.lbl_u_c.setStyleSheet("font-size: 20px; font-weight: 700; color: #475569;")
+        self.lbl_u_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #334155;")
         lay_unc.addWidget(self.lbl_u_c)
         lbl_u_sub = QLabel("Identical status (Click to filter)")
-        lbl_u_sub.setStyleSheet("font-size: 10px; color: #64748B;")
+        lbl_u_sub.setStyleSheet("font-size: 11px; color: #94A3B8;")
         lay_unc.addWidget(lbl_u_sub)
         self.c_unc.mousePressEvent = lambda _e: self._filter_by_card("UNCHANGED")
         kpi_row.addWidget(self.c_unc, stretch=1)
 
         # New / Removed Card
         self.c_mod = QFrame()
+        self.c_mod.setObjectName("CardMod")
         self.c_mod.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.c_mod.setStyleSheet("background-color: #EFF6FF; border: 1px solid #93C5FD; border-radius: 8px; padding: 6px;")
+        self.c_mod.setStyleSheet(
+            "QFrame#CardMod { background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; } "
+            "QFrame#CardMod:hover { background-color: #DBEAFE; border-color: #60A5FA; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_mod = QVBoxLayout(self.c_mod)
-        lay_mod.setContentsMargins(10, 8, 10, 8)
-        lay_mod.setSpacing(2)
+        lay_mod.setContentsMargins(14, 12, 14, 12)
+        lay_mod.setSpacing(4)
         lbl_m_t = QLabel("NEW / REMOVED RULES")
-        lbl_m_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #1D4ED8;")
+        lbl_m_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #1D4ED8; letter-spacing: 0.5px;")
         lay_mod.addWidget(lbl_m_t)
         self.lbl_m_c = QLabel(f"+{self._cmp.new_rules_count} / -{self._cmp.removed_rules_count}")
-        self.lbl_m_c.setStyleSheet("font-size: 20px; font-weight: 700; color: #1D4ED8;")
+        self.lbl_m_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #1D4ED8;")
         lay_mod.addWidget(self.lbl_m_c)
         lbl_m_sub = QLabel("Added or removed (Click to filter)")
-        lbl_m_sub.setStyleSheet("font-size: 10px; color: #1E40AF;")
+        lbl_m_sub.setStyleSheet("font-size: 11px; color: #1E40AF;")
         lay_mod.addWidget(lbl_m_sub)
         self.c_mod.mousePressEvent = lambda _e: self._filter_by_card("MODIFIED")
         kpi_row.addWidget(self.c_mod, stretch=1)

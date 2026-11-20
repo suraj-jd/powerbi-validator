@@ -433,13 +433,14 @@ class HomePage(QWidget):
         card_attempt = QFrame()
         card_attempt.setObjectName("Card")
         card_attempt.setStyleSheet(
-            "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
         )
         lay_att = QVBoxLayout(card_attempt)
-        lay_att.setContentsMargins(10, 8, 10, 8)
-        lay_att.setSpacing(4)
+        lay_att.setContentsMargins(14, 12, 14, 12)
+        lay_att.setSpacing(6)
         lbl_att_title = QLabel("LATEST REFRESH ATTEMPT")
-        lbl_att_title.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_att_title.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_att.addWidget(lbl_att_title)
 
         self.home_attempt_pill_container = QWidget()
@@ -451,7 +452,7 @@ class HomePage(QWidget):
         lay_att.addWidget(self.home_attempt_pill_container)
 
         self.home_attempt_start = QLabel("Start: —")
-        self.home_attempt_start.setStyleSheet("color: #475569; font-size: 11px;")
+        self.home_attempt_start.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_att.addWidget(self.home_attempt_start)
         self.home_attempt_duration = QLabel("Duration: —")
         self.home_attempt_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
@@ -462,20 +463,21 @@ class HomePage(QWidget):
         card_success = QFrame()
         card_success.setObjectName("Card")
         card_success.setStyleSheet(
-            "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
         )
         lay_suc = QVBoxLayout(card_success)
-        lay_suc.setContentsMargins(10, 8, 10, 8)
-        lay_suc.setSpacing(4)
+        lay_suc.setContentsMargins(14, 12, 14, 12)
+        lay_suc.setSpacing(6)
         lbl_suc_title = QLabel("LATEST SUCCESSFUL REFRESH")
-        lbl_suc_title.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_suc_title.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_suc.addWidget(lbl_suc_title)
 
         self.home_success_time = QLabel("—")
-        self.home_success_time.setStyleSheet("color: #065F46; font-size: 13px; font-weight: 700;")
+        self.home_success_time.setStyleSheet("color: #059669; font-size: 14px; font-weight: 700;")
         lay_suc.addWidget(self.home_success_time)
         self.home_success_age = QLabel("Age: —")
-        self.home_success_age.setStyleSheet("color: #475569; font-size: 11px;")
+        self.home_success_age.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_suc.addWidget(self.home_success_age)
         self.home_success_duration = QLabel("Duration: —")
         self.home_success_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
@@ -486,20 +488,21 @@ class HomePage(QWidget):
         card_rel = QFrame()
         card_rel.setObjectName("Card")
         card_rel.setStyleSheet(
-            "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
         )
         lay_rel = QVBoxLayout(card_rel)
-        lay_rel.setContentsMargins(10, 8, 10, 8)
-        lay_rel.setSpacing(4)
+        lay_rel.setContentsMargins(14, 12, 14, 12)
+        lay_rel.setSpacing(6)
         lbl_rel_title = QLabel("HISTORICAL RELIABILITY")
-        lbl_rel_title.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_rel_title.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_rel.addWidget(lbl_rel_title)
 
         self.home_reliability_rate = QLabel("No Data")
-        self.home_reliability_rate.setStyleSheet("color: #1668DC; font-size: 14px; font-weight: 700;")
+        self.home_reliability_rate.setStyleSheet("color: #1668DC; font-size: 15px; font-weight: 700;")
         lay_rel.addWidget(self.home_reliability_rate)
         self.home_reliability_detail = QLabel("Recorded Runs: 0")
-        self.home_reliability_detail.setStyleSheet("color: #475569; font-size: 11px;")
+        self.home_reliability_detail.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_rel.addWidget(self.home_reliability_detail)
         kpi_row.addWidget(card_rel)
 
@@ -780,12 +783,16 @@ class HomePage(QWidget):
 
         # 1. Overall Status
         card_ov = QFrame()
-        card_ov.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        card_ov.setObjectName("Card")
+        card_ov.setStyleSheet(
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_ov = QVBoxLayout(card_ov)
-        lay_ov.setContentsMargins(8, 8, 8, 8)
-        lay_ov.setSpacing(4)
+        lay_ov.setContentsMargins(14, 12, 14, 12)
+        lay_ov.setSpacing(6)
         lbl_ov_t = QLabel("OVERALL HEALTH")
-        lbl_ov_t.setStyleSheet("color: #64748B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_ov_t.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_ov.addWidget(lbl_ov_t)
 
         self.home_overall_pill_container = QWidget()
@@ -797,75 +804,91 @@ class HomePage(QWidget):
         lay_ov.addWidget(self.home_overall_pill_container)
 
         self.home_overall_timing = QLabel("Last Run: —")
-        self.home_overall_timing.setStyleSheet("color: #64748B; font-size: 11px;")
+        self.home_overall_timing.setStyleSheet("color: #94A3B8; font-size: 11px;")
         lay_ov.addWidget(self.home_overall_timing)
         kpi_row.addWidget(card_ov, stretch=1)
 
         # 2. Passed
         card_pass = QFrame()
-        card_pass.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        card_pass.setObjectName("Card")
+        card_pass.setStyleSheet(
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_p = QVBoxLayout(card_pass)
-        lay_p.setContentsMargins(8, 8, 8, 8)
-        lay_p.setSpacing(4)
+        lay_p.setContentsMargins(14, 12, 14, 12)
+        lay_p.setSpacing(6)
         lbl_p_t = QLabel("PASSED CHECKS")
-        lbl_p_t.setStyleSheet("color: #166534; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_p_t.setStyleSheet("color: #15803D; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_p.addWidget(lbl_p_t)
         self.home_passed_count = QLabel("0")
-        self.home_passed_count.setStyleSheet("color: #166534; font-size: 20px; font-weight: 700;")
+        self.home_passed_count.setStyleSheet("color: #15803D; font-size: 24px; font-weight: 700;")
         lay_p.addWidget(self.home_passed_count)
         lbl_p_sub = QLabel("Within expected SLA")
-        lbl_p_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lbl_p_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
         lay_p.addWidget(lbl_p_sub)
         kpi_row.addWidget(card_pass, stretch=1)
 
         # 3. Failed
         card_fail = QFrame()
-        card_fail.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        card_fail.setObjectName("Card")
+        card_fail.setStyleSheet(
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_f = QVBoxLayout(card_fail)
-        lay_f.setContentsMargins(8, 8, 8, 8)
-        lay_f.setSpacing(4)
+        lay_f.setContentsMargins(14, 12, 14, 12)
+        lay_f.setSpacing(6)
         lbl_f_t = QLabel("FAILED CHECKS")
-        lbl_f_t.setStyleSheet("color: #991B1B; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_f_t.setStyleSheet("color: #B91C1C; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_f.addWidget(lbl_f_t)
         self.home_failed_count = QLabel("0")
-        self.home_failed_count.setStyleSheet("color: #991B1B; font-size: 20px; font-weight: 700;")
+        self.home_failed_count.setStyleSheet("color: #B91C1C; font-size: 24px; font-weight: 700;")
         lay_f.addWidget(self.home_failed_count)
         lbl_f_sub = QLabel("Violations detected")
-        lbl_f_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lbl_f_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
         lay_f.addWidget(lbl_f_sub)
         kpi_row.addWidget(card_fail, stretch=1)
 
         # 4. Warnings
         card_warn = QFrame()
-        card_warn.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        card_warn.setObjectName("Card")
+        card_warn.setStyleSheet(
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_w = QVBoxLayout(card_warn)
-        lay_w.setContentsMargins(8, 8, 8, 8)
-        lay_w.setSpacing(4)
+        lay_w.setContentsMargins(14, 12, 14, 12)
+        lay_w.setSpacing(6)
         lbl_w_t = QLabel("WARNINGS / ANOMALIES")
-        lbl_w_t.setStyleSheet("color: #92400E; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_w_t.setStyleSheet("color: #B45309; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_w.addWidget(lbl_w_t)
         self.home_warning_count = QLabel("0")
-        self.home_warning_count.setStyleSheet("color: #92400E; font-size: 20px; font-weight: 700;")
+        self.home_warning_count.setStyleSheet("color: #B45309; font-size: 24px; font-weight: 700;")
         lay_w.addWidget(self.home_warning_count)
         lbl_w_sub = QLabel("Deviations or empty")
-        lbl_w_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lbl_w_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
         lay_w.addWidget(lbl_w_sub)
         kpi_row.addWidget(card_warn, stretch=1)
 
         # 5. Errors
         card_err = QFrame()
-        card_err.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px;")
+        card_err.setObjectName("Card")
+        card_err.setStyleSheet(
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
+        )
         lay_e = QVBoxLayout(card_err)
-        lay_e.setContentsMargins(8, 8, 8, 8)
-        lay_e.setSpacing(4)
+        lay_e.setContentsMargins(14, 12, 14, 12)
+        lay_e.setSpacing(6)
         lbl_e_t = QLabel("EXECUTION ERRORS")
-        lbl_e_t.setStyleSheet("color: #6B21A8; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;")
+        lbl_e_t.setStyleSheet("color: #7E22CE; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_e.addWidget(lbl_e_t)
         self.home_error_count = QLabel("0")
-        self.home_error_count.setStyleSheet("color: #6B21A8; font-size: 20px; font-weight: 700;")
+        self.home_error_count.setStyleSheet("color: #7E22CE; font-size: 24px; font-weight: 700;")
         lay_e.addWidget(self.home_error_count)
         lbl_e_sub = QLabel("Query or engine errors")
-        lbl_e_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+        lbl_e_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
         lay_e.addWidget(lbl_e_sub)
         kpi_row.addWidget(card_err, stretch=1)
 
