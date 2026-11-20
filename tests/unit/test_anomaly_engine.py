@@ -318,3 +318,175 @@ def test_anomaly_validator_direction_filter():
 def test_factory_registry_stage_11():
     assert isinstance(get_validator(VALIDATION_TYPE_DAX_MEASURE), DaxMeasureValidator)
     assert isinstance(get_validator(VALIDATION_TYPE_ANOMALY), AnomalyValidator)
+
+
+def test_anomaly_validator_fast_fail_min_baseline():
+    """If actual value is below configured min baseline (e.g. 900 < 1000), immediately fail as anomaly."""
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 900.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = _make_anomaly_rule({
+        "min_baseline": 1000.0,
+        "comparison_method": "z_score",
+        "min_samples": 5,
+    })
+
+    # Even with no historical points or z-score, it fails immediately on min baseline
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={},
+    )
+
+    assert res.status == ValidationStatus.FAIL
+    assert "below minimum baseline" in res.result_summary.lower()
+    assert res.actual_value == "900.00"
+    assert ">= 1,000.00" in res.expected_value
+
+
+def test_anomaly_validator_fast_fail_max_baseline():
+    """If actual value exceeds configured max baseline ceiling (e.g. 6200 > 5000), immediately fail as anomaly."""
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 6200.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = _make_anomaly_rule({
+        "max_baseline": 5000.0,
+        "comparison_method": "threshold_only",
+    })
+
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={},
+    )
+
+    assert res.status == ValidationStatus.FAIL
+    assert "exceeds maximum baseline" in res.result_summary.lower()
+    assert res.actual_value == "6,200.00"
+    assert "<= 5,000.00" in res.expected_value
+
+
+def test_anomaly_validator_threshold_only_passes_within_bounds():
+    """Values within [min, max] pass cleanly in threshold_only mode."""
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 2500.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = _make_anomaly_rule({
+        "min_baseline": 1000.0,
+        "max_baseline": 5000.0,
+        "comparison_method": "threshold_only",
+    })
+
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={},
+    )
+
+    assert res.status == ValidationStatus.PASS
+    assert "satisfies baseline thresholds" in res.result_summary.lower()
+
+
+def test_anomaly_validator_fixed_baseline_percentage_mode():
+    """Test fixed baseline ± % deviation check without requiring history."""
+    client = MagicMock(spec=DaxQueryClient)
+    # Expected: 1000, Allowed ± 10% (900 to 1100). Actual: 950 -> PASS
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 950.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = _make_anomaly_rule({
+        "comparison_method": "percentage",
+        "baseline_value": 1000.0,
+        "allowed_deviation_pct": 10.0,
+    })
+
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={},
+    )
+    assert res.status == ValidationStatus.PASS
+    assert "within ±10.0% of baseline" in res.result_summary.lower()
+
+    # Outlier: 1200 (> 10% deviation) -> FAIL
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 1200.0}], duration_ms=25)
+    res_fail = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={},
+    )
+    assert res_fail.status == ValidationStatus.FAIL
+    assert "deviates by 20.0%" in res_fail.result_summary.lower()
+
+
+def test_anomaly_validator_previous_run_mode():
+    """Test run-over-run ± % deviation check."""
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 105.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = _make_anomaly_rule({
+        "comparison_method": "previous_run",
+        "allowed_deviation_pct": 10.0,
+    })
+
+    # Previous run was 100.0; 105.0 is +5% change (<= 10%) -> PASS
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={"historical_points": [100.0]},
+    )
+    assert res.status == ValidationStatus.PASS
+    assert "within ±10.0% of previous run" in res.result_summary.lower()
+
+    # If change is 130.0 vs 100.0 (+30% change) -> FAIL
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 130.0}], duration_ms=25)
+    res_fail = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={"historical_points": [100.0]},
+    )
+    assert res_fail.status == ValidationStatus.FAIL
+    assert "changed by 30.0% vs previous run" in res_fail.result_summary.lower()
+
+
+def test_anomaly_validator_graceful_insufficient_history_when_baseline_met():
+    """If history < min_samples but user set a baseline floor that passed, return PASS instead of WARNING."""
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 1500.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = _make_anomaly_rule({
+        "min_baseline": 1000.0,
+        "comparison_method": "z_score",
+        "min_samples": 5,
+    })
+
+    # Only 1 sample in history (< 5 required), but 1500 >= 1000 floor
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={"historical_points": [1400.0]},
+    )
+    assert res.status == ValidationStatus.PASS
+    assert "satisfies baseline limits" in res.result_summary.lower()
+

@@ -265,6 +265,35 @@ class AdvancedSettingsDialog(QDialog):
             form.addRow(self._make_label("DAX Filter Context:"), self.edit_filter)
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
+            # Baseline Floor & Ceiling thresholds
+            self.spin_min_baseline = QDoubleSpinBox()
+            self.spin_min_baseline.setRange(-1e12, 1e12)
+            self.spin_min_baseline.setDecimals(2)
+            cur_min = self._config.get("min_baseline") if self._config.get("min_baseline") is not None else self._config.get("min_value")
+            self.spin_min_baseline.setValue(float(cur_min) if cur_min is not None else 0.0)
+            self.chk_min_baseline = QCheckBox("Enable Min Floor:")
+            self.chk_min_baseline.setChecked(cur_min is not None)
+            self.spin_min_baseline.setEnabled(cur_min is not None)
+            self.chk_min_baseline.toggled.connect(self.spin_min_baseline.setEnabled)
+            h_min = QHBoxLayout()
+            h_min.addWidget(self.chk_min_baseline)
+            h_min.addWidget(self.spin_min_baseline, stretch=1)
+            form.addRow(self._make_label("Minimum Baseline (Floor):"), h_min)
+
+            self.spin_max_baseline = QDoubleSpinBox()
+            self.spin_max_baseline.setRange(-1e12, 1e12)
+            self.spin_max_baseline.setDecimals(2)
+            cur_max = self._config.get("max_baseline") if self._config.get("max_baseline") is not None else self._config.get("max_value")
+            self.spin_max_baseline.setValue(float(cur_max) if cur_max is not None else 0.0)
+            self.chk_max_baseline = QCheckBox("Enable Max Ceiling:")
+            self.chk_max_baseline.setChecked(cur_max is not None)
+            self.spin_max_baseline.setEnabled(cur_max is not None)
+            self.chk_max_baseline.toggled.connect(self.spin_max_baseline.setEnabled)
+            h_max = QHBoxLayout()
+            h_max.addWidget(self.chk_max_baseline)
+            h_max.addWidget(self.spin_max_baseline, stretch=1)
+            form.addRow(self._make_label("Maximum Baseline (Ceiling):"), h_max)
+
             self.combo_agg = AnimatedComboBox()
             self.combo_agg.addItems(["MEASURE", "SUM", "COUNT", "DISTINCTCOUNT", "AVERAGE", "MIN", "MAX"])
             agg_idx = self.combo_agg.findText(self._config.get("aggregation", "MEASURE"))
@@ -405,6 +434,20 @@ class AdvancedSettingsDialog(QDialog):
             cfg["filter_context"] = self.edit_filter.text().strip()
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
+            if self.chk_min_baseline.isChecked():
+                cfg["min_baseline"] = self.spin_min_baseline.value()
+                cfg["min_value"] = self.spin_min_baseline.value()
+            else:
+                cfg.pop("min_baseline", None)
+                cfg.pop("min_value", None)
+
+            if self.chk_max_baseline.isChecked():
+                cfg["max_baseline"] = self.spin_max_baseline.value()
+                cfg["max_value"] = self.spin_max_baseline.value()
+            else:
+                cfg.pop("max_baseline", None)
+                cfg.pop("max_value", None)
+
             cfg["aggregation"] = self.combo_agg.currentText()
             cfg["date_column"] = self.edit_date_col.text().strip()
             comp_keys = ["z_score", "historical_median", "historical_mean", "previous_period"]

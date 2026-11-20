@@ -99,6 +99,45 @@ def test_sheet_rule_config_dialog_refresh_sla(qtbot) -> None:
     assert dialog.config["expected_status"] == "Completed"
 
 
+def test_sheet_rule_config_dialog_anomaly_check(qtbot) -> None:
+    from app.services.rule_service import VALIDATION_TYPE_ANOMALY
+    dialog = SheetRuleConfigDialog(
+        validation_type=VALIDATION_TYPE_ANOMALY,
+        target_display="Sales[Total_Revenue]",
+        current_config={
+            "min_baseline": 1000.0,
+            "max_baseline": 50000.0,
+            "comparison_method": "percentage",
+            "baseline_value": 15000.0,
+            "allowed_deviation_pct": 10.0,
+        },
+        rule_name="Revenue Anomaly Check",
+    )
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    assert "Historical Anomaly Check" in dialog.windowTitle()
+    assert dialog.anom_chk_min.isChecked() is True
+    assert dialog.anom_spin_min.value() == 1000.0
+    assert dialog.anom_chk_max.isChecked() is True
+    assert dialog.anom_spin_max.value() == 50000.0
+
+    # Switch to Previous Run mode and modify min floor
+    dialog.anom_spin_min.setValue(2000.0)
+    idx_prev = dialog.anom_method_combo.findData("previous_run")
+    assert idx_prev >= 0
+    dialog.anom_method_combo.setCurrentIndex(idx_prev)
+    dialog.anom_dev_pct.setValue(15.0)
+
+    qtbot.mouseClick(dialog.apply_button, Qt.MouseButton.LeftButton)
+
+    assert dialog.config["min_baseline"] == 2000.0
+    assert dialog.config["max_baseline"] == 50000.0
+    assert dialog.config["comparison_method"] == "previous_run"
+    assert dialog.config["allowed_deviation_pct"] == 15.0
+
+
+
 def test_sheet_settings_page_initial_ui(qtbot, db: DatabaseManager, sample_registration: int) -> None:
     page = SheetSettingsPage(db=db)
     qtbot.addWidget(page)

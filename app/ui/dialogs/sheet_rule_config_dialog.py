@@ -273,6 +273,96 @@ class SheetRuleConfigDialog(QDialog):
             form.addRow("Allowed Deviation %:", self.dax_dev_pct)
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
+            # 1. Baseline Floor (Min)
+            self.anom_chk_min = QCheckBox("Enable Minimum Baseline (Floor):")
+            self.anom_chk_min.setStyleSheet("font-weight: 600; color: #1E293B;")
+            self.anom_spin_min = QDoubleSpinBox()
+            self.anom_spin_min.setRange(-1e12, 1e12)
+            self.anom_spin_min.setDecimals(2)
+            has_min = self._config.get("min_baseline") is not None or self._config.get("min_value") is not None
+            cur_min = float(self._config.get("min_baseline") if self._config.get("min_baseline") is not None else self._config.get("min_value", 0.0))
+            self.anom_spin_min.setValue(cur_min)
+            self.anom_spin_min.setEnabled(has_min)
+            self.anom_chk_min.setChecked(has_min)
+            self.anom_chk_min.toggled.connect(self.anom_spin_min.setEnabled)
+
+            h_min = QHBoxLayout()
+            h_min.addWidget(self.anom_chk_min)
+            h_min.addWidget(self.anom_spin_min, stretch=1)
+            form.addRow("Minimum Floor:", h_min)
+
+            # 2. Baseline Ceiling (Max)
+            self.anom_chk_max = QCheckBox("Enable Maximum Baseline (Ceiling):")
+            self.anom_chk_max.setStyleSheet("font-weight: 600; color: #1E293B;")
+            self.anom_spin_max = QDoubleSpinBox()
+            self.anom_spin_max.setRange(-1e12, 1e12)
+            self.anom_spin_max.setDecimals(2)
+            has_max = self._config.get("max_baseline") is not None or self._config.get("max_value") is not None
+            cur_max = float(self._config.get("max_baseline") if self._config.get("max_baseline") is not None else self._config.get("max_value", 0.0))
+            self.anom_spin_max.setValue(cur_max)
+            self.anom_spin_max.setEnabled(has_max)
+            self.anom_chk_max.setChecked(has_max)
+            self.anom_chk_max.toggled.connect(self.anom_spin_max.setEnabled)
+
+            h_max = QHBoxLayout()
+            h_max.addWidget(self.anom_chk_max)
+            h_max.addWidget(self.anom_spin_max, stretch=1)
+            form.addRow("Maximum Ceiling:", h_max)
+
+            # 3. Secondary Anomaly Detection Check Method
+            self.anom_method_combo = AnimatedComboBox()
+            self.anom_method_combo.addItem("Baseline Thresholds Only (Min / Max)", "threshold_only")
+            self.anom_method_combo.addItem("± % Change from Fixed Baseline", "percentage")
+            self.anom_method_combo.addItem("± % Change from Previous Run", "previous_run")
+            self.anom_method_combo.addItem("± % from Historical Median", "median")
+            self.anom_method_combo.addItem("± Standard Deviation (Z-Score)", "z_score")
+
+            cur_m = str(self._config.get("comparison_method", "z_score")).strip().lower()
+            if cur_m in ("threshold_only", "baseline_only", "none"):
+                target_key = "threshold_only"
+            elif cur_m in ("percentage", "fixed_baseline"):
+                target_key = "percentage"
+            elif cur_m in ("previous_run", "previous_period"):
+                target_key = "previous_run"
+            elif cur_m == "median":
+                target_key = "median"
+            else:
+                target_key = "z_score"
+
+            m_idx = next((i for i in range(self.anom_method_combo.count()) if self.anom_method_combo.itemData(i) == target_key), 4)
+            self.anom_method_combo.setCurrentIndex(m_idx)
+            form.addRow("Detection Method:", self.anom_method_combo)
+
+            # Fixed Baseline Value (for "percentage")
+            self.anom_fixed_baseline = QDoubleSpinBox()
+            self.anom_fixed_baseline.setRange(-1e12, 1e12)
+            self.anom_fixed_baseline.setDecimals(2)
+            self.anom_fixed_baseline.setValue(float(self._config.get("baseline_value", 0.0)))
+            self.anom_fixed_baseline_row_lbl = QLabel("Fixed Baseline Value:")
+            form.addRow(self.anom_fixed_baseline_row_lbl, self.anom_fixed_baseline)
+
+            # Allowed Deviation % (for "percentage", "previous_run", "median")
+            self.anom_dev_pct = QDoubleSpinBox()
+            self.anom_dev_pct.setRange(0.1, 500.0)
+            self.anom_dev_pct.setDecimals(1)
+            self.anom_dev_pct.setSuffix(" %")
+            self.anom_dev_pct.setValue(float(self._config.get("allowed_deviation_pct", 10.0)))
+            self.anom_dev_pct_row_lbl = QLabel("Allowed Deviation %:")
+            form.addRow(self.anom_dev_pct_row_lbl, self.anom_dev_pct)
+
+            # Sensitivity (for "z_score")
+            self.anom_sensitivity = AnimatedComboBox()
+            self.anom_sensitivity.addItem("Standard (Z-Score ±2.5)", "z_score")
+            self.anom_sensitivity.addItem("High Sensitivity (Z-Score ±2.0)", "z_score_high")
+            self.anom_sensitivity.addItem("Tolerant (Z-Score ±3.0)", "z_score_tolerant")
+            cur_z = self._config.get("z_score_threshold", 2.5)
+            z_code = "z_score_high" if cur_z == 2.0 else ("z_score_tolerant" if cur_z == 3.0 else "z_score")
+            sm_idx = next((i for i in range(self.anom_sensitivity.count()) if self.anom_sensitivity.itemData(i) == z_code), 0)
+            self.anom_sensitivity.setCurrentIndex(sm_idx)
+            self.anom_sens_row_lbl = QLabel("Detection Sensitivity:")
+            form.addRow(self.anom_sens_row_lbl, self.anom_sensitivity)
+
+            # Lookback Window (for "median", "z_score")
             self.anom_lookback = AnimatedComboBox()
             self.anom_lookback.addItem("7 Days Lookback", 7)
             self.anom_lookback.addItem("15 Days Lookback", 15)
@@ -282,25 +372,30 @@ class SheetRuleConfigDialog(QDialog):
             cur_lb = self._config.get("lookback_days", 30)
             lb_idx = next((i for i in range(self.anom_lookback.count()) if self.anom_lookback.itemData(i) == cur_lb), 2)
             self.anom_lookback.setCurrentIndex(lb_idx)
-            form.addRow("Historical Baseline:", self.anom_lookback)
+            self.anom_lookback_row_lbl = QLabel("Historical Lookback:")
+            form.addRow(self.anom_lookback_row_lbl, self.anom_lookback)
 
-            self.anom_sensitivity = AnimatedComboBox()
-            self.anom_sensitivity.addItem("Standard (Z-Score ±2.5)", "z_score")
-            self.anom_sensitivity.addItem("High Sensitivity (Z-Score ±2.0)", "z_score_high")
-            self.anom_sensitivity.addItem("Tolerant (Z-Score ±3.0)", "z_score_tolerant")
-            self.anom_sensitivity.addItem("Interquartile Range (IQR)", "iqr")
-            self.anom_sensitivity.addItem("Percentage Threshold", "percentage")
-            cur_m = self._config.get("comparison_method", "z_score")
-            sm_idx = next((i for i in range(self.anom_sensitivity.count()) if self.anom_sensitivity.itemData(i) == cur_m), 0)
-            self.anom_sensitivity.setCurrentIndex(sm_idx)
-            form.addRow("Detection Sensitivity:", self.anom_sensitivity)
+            def _update_method_visibility():
+                meth = self.anom_method_combo.currentData()
+                is_pct = meth == "percentage"
+                is_prev = meth == "previous_run"
+                is_med = meth == "median"
+                is_z = meth == "z_score"
 
-            self.anom_dev_pct = QDoubleSpinBox()
-            self.anom_dev_pct.setRange(0.1, 500.0)
-            self.anom_dev_pct.setDecimals(1)
-            self.anom_dev_pct.setSuffix(" %")
-            self.anom_dev_pct.setValue(float(self._config.get("allowed_deviation_pct", 10.0)))
-            form.addRow("Allowed Deviation %:", self.anom_dev_pct)
+                self.anom_fixed_baseline_row_lbl.setVisible(is_pct)
+                self.anom_fixed_baseline.setVisible(is_pct)
+
+                self.anom_dev_pct_row_lbl.setVisible(is_pct or is_prev or is_med)
+                self.anom_dev_pct.setVisible(is_pct or is_prev or is_med)
+
+                self.anom_sens_row_lbl.setVisible(is_z)
+                self.anom_sensitivity.setVisible(is_z)
+
+                self.anom_lookback_row_lbl.setVisible(is_med or is_z)
+                self.anom_lookback.setVisible(is_med or is_z)
+
+            self.anom_method_combo.currentIndexChanged.connect(lambda _: _update_method_visibility())
+            _update_method_visibility()
 
         layout.addLayout(form)
 
@@ -350,9 +445,35 @@ class SheetRuleConfigDialog(QDialog):
             cfg["allowed_deviation_pct"] = self.dax_dev_pct.value()
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
-            cfg["lookback_days"] = self.anom_lookback.currentData()
-            cfg["comparison_method"] = self.anom_sensitivity.currentData()
-            cfg["allowed_deviation_pct"] = self.anom_dev_pct.value()
+            if self.anom_chk_min.isChecked():
+                cfg["min_baseline"] = self.anom_spin_min.value()
+                cfg["min_value"] = self.anom_spin_min.value()
+            else:
+                cfg.pop("min_baseline", None)
+                cfg.pop("min_value", None)
+
+            if self.anom_chk_max.isChecked():
+                cfg["max_baseline"] = self.anom_spin_max.value()
+                cfg["max_value"] = self.anom_spin_max.value()
+            else:
+                cfg.pop("max_baseline", None)
+                cfg.pop("max_value", None)
+
+            method = self.anom_method_combo.currentData()
+            cfg["comparison_method"] = method
+            if method == "percentage":
+                cfg["baseline_value"] = self.anom_fixed_baseline.value()
+                cfg["allowed_deviation_pct"] = self.anom_dev_pct.value()
+            elif method in ("previous_run", "previous_period"):
+                cfg["allowed_deviation_pct"] = self.anom_dev_pct.value()
+            elif method == "median":
+                cfg["allowed_deviation_pct"] = self.anom_dev_pct.value()
+                cfg["lookback_days"] = self.anom_lookback.currentData()
+            elif method == "z_score":
+                z_data = self.anom_sensitivity.currentData()
+                z_val = 2.0 if z_data == "z_score_high" else (3.0 if z_data == "z_score_tolerant" else 2.5)
+                cfg["z_score_threshold"] = z_val
+                cfg["lookback_days"] = self.anom_lookback.currentData()
 
         self._result_config = cfg
         self._result_rule_name = self.rule_name_input.text().strip()
