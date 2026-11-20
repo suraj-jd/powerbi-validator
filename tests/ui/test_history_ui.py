@@ -142,6 +142,44 @@ def test_run_comparison_dialog_ui(qtbot):
     assert dialog.diff_table.item(0, 4).font().bold() is True
 
 
+def test_run_comparison_dialog_up_to_4_runs_ui(qtbot):
+    run1 = _make_dummy_run(1, ValidationStatus.PASS)
+    run2 = _make_dummy_run(2, ValidationStatus.FAIL)
+    run3 = _make_dummy_run(3, ValidationStatus.WARNING)
+    run4 = _make_dummy_run(4, ValidationStatus.PASS)
+    all_runs = [run1, run2, run3, run4]
+
+    # Initial 4-run comparison
+    cmp4 = compare_validation_runs(run1, run2, run3, run4)
+    dialog = RunComparisonDialog(cmp4, all_runs=all_runs)
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    # 12 columns: Change, Rule Name, Target, 4 Statuses, 4 Actuals, 1 Deviation
+    assert dialog.diff_table.columnCount() == 12
+    assert "Run #1 vs Run #2 vs Run #3 vs Run #4" in dialog.windowTitle()
+    assert dialog.combo_run_a.currentData() == 1
+    assert dialog.combo_run_b.currentData() == 2
+    assert dialog.combo_run_c.currentData() == 3
+    assert dialog.combo_run_d.currentData() == 4
+
+    # Click clear optional (Run 3 and Run 4)
+    dialog.btn_clear_optional.click()
+    assert dialog.combo_run_c.currentData() is None
+    assert dialog.combo_run_d.currentData() is None
+    # Now drops to 8 columns (only Run 1 and Run 2 active)
+    assert dialog.diff_table.columnCount() == 8
+    assert "Run #1 vs Run #2" in dialog.windowTitle()
+
+    # Select Run 3 back in combo_run_c
+    idx3 = dialog.combo_run_c.findData(3)
+    assert idx3 > 0
+    dialog.combo_run_c.setCurrentIndex(idx3)
+    # Now 10 columns (Run 1, Run 2, Run 3)
+    assert dialog.diff_table.columnCount() == 10
+    assert "Run #1 vs Run #2 vs Run #3" in dialog.windowTitle()
+
+
 def test_backup_maintenance_dialog_ui(qtbot, tmp_path):
     db_file = tmp_path / "maint_test.db"
     db = DatabaseManager(db_file)

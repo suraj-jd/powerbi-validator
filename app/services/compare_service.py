@@ -1,4 +1,4 @@
-"""Run comparison and regression detection service between two validation runs (Stage 14)."""
+"""Run comparison and regression detection service across 2 to 4 validation runs (Stage 14)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from app.services.orchestrator_service import (
 
 @dataclass(frozen=True, slots=True)
 class RuleComparisonDTO:
-    """Comparison item between two evaluations of the same validation rule."""
+    """Comparison item between evaluations of the same validation rule across up to 4 runs."""
 
     rule_name: str
     target_display: str
@@ -28,11 +28,17 @@ class RuleComparisonDTO:
     deviation_a: str | None
     deviation_b: str | None
     change_type: str  # "REGRESSION", "IMPROVEMENT", "UNCHANGED", "NEW", "REMOVED"
+    status_c: ValidationStatus | None = None
+    status_d: ValidationStatus | None = None
+    actual_c: str | None = None
+    actual_d: str | None = None
+    deviation_c: str | None = None
+    deviation_d: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RunComparisonDTO:
-    """Complete diff representation between two validation execution runs."""
+    """Complete diff representation between 2 (compulsory) and up to 4 validation runs."""
 
     run_a: ValidationRunSummaryDTO
     run_b: ValidationRunSummaryDTO
@@ -42,6 +48,18 @@ class RunComparisonDTO:
     unchanged_count: int
     new_rules_count: int
     removed_rules_count: int
+    run_c: ValidationRunSummaryDTO | None = None
+    run_d: ValidationRunSummaryDTO | None = None
+
+    @property
+    def active_runs(self) -> list[ValidationRunSummaryDTO]:
+        """List of active runs participating in this comparison (2, 3, or 4)."""
+        runs = [self.run_a, self.run_b]
+        if self.run_c is not None:
+            runs.append(self.run_c)
+        if self.run_d is not None:
+            runs.append(self.run_d)
+        return runs
 
 
 def _classify_change(
@@ -52,6 +70,8 @@ def _classify_change(
         return "NEW"
     if status_a is not None and status_b is None:
         return "REMOVED"
+    if status_a is None and status_b is None:
+        return "NEW"
     if status_a == status_b:
         return "UNCHANGED"
 
@@ -74,12 +94,18 @@ def _classify_change(
 def compare_validation_runs(
     run_a: ValidationRunSummaryDTO,
     run_b: ValidationRunSummaryDTO,
+    run_c: ValidationRunSummaryDTO | None = None,
+    run_d: ValidationRunSummaryDTO | None = None,
 ) -> RunComparisonDTO:
-    """Perform side-by-side rule comparison between Baseline Run A and Target Run B."""
+    """Perform side-by-side rule comparison between 2 (compulsory) and up to 4 validation runs."""
     map_a: dict[str, ValidationResultDTO] = {r.rule_name: r for r in run_a.results}
     map_b: dict[str, ValidationResultDTO] = {r.rule_name: r for r in run_b.results}
+    map_c: dict[str, ValidationResultDTO] = {r.rule_name: r for r in run_c.results} if run_c else {}
+    map_d: dict[str, ValidationResultDTO] = {r.rule_name: r for r in run_d.results} if run_d else {}
 
-    all_rule_names = sorted(set(map_a.keys()) | set(map_b.keys()))
+    all_rule_names = sorted(
+        set(map_a.keys()) | set(map_b.keys()) | set(map_c.keys()) | set(map_d.keys())
+    )
     comparisons: list[RuleComparisonDTO] = []
 
     reg_cnt = 0
@@ -91,9 +117,13 @@ def compare_validation_runs(
     for name in all_rule_names:
         item_a = map_a.get(name)
         item_b = map_b.get(name)
+        item_c = map_c.get(name)
+        item_d = map_d.get(name)
 
         st_a = item_a.status if item_a else None
         st_b = item_b.status if item_b else None
+        st_c = item_c.status if item_c else None
+        st_d = item_d.status if item_d else None
 
         change = _classify_change(st_a, st_b)
         if change == "REGRESSION":
@@ -107,8 +137,9 @@ def compare_validation_runs(
         else:
             unc_cnt += 1
 
-        target = (item_b or item_a).target_display
-        val_type = (item_b or item_a).validation_type
+        rep_item = item_b or item_a or item_c or item_d
+        target = rep_item.target_display if rep_item else ""
+        val_type = rep_item.validation_type if rep_item else ""
 
         comparisons.append(
             RuleComparisonDTO(
@@ -122,6 +153,12 @@ def compare_validation_runs(
                 deviation_a=item_a.deviation if item_a else None,
                 deviation_b=item_b.deviation if item_b else None,
                 change_type=change,
+                status_c=st_c,
+                status_d=st_d,
+                actual_c=item_c.actual_value if item_c else None,
+                actual_d=item_d.actual_value if item_d else None,
+                deviation_c=item_c.deviation if item_c else None,
+                deviation_d=item_d.deviation if item_d else None,
             )
         )
 
@@ -138,36 +175,51 @@ def compare_validation_runs(
         unchanged_count=unc_cnt,
         new_rules_count=new_cnt,
         removed_rules_count=rem_cnt,
+        run_c=run_c,
+        run_d=run_d,
     )
 
 
 def export_comparison_to_csv(comparison: RunComparisonDTO, destination: Path | str) -> Path:
-    """Export run comparison diff to a structured CSV report."""
+    """Export run comparison diff to a structured CSV report (supporting 2 to 4 runs)."""
     dest = Path(destination)
     dest.parent.mkdir(parents=True, exist_ok=True)
     with dest.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "Change Type",
-            "Rule Name",
-            "Validation Type",
-            "Target",
-            f"Run #{comparison.run_a.id} Status",
-            f"Run #{comparison.run_b.id} Status",
-            f"Run #{comparison.run_a.id} Actual",
-            f"Run #{comparison.run_b.id} Actual",
-            f"Run #{comparison.run_b.id} Deviation",
-        ])
+        headers = ["Change Type", "Rule Name", "Validation Type", "Target"]
+        for r in comparison.active_runs:
+            headers.append(f"Run #{r.id} Status")
+        for r in comparison.active_runs:
+            headers.append(f"Run #{r.id} Actual")
+        headers.append(f"Run #{comparison.run_b.id} Deviation")
+
+        writer.writerow(headers)
+
         for c in comparison.rule_comparisons:
-            writer.writerow([
+            row = [
                 c.change_type,
                 c.rule_name,
                 c.validation_type,
                 c.target_display,
-                c.status_a.value if c.status_a else "—",
-                c.status_b.value if c.status_b else "—",
-                c.actual_a or "—",
-                c.actual_b or "—",
-                c.deviation_b or "—",
-            ])
+            ]
+            # Statuses
+            row.append(c.status_a.value if c.status_a else "—")
+            row.append(c.status_b.value if c.status_b else "—")
+            if comparison.run_c:
+                row.append(c.status_c.value if c.status_c else "—")
+            if comparison.run_d:
+                row.append(c.status_d.value if c.status_d else "—")
+
+            # Actuals
+            row.append(c.actual_a or "—")
+            row.append(c.actual_b or "—")
+            if comparison.run_c:
+                row.append(c.actual_c or "—")
+            if comparison.run_d:
+                row.append(c.actual_d or "—")
+
+            # Deviation (Target Run B)
+            row.append(c.deviation_b or "—")
+
+            writer.writerow(row)
     return dest

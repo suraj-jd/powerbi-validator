@@ -150,6 +150,48 @@ def test_compare_validation_runs_regression_and_improvement():
     assert rule2_cmp.status_b == ValidationStatus.PASS
 
 
+def test_compare_validation_runs_up_to_4_runs_and_csv_export(tmp_path: Path):
+    run1 = _make_sample_run(1, ValidationStatus.FAIL, [ValidationStatus.PASS, ValidationStatus.FAIL])
+    run2 = _make_sample_run(2, ValidationStatus.FAIL, [ValidationStatus.FAIL, ValidationStatus.PASS])
+    run3 = _make_sample_run(3, ValidationStatus.PASS, [ValidationStatus.PASS, ValidationStatus.PASS])
+    run4 = _make_sample_run(4, ValidationStatus.WARNING, [ValidationStatus.WARNING, ValidationStatus.PASS])
+
+    # 1. 2 runs (default optional is None)
+    cmp2 = compare_validation_runs(run1, run2)
+    assert len(cmp2.active_runs) == 2
+    assert cmp2.run_c is None
+    assert cmp2.run_d is None
+
+    # 2. 3 runs
+    cmp3 = compare_validation_runs(run1, run2, run3)
+    assert len(cmp3.active_runs) == 3
+    assert cmp3.run_c is not None and cmp3.run_c.id == 3
+    assert cmp3.run_d is None
+    r1_cmp = next(c for c in cmp3.rule_comparisons if c.rule_name == "Rule 1")
+    assert r1_cmp.status_c == ValidationStatus.PASS
+
+    # 3. 4 runs
+    cmp4 = compare_validation_runs(run1, run2, run3, run4)
+    assert len(cmp4.active_runs) == 4
+    assert cmp4.run_c.id == 3
+    assert cmp4.run_d.id == 4
+    r1_4 = next(c for c in cmp4.rule_comparisons if c.rule_name == "Rule 1")
+    assert r1_4.status_a == ValidationStatus.PASS
+    assert r1_4.status_b == ValidationStatus.FAIL
+    assert r1_4.status_c == ValidationStatus.PASS
+    assert r1_4.status_d == ValidationStatus.WARNING
+
+    # 4. CSV export with 4 runs
+    csv_file = tmp_path / "comp_4runs.csv"
+    from app.services.compare_service import export_comparison_to_csv
+    out = export_comparison_to_csv(cmp4, csv_file)
+    assert out.exists()
+    content = out.read_text(encoding="utf-8")
+    assert "Run #1 Status,Run #2 Status,Run #3 Status,Run #4 Status" in content
+    assert "Run #1 Actual,Run #2 Actual,Run #3 Actual,Run #4 Actual" in content
+    assert "Run #2 Deviation" in content
+
+
 # =========================================================================
 # Backup & Pruning Tests
 # =========================================================================

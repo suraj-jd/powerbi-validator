@@ -131,7 +131,7 @@ def make_change_pill(change_type: str) -> QLabel:
 
 
 class RunComparisonDialog(QDialog):
-    """Side-by-side comparison of two validation runs highlighting regressions and improvements."""
+    """Side-by-side comparison across 2 to 4 validation runs highlighting regressions and improvements."""
 
     def __init__(
         self,
@@ -142,16 +142,15 @@ class RunComparisonDialog(QDialog):
         super().__init__(parent)
         self._cmp = comparison
         self._all_runs: list[ValidationRunSummaryDTO] = (
-            list(all_runs) if all_runs else [comparison.run_a, comparison.run_b]
+            list(all_runs) if all_runs else list(comparison.active_runs)
         )
         self._current_filter_change = "ALL"
         self._current_search_query = ""
 
-        self.setWindowTitle(
-            f"Run Comparison — Run #{comparison.run_a.id} vs Run #{comparison.run_b.id}"
-        )
+        run_ids_str = " vs ".join(f"Run #{r.id}" for r in comparison.active_runs)
+        self.setWindowTitle(f"Run Comparison — {run_ids_str}")
         self.setMinimumSize(1000, 620)
-        self.resize(1120, 680)
+        self.resize(1180, 700)
         self._build_ui()
         self._populate_comparison(self._cmp)
 
@@ -163,17 +162,17 @@ class RunComparisonDialog(QDialog):
         # Header Title and Subtitle Block
         header_block = QVBoxLayout()
         header_block.setSpacing(4)
-        self.title_label = QLabel(
-            f"Validation Run Comparison: #{self._cmp.run_a.id} vs #{self._cmp.run_b.id}"
-        )
+        run_titles = " vs ".join(f"#{r.id}" for r in self._cmp.active_runs)
+        self.title_label = QLabel(f"Validation Run Comparison: {run_titles}")
         self.title_label.setObjectName("SectionTitle")
         self.title_label.setStyleSheet("font-size: 17px; font-weight: 700; color: #0F172A;")
         header_block.addWidget(self.title_label)
 
-        self.sub_label = QLabel(
-            f"Baseline Run A: #{self._cmp.run_a.id} ({self._cmp.run_a.started_at_display}, {self._cmp.run_a.overall_status.value})  ➔  "
-            f"Target Run B: #{self._cmp.run_b.id} ({self._cmp.run_b.started_at_display}, {self._cmp.run_b.overall_status.value})"
-        )
+        sub_parts = [
+            f"Run #{r.id} ({r.started_at_display}, {r.overall_status.value})"
+            for r in self._cmp.active_runs
+        ]
+        self.sub_label = QLabel("  ➔  ".join(sub_parts))
         self.sub_label.setStyleSheet("font-size: 12px; color: #64748B;")
         header_block.addWidget(self.sub_label)
         layout.addLayout(header_block)
@@ -182,48 +181,89 @@ class RunComparisonDialog(QDialog):
         self.banner = NotificationBanner(self)
         layout.addWidget(self.banner)
 
-        # Run Selector Toolbar Card (if multiple runs are available)
+        # Run Selector Toolbar Card (supporting 2 compulsory runs and 2 optional runs)
         sel_card = QFrame()
-        sel_card.setObjectName("Card")
+        sel_card.setObjectName("ComparisonSelectorCard")
         sel_card.setStyleSheet(
-            "background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px;"
+            "QFrame#ComparisonSelectorCard { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QLabel { border: none; background: transparent; }"
         )
-        sel_layout = QHBoxLayout(sel_card)
-        sel_layout.setContentsMargins(12, 10, 12, 10)
-        sel_layout.setSpacing(12)
+        sel_layout = QVBoxLayout(sel_card)
+        sel_layout.setContentsMargins(14, 10, 14, 10)
+        sel_layout.setSpacing(8)
 
-        lbl_a = QLabel("Baseline (Run A):")
-        lbl_a.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;")
-        sel_layout.addWidget(lbl_a)
+        # Row 1: Compulsory Run 1 and Run 2
+        row1 = QHBoxLayout()
+        row1.setSpacing(10)
+
+        lbl_a = QLabel("Run 1 (Baseline)*:")
+        lbl_a.setStyleSheet("font-size: 12px; font-weight: 600; color: #1E293B;")
+        row1.addWidget(lbl_a)
 
         self.combo_run_a = QComboBox()
         self.combo_run_a.setMinimumWidth(220)
         self.combo_run_a.setStyleSheet("padding: 4px 8px; font-size: 12px;")
-        sel_layout.addWidget(self.combo_run_a)
+        row1.addWidget(self.combo_run_a)
 
-        self.btn_swap = QPushButton("⇄ Swap Runs")
+        self.btn_swap = QPushButton("⇄ Swap 1 & 2")
         self.btn_swap.setObjectName("SecondaryButton")
         self.btn_swap.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_swap.setToolTip("Swap Baseline Run A and Target Run B")
+        self.btn_swap.setToolTip("Swap Run 1 (Baseline) and Run 2 (Target)")
         self.btn_swap.clicked.connect(self._handle_swap_runs)
-        sel_layout.addWidget(self.btn_swap)
+        row1.addWidget(self.btn_swap)
 
-        lbl_b = QLabel("Target (Run B):")
-        lbl_b.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;")
-        sel_layout.addWidget(lbl_b)
+        lbl_b = QLabel("Run 2 (Target)*:")
+        lbl_b.setStyleSheet("font-size: 12px; font-weight: 600; color: #1E293B;")
+        row1.addWidget(lbl_b)
 
         self.combo_run_b = QComboBox()
         self.combo_run_b.setMinimumWidth(220)
         self.combo_run_b.setStyleSheet("padding: 4px 8px; font-size: 12px;")
-        sel_layout.addWidget(self.combo_run_b)
+        row1.addWidget(self.combo_run_b)
 
-        sel_layout.addStretch(1)
+        row1.addStretch(1)
+        sel_layout.addLayout(row1)
+
+        # Row 2: Optional Run 3 and Run 4
+        row2 = QHBoxLayout()
+        row2.setSpacing(10)
+
+        lbl_c = QLabel("Run 3 (Optional):")
+        lbl_c.setStyleSheet("font-size: 12px; font-weight: 500; color: #64748B;")
+        row2.addWidget(lbl_c)
+
+        self.combo_run_c = QComboBox()
+        self.combo_run_c.setMinimumWidth(220)
+        self.combo_run_c.setStyleSheet("padding: 4px 8px; font-size: 12px;")
+        row2.addWidget(self.combo_run_c)
+
+        lbl_d = QLabel("Run 4 (Optional):")
+        lbl_d.setStyleSheet("font-size: 12px; font-weight: 500; color: #64748B;")
+        row2.addWidget(lbl_d)
+
+        self.combo_run_d = QComboBox()
+        self.combo_run_d.setMinimumWidth(220)
+        self.combo_run_d.setStyleSheet("padding: 4px 8px; font-size: 12px;")
+        row2.addWidget(self.combo_run_d)
+
+        self.btn_clear_optional = QPushButton("✕ Reset (3 & 4)")
+        self.btn_clear_optional.setObjectName("SecondaryButton")
+        self.btn_clear_optional.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear_optional.setToolTip("Reset optional Run 3 and Run 4 to None")
+        self.btn_clear_optional.clicked.connect(self._handle_clear_optional)
+        row2.addWidget(self.btn_clear_optional)
+
+        row2.addStretch(1)
+        sel_layout.addLayout(row2)
+
         layout.addWidget(sel_card)
 
         # Populate run dropdowns
         self._populate_run_combos()
         self.combo_run_a.currentIndexChanged.connect(self._on_run_selection_changed)
         self.combo_run_b.currentIndexChanged.connect(self._on_run_selection_changed)
+        self.combo_run_c.currentIndexChanged.connect(self._on_run_selection_changed)
+        self.combo_run_d.currentIndexChanged.connect(self._on_run_selection_changed)
 
         # 4 Interactive KPI Summary Cards
         kpi_row = QHBoxLayout()
@@ -412,26 +452,42 @@ class RunComparisonDialog(QDialog):
         layout.addLayout(footer)
 
     def _populate_run_combos(self) -> None:
-        self.combo_run_a.blockSignals(True)
-        self.combo_run_b.blockSignals(True)
-        self.combo_run_a.clear()
-        self.combo_run_b.clear()
+        for combo in (self.combo_run_a, self.combo_run_b, self.combo_run_c, self.combo_run_d):
+            combo.blockSignals(True)
+            combo.clear()
+
+        # Optional combos start with a (None - Skip) entry
+        self.combo_run_c.addItem("(None - Skip)", None)
+        self.combo_run_d.addItem("(None - Skip)", None)
 
         idx_a = 0
         idx_b = 0
+        idx_c = 0
+        idx_d = 0
+
         for idx, r in enumerate(self._all_runs):
             label = f"Run #{r.id}  •  {r.started_at_display}  ({r.overall_status.value})"
             self.combo_run_a.addItem(label, r.id)
             self.combo_run_b.addItem(label, r.id)
+            self.combo_run_c.addItem(label, r.id)
+            self.combo_run_d.addItem(label, r.id)
+
             if r.id == self._cmp.run_a.id:
                 idx_a = idx
             if r.id == self._cmp.run_b.id:
                 idx_b = idx
+            if self._cmp.run_c and r.id == self._cmp.run_c.id:
+                idx_c = idx + 1
+            if self._cmp.run_d and r.id == self._cmp.run_d.id:
+                idx_d = idx + 1
 
         self.combo_run_a.setCurrentIndex(idx_a)
         self.combo_run_b.setCurrentIndex(idx_b)
-        self.combo_run_a.blockSignals(False)
-        self.combo_run_b.blockSignals(False)
+        self.combo_run_c.setCurrentIndex(idx_c)
+        self.combo_run_d.setCurrentIndex(idx_d)
+
+        for combo in (self.combo_run_a, self.combo_run_b, self.combo_run_c, self.combo_run_d):
+            combo.blockSignals(False)
 
     def _handle_swap_runs(self) -> None:
         idx_a = self.combo_run_a.currentIndex()
@@ -439,39 +495,66 @@ class RunComparisonDialog(QDialog):
         self.combo_run_a.setCurrentIndex(idx_b)
         self.combo_run_b.setCurrentIndex(idx_a)
 
+    def _handle_clear_optional(self) -> None:
+        self.combo_run_c.setCurrentIndex(0)
+        self.combo_run_d.setCurrentIndex(0)
+
     def _on_run_selection_changed(self) -> None:
         id_a = self.combo_run_a.currentData()
         id_b = self.combo_run_b.currentData()
+        id_c = self.combo_run_c.currentData()
+        id_d = self.combo_run_d.currentData()
+
         if id_a is None or id_b is None:
             return
 
         run_a = next((r for r in self._all_runs if r.id == id_a), None)
         run_b = next((r for r in self._all_runs if r.id == id_b), None)
+        run_c = next((r for r in self._all_runs if r.id == id_c), None) if id_c is not None else None
+        run_d = next((r for r in self._all_runs if r.id == id_d), None) if id_d is not None else None
+
         if not run_a or not run_b:
             return
 
-        new_cmp = compare_validation_runs(run_a, run_b)
+        new_cmp = compare_validation_runs(run_a, run_b, run_c, run_d)
         self._cmp = new_cmp
-        self.setWindowTitle(f"Run Comparison — Run #{run_a.id} vs Run #{run_b.id}")
-        self.title_label.setText(f"Validation Run Comparison: #{run_a.id} vs #{run_b.id}")
-        self.sub_label.setText(
-            f"Baseline Run A: #{run_a.id} ({run_a.started_at_display}, {run_a.overall_status.value})  ➔  "
-            f"Target Run B: #{run_b.id} ({run_b.started_at_display}, {run_b.overall_status.value})"
+
+        run_ids_str = " vs ".join(f"Run #{r.id}" for r in new_cmp.active_runs)
+        self.setWindowTitle(f"Run Comparison — {run_ids_str}")
+        self.title_label.setText(
+            f"Validation Run Comparison: {' vs '.join(f'#{r.id}' for r in new_cmp.active_runs)}"
         )
+        sub_parts = [
+            f"Run #{r.id} ({r.started_at_display}, {r.overall_status.value})"
+            for r in new_cmp.active_runs
+        ]
+        self.sub_label.setText("  ➔  ".join(sub_parts))
         self._update_table_headers()
         self._populate_comparison(new_cmp)
 
     def _update_table_headers(self) -> None:
-        self.diff_table.setHorizontalHeaderLabels([
-            "Change",
-            "Rule Name",
-            "Target",
-            f"Run #{self._cmp.run_a.id}",
-            f"Run #{self._cmp.run_b.id}",
-            f"Run #{self._cmp.run_a.id} Actual",
-            f"Run #{self._cmp.run_b.id} Actual",
-            f"Run #{self._cmp.run_b.id} Deviation",
-        ])
+        active = self._cmp.active_runs
+        headers = ["Change", "Rule Name", "Target"]
+        for r in active:
+            headers.append(f"Run #{r.id}")
+        for r in active:
+            headers.append(f"Run #{r.id} Actual")
+        headers.append(f"Run #{self._cmp.run_b.id} Dev")
+
+        self.diff_table.setColumnCount(len(headers))
+        self.diff_table.setHorizontalHeaderLabels(headers)
+
+        self.diff_table.setColumnWidth(0, 115)  # Change
+        self.diff_table.setColumnWidth(1, 210)  # Rule Name
+        self.diff_table.setColumnWidth(2, 160)  # Target
+        col_idx = 3
+        for _ in active:
+            self.diff_table.setColumnWidth(col_idx, 100)
+            col_idx += 1
+        for _ in active:
+            self.diff_table.setColumnWidth(col_idx, 125)
+            col_idx += 1
+        self.diff_table.setColumnWidth(col_idx, 125)
 
     def _populate_comparison(self, cmp: RunComparisonDTO) -> None:
         # Update KPI labels
@@ -484,6 +567,7 @@ class RunComparisonDialog(QDialog):
         self.diff_table.setSortingEnabled(False)
         self.diff_table.setRowCount(len(cmp.rule_comparisons))
 
+        active = cmp.active_runs
         for row_idx, item in enumerate(cmp.rule_comparisons):
             # Col 0: Change
             it_change = make_change_table_item(item.change_type)
@@ -497,25 +581,44 @@ class RunComparisonDialog(QDialog):
             it_target = QTableWidgetItem(item.target_display)
             self.diff_table.setItem(row_idx, 2, it_target)
 
-            # Col 3: Status A
-            self.diff_table.setItem(row_idx, 3, make_status_table_item(item.status_a))
+            # Statuses for active runs
+            col_curr = 3
+            for r in active:
+                if r.id == cmp.run_a.id:
+                    st = item.status_a
+                elif r.id == cmp.run_b.id:
+                    st = item.status_b
+                elif cmp.run_c and r.id == cmp.run_c.id:
+                    st = item.status_c
+                elif cmp.run_d and r.id == cmp.run_d.id:
+                    st = item.status_d
+                else:
+                    st = None
+                self.diff_table.setItem(row_idx, col_curr, make_status_table_item(st))
+                col_curr += 1
 
-            # Col 4: Status B
-            self.diff_table.setItem(row_idx, 4, make_status_table_item(item.status_b))
+            # Actuals for active runs
+            for r in active:
+                if r.id == cmp.run_a.id:
+                    act = item.actual_a
+                elif r.id == cmp.run_b.id:
+                    act = item.actual_b
+                elif cmp.run_c and r.id == cmp.run_c.id:
+                    act = item.actual_c
+                elif cmp.run_d and r.id == cmp.run_d.id:
+                    act = item.actual_d
+                else:
+                    act = None
+                self.diff_table.setItem(row_idx, col_curr, QTableWidgetItem(act or "—"))
+                col_curr += 1
 
-            # Col 5: Actual A
-            self.diff_table.setItem(row_idx, 5, QTableWidgetItem(item.actual_a or "—"))
-
-            # Col 6: Actual B
-            self.diff_table.setItem(row_idx, 6, QTableWidgetItem(item.actual_b or "—"))
-
-            # Col 7: Deviation B
+            # Deviation for Target Run B
             dev_str = item.deviation_b
             if not dev_str or dev_str == "None":
                 dev_str = "—"
             it_dev = QTableWidgetItem(dev_str)
             it_dev.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.diff_table.setItem(row_idx, 7, it_dev)
+            self.diff_table.setItem(row_idx, col_curr, it_dev)
 
         self.diff_table.setSortingEnabled(True)
         self._apply_filters()
@@ -587,7 +690,8 @@ class RunComparisonDialog(QDialog):
         self.lbl_stats.setText(f"Showing {visible_rows} of {total_rows} rule comparison(s)")
 
     def _handle_export_csv(self) -> None:
-        default_name = f"comparison_run_{self._cmp.run_a.id}_vs_{self._cmp.run_b.id}.csv"
+        active_ids = "_".join(str(r.id) for r in self._cmp.active_runs)
+        default_name = f"comparison_runs_{active_ids}.csv"
         filename, _ = QFileDialog.getSaveFileName(
             self,
             "Export Run Comparison to CSV",

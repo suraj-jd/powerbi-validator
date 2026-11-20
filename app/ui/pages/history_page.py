@@ -810,9 +810,27 @@ class HistoryPage(QWidget):
                     return found
             return self._runs[row_i] if 0 <= row_i < len(self._runs) else None
 
+        run_a: ValidationRunSummaryDTO | None = None
+        run_b: ValidationRunSummaryDTO | None = None
+        run_c: ValidationRunSummaryDTO | None = None
+        run_d: ValidationRunSummaryDTO | None = None
+
         if len(selected_rows) >= 2:
-            run_b = _get_run_for_row(selected_rows[0].row())
-            run_a = _get_run_for_row(selected_rows[1].row())
+            chosen_runs: list[ValidationRunSummaryDTO] = []
+            for sel in selected_rows[:4]:
+                r = _get_run_for_row(sel.row())
+                if r and r not in chosen_runs:
+                    chosen_runs.append(r)
+
+            # Sort chronological / ID ascending so Run 1 is baseline, Run 2 is target, etc.
+            chosen_runs.sort(key=lambda x: x.id)
+            if len(chosen_runs) >= 2:
+                run_a = chosen_runs[0]
+                run_b = chosen_runs[1]
+                if len(chosen_runs) > 2:
+                    run_c = chosen_runs[2]
+                if len(chosen_runs) > 3:
+                    run_d = chosen_runs[3]
         elif len(selected_rows) == 1:
             sel_run = _get_run_for_row(selected_rows[0].row())
             if sel_run:
@@ -832,7 +850,7 @@ class HistoryPage(QWidget):
             run_b = self._runs[0]
             run_a = self._runs[1]
 
-        comparison = compare_validation_runs(run_a, run_b)
+        comparison = compare_validation_runs(run_a, run_b, run_c, run_d)
         dialog = RunComparisonDialog(comparison, all_runs=self._runs, parent=self)
         dialog.exec()
 
