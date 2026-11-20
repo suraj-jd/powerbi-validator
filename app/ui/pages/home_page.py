@@ -279,9 +279,9 @@ class HomePage(QWidget):
         self.validation_card = self._create_validation_dashboard_card(container)
         layout.addWidget(self.validation_card)
 
-        # Stage 8 Dataset Refresh Health & Monitoring Card
+        # Stage 8 Dataset Refresh Health & Monitoring Card (hidden to keep Home focused strictly on today's validation)
         self.refresh_card = self._create_refresh_monitoring_card(container)
-        layout.addWidget(self.refresh_card)
+        self.refresh_card.hide()
 
         layout.addStretch(1)
 

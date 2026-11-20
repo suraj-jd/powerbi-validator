@@ -525,6 +525,11 @@ class MainWindow(QMainWindow):
         self._nav_buttons[page_key].setChecked(True)
         self._current_page_key = page_key
 
+        if page_key == "history" and hasattr(self.history_page, "refresh_history"):
+            self.history_page.refresh_history()
+        elif page_key == "home" and hasattr(self.home_page, "reload_registered_models"):
+            self.home_page.reload_registered_models()
+
         page_label = self._nav_buttons[page_key].text().strip()
         self.statusBar().showMessage(f"Ready  |  View: {page_label}")
         logger.debug("Navigated to page: %s", page_key)
