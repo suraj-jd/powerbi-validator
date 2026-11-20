@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
-from typing import Any, Sequence
+from datetime import datetime
+from typing import Any
 
 from app.core.status import ValidationStatus
 from app.database.models import utc_now
@@ -14,10 +14,9 @@ from app.integrations.powerbi.dax_client import (
     build_table_expression,
     escape_column_reference,
     escape_measure_name,
-    escape_table_name,
     extract_rule_filters,
 )
-from app.services.rule_service import RuleRecord, TARGET_TYPE_MEASURE
+from app.services.rule_service import TARGET_TYPE_MEASURE, RuleRecord
 from app.validation.base import BaseValidator
 from app.validation.models import CheckEvaluationResult
 from app.validation.stats import (
@@ -70,7 +69,6 @@ class AnomalyValidator(BaseValidator):
                     started_at=t_start,
                 )
             agg = str(cfg.get("aggregation_func", "SUM")).strip().upper()
-            tbl_name = escape_table_name(rule.table_name)
             col_ref = escape_column_reference(rule.column_name, rule.table_name)
             filters = extract_rule_filters(cfg)
             table_expr = build_table_expression(rule.table_name, filters)
@@ -135,7 +133,7 @@ class AnomalyValidator(BaseValidator):
         has_min = min_baseline is not None and str(min_baseline).strip() != ""
         has_max = max_baseline is not None and str(max_baseline).strip() != ""
 
-        if has_min and actual_val < float(min_baseline):
+        if has_min and min_baseline is not None and actual_val < float(min_baseline):
             min_b = float(min_baseline)
             diff = actual_val - min_b
             pct = (diff / abs(min_b) * 100.0) if min_b != 0 else 0.0
@@ -166,7 +164,7 @@ class AnomalyValidator(BaseValidator):
                 },
             )
 
-        if has_max and actual_val > float(max_baseline):
+        if has_max and max_baseline is not None and actual_val > float(max_baseline):
             max_b = float(max_baseline)
             diff = actual_val - max_b
             pct = (diff / abs(max_b) * 100.0) if max_b != 0 else 0.0
@@ -202,9 +200,9 @@ class AnomalyValidator(BaseValidator):
         # 1c. Baseline Thresholds Only Mode (No statistical comparison needed)
         if comparison_method in ("threshold_only", "baseline_only", "none"):
             exp_parts = []
-            if has_min:
+            if has_min and min_baseline is not None:
                 exp_parts.append(f">= {float(min_baseline):,.2f}")
-            if has_max:
+            if has_max and max_baseline is not None:
                 exp_parts.append(f"<= {float(max_baseline):,.2f}")
             exp_str = " and ".join(exp_parts) if exp_parts else "Baseline satisfied"
             return CheckEvaluationResult(

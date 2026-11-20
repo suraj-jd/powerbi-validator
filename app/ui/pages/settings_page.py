@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from app.core.exceptions import PersistenceError, ValidationConfigError, format_safe_user_error
 from app.core.status import NotificationLevel, RefreshStatus
+from app.integrations.file_import import RegistrationInput
 from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata, PowerBIWorkspace
 from app.services.registry_service import RegistrationRecord, RegistryService
 from app.ui.dialogs.confirm_dialog import ConfirmDialog
@@ -451,8 +452,7 @@ class SettingsPage(QWidget):
         ws_id, ds_id = current_data[0], current_data[1]
         disp_name = current_data[3] if len(current_data) > 3 else f"{ds_id[:8]}..."
         cached_meta = self._metadata_service.get_cached_metadata(ws_id, ds_id) if self._metadata_service else None
-        current_obj = self.metadata_selector.selected_object()
-        preselected_measure = current_obj.measure_name if current_obj and current_obj.measure_name else None
+        preselected_measure = self.metadata_selector.selected_measure() or None
 
         dialog = DaxInspectorDialog(
             workspace_id=ws_id,

@@ -64,7 +64,8 @@ class NumericTableWidgetItem(QTableWidgetItem):
                     return float(v1) < float(v2)
                 except (ValueError, TypeError):
                     return str(v1) < str(v2)
-        return super().__lt__(other)
+            return super().__lt__(other)
+        return False
 
 
 def make_status_table_item(status: ValidationStatus | str | None) -> NumericTableWidgetItem:

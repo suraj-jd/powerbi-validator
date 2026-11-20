@@ -26,8 +26,11 @@ class ConfirmDialog(QDialog):
         cancel_text: str = "Cancel",
         destructive: bool = False,
         parent: QWidget | None = None,
+        confirm_label: str | None = None,
     ) -> None:
         super().__init__(parent)
+        if confirm_label:
+            confirm_text = confirm_label
         self.setWindowTitle(title)
         self.setModal(True)
         self.setMinimumWidth(420)

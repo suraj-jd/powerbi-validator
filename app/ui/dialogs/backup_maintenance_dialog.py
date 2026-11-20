@@ -420,7 +420,7 @@ class BackupMaintenanceDialog(QDialog):
                 "All current registrations, rules, and run history will be replaced with the backup's data.\n"
                 "A safety backup of your current database will be saved automatically before restoring."
             ),
-            confirm_label="Restore Database",
+            confirm_text="Restore Database",
             parent=self,
         )
         if confirm.exec() != QDialog.DialogCode.Accepted:
@@ -460,7 +460,7 @@ class BackupMaintenanceDialog(QDialog):
                 f"older than {days} days?\n\n"
                 "This action cannot be undone. Workspace registrations and validation rules will NOT be touched."
             ),
-            confirm_label=f"Prune {eligible} Run(s)",
+            confirm_text=f"Prune {eligible} Run(s)",
             parent=self,
         )
         if confirm.exec() != QDialog.DialogCode.Accepted:

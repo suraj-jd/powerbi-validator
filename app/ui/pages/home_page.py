@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -48,6 +49,8 @@ from app.ui.widgets.animated_combo import AnimatedComboBox
 from app.ui.widgets.auth_banner import AuthBanner
 from app.ui.widgets.notification_banner import NotificationBanner
 from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.services.orchestrator_service import (

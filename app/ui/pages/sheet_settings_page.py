@@ -1098,10 +1098,10 @@ class SheetSettingsPage(QWidget):
     ) -> None:
         if vtype == VALIDATION_TYPE_REFRESH:
             tbl_input.setEnabled(False)
-            if hasattr(tbl_input, "setPlaceholderText"):
+            if isinstance(tbl_input, QLineEdit):
                 tbl_input.setPlaceholderText("- (Model SLA)")
             col_input.setEnabled(False)
-            if hasattr(col_input, "setPlaceholderText"):
+            if isinstance(col_input, QLineEdit):
                 col_input.setPlaceholderText("- (Model SLA)")
             if filter_edits:
                 for fe in filter_edits:
@@ -1109,10 +1109,10 @@ class SheetSettingsPage(QWidget):
                     fe.setPlaceholderText("- (N/A)")
         elif vtype == VALIDATION_TYPE_DAX_MEASURE:
             tbl_input.setEnabled(False)
-            if hasattr(tbl_input, "setPlaceholderText"):
+            if isinstance(tbl_input, QLineEdit):
                 tbl_input.setPlaceholderText("- (DAX Measure)")
             col_input.setEnabled(True)
-            if hasattr(col_input, "setPlaceholderText"):
+            if isinstance(col_input, QLineEdit):
                 col_input.setPlaceholderText("Measure, e.g. [Sales]")
             if filter_edits:
                 for idx, fe in enumerate(filter_edits, start=1):
@@ -1120,10 +1120,10 @@ class SheetSettingsPage(QWidget):
                     fe.setPlaceholderText(f"Filter {idx} (Optional)")
         else:
             tbl_input.setEnabled(True)
-            if hasattr(tbl_input, "setPlaceholderText"):
+            if isinstance(tbl_input, QLineEdit):
                 tbl_input.setPlaceholderText("Table, e.g. Sales")
             col_input.setEnabled(True)
-            if hasattr(col_input, "setPlaceholderText"):
+            if isinstance(col_input, QLineEdit):
                 col_input.setPlaceholderText("Column, e.g. Amount")
             if filter_edits:
                 for idx, fe in enumerate(filter_edits, start=1):

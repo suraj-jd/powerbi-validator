@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
 
 from app.core.status import NotificationLevel, ValidationStatus
 from app.services.compare_service import (
-    RuleComparisonDTO,
     RunComparisonDTO,
     compare_validation_runs,
     export_comparison_to_csv,

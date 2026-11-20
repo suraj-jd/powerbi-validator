@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 from app.core.status import ValidationStatus
 from app.services.orchestrator_service import (
@@ -77,7 +76,7 @@ def _classify_change(
 
     # Status hierarchy for regression vs improvement:
     # PASS (good) -> WARNING (worse) -> FAIL (bad) -> ERROR (bad)
-    rank = {
+    rank: dict[ValidationStatus | None, int] = {
         ValidationStatus.PASS: 1,
         ValidationStatus.WARNING: 2,
         ValidationStatus.FAIL: 3,

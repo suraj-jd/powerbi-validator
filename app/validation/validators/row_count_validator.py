@@ -199,6 +199,7 @@ class RowCountValidator(BaseValidator):
             )
 
         expected_str = f"{int(baseline_val):,} (±{allowed_dev_pct}%)"
+        pct_signed = 0.0
 
         if baseline_val == 0:
             if actual_count == 0:

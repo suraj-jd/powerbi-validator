@@ -33,13 +33,17 @@ from app.ui.dialogs.entra_config_dialog import EntraConfigDialog
 from app.ui.pages.about_page import AboutPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.home_page import HomePage
-from app.ui.pages.settings_page import SettingsPage
 from app.ui.pages.sheet_settings_page import SheetSettingsPage
 from app.ui.theme import make_nav_icon
 from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
     from app.database.db import DatabaseManager
+    from app.integrations.powerbi.models import (
+        PowerBIDataset,
+        PowerBIReport,
+        PowerBIWorkspace,
+    )
     from app.services.auth_service import AuthService
     from app.services.dax_service import DaxQueryService
     from app.services.metadata_service import MetadataService
@@ -394,8 +398,9 @@ class MainWindow(QMainWindow):
     def _handle_access_verified(self, result: object) -> None:
         self.home_page.display_verification_result(result)  # type: ignore[arg-type]
         if self._pending_verify_reg_id is not None:
-            if hasattr(self, "settings_page") and self.settings_page is not None:
-                self.settings_page.set_verification_result(
+            settings_page = getattr(self, "settings_page", None)
+            if settings_page is not None:
+                settings_page.set_verification_result(
                     self._pending_verify_reg_id,
                     result,  # type: ignore[arg-type]
                 )
