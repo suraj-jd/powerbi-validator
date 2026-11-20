@@ -1,8 +1,8 @@
 """Popup dialog for building Power BI / DAX filter conditions for sheet validation rules.
 
 Allows non-technical users to pick Table, Column, Condition (=, <>, <, >, <=, >=,
-IN, NOT IN, IS BLANK, IS NOT BLANK) and value with live DAX preview, or enter
-custom DAX directly. Used by Filter 1 to 4 in SheetSettingsPage.
+IN, NOT IN, IS BLANK, IS NOT BLANK) and value in a compact, professional dialog
+with live DAX preview, or enter custom DAX directly.
 """
 
 from __future__ import annotations
@@ -11,12 +11,13 @@ import logging
 import re
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -46,9 +47,9 @@ OPERATOR_CHOICES: list[tuple[str, str]] = [
     (">= (Greater than or equal to)", OPERATOR_GREATER_EQUAL),
     ("< (Less than)", OPERATOR_LESS_THAN),
     ("<= (Less than or equal to)", OPERATOR_LESS_EQUAL),
-    ("IN (In list / Multiple values)", OPERATOR_IN),
+    ("IN (In list / Slicer)", OPERATOR_IN),
     ("NOT IN (Not in list)", OPERATOR_NOT_IN),
-    ("IS BLANK (Is empty or blank)", OPERATOR_IS_BLANK),
+    ("IS BLANK (Blank or empty)", OPERATOR_IS_BLANK),
     ("IS NOT BLANK (Has value)", OPERATOR_IS_NOT_BLANK),
 ]
 
@@ -248,10 +249,10 @@ def parse_dax_filter_expression(expr: str) -> dict[str, str] | None:
 
 
 class FilterBuilderDialog(QDialog):
-    """Popup modal dialog for creating or editing a Power BI / DAX filter condition.
+    """Compact, professional popup dialog for creating or editing a Power BI / DAX filter condition.
     
-    Provides a visual builder (Table, Column, Operator, Value) with live DAX preview,
-    and a custom DAX override option.
+    Uses a neat 2x2 grid (Table | Column, Condition | Value) with live DAX preview
+    to keep the dialog clean, rectangular, and comfortably sized.
     """
 
     def __init__(
@@ -267,9 +268,12 @@ class FilterBuilderDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setModal(True)
-        self.setMinimumWidth(560)
+        self.setFixedWidth(460)
         self.setWindowTitle(f"Configure Filter {filter_index}")
         self.setObjectName("FilterBuilderDialog")
+        self.setStyleSheet(
+            "QDialog { background: #FFFFFF; font-family: Segoe UI, -apple-system, sans-serif; }"
+        )
 
         self._filter_index = filter_index
         self._initial_expression = current_expression.strip()
@@ -292,71 +296,63 @@ class FilterBuilderDialog(QDialog):
 
     def _build_ui(self) -> None:
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 20, 24, 20)
-        main_layout.setSpacing(14)
+        main_layout.setContentsMargins(18, 16, 18, 16)
+        main_layout.setSpacing(10)
 
-        # Header card
-        header_card = QFrame()
-        header_card.setStyleSheet(
-            "QFrame { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; }"
-        )
-        h_layout = QVBoxLayout(header_card)
-        h_layout.setContentsMargins(4, 4, 4, 4)
-        h_layout.setSpacing(3)
-
-        lbl_title = QLabel(f"Filter Condition Builder: Filter {self._filter_index}")
-        lbl_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
+        # 1. Sleek Compact Header
+        h_layout = QHBoxLayout()
+        lbl_title = QLabel(f"Filter {self._filter_index} Condition Builder")
+        lbl_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
         h_layout.addWidget(lbl_title)
 
-        lbl_desc = QLabel(
-            "Configure a Power BI slicer or filter condition. This condition is evaluated inside DAX CALCULATE."
+        h_layout.addStretch()
+
+        badge = QLabel("DAX CALCULATE")
+        badge.setStyleSheet(
+            "font-size: 10px; font-weight: 600; color: #1668DC; background: #EFF6FF; "
+            "border: 1px solid #BFDBFE; border-radius: 3px; padding: 2px 6px;"
         )
-        lbl_desc.setStyleSheet("font-size: 11px; color: #64748B;")
-        lbl_desc.setWordWrap(True)
-        h_layout.addWidget(lbl_desc)
+        h_layout.addWidget(badge)
+        main_layout.addLayout(h_layout)
 
-        main_layout.addWidget(header_card)
+        # 2. Compact 2x2 Grid Form (Table | Column, Condition | Value)
+        self.grid_container = QWidget()
+        grid = QGridLayout(self.grid_container)
+        grid.setContentsMargins(0, 2, 0, 2)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
 
-        # Form container
-        form_card = QFrame()
-        form_card.setStyleSheet(
-            "QFrame { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 14px; }"
-        )
-        f_layout = QVBoxLayout(form_card)
-        f_layout.setContentsMargins(8, 8, 8, 8)
-        f_layout.setSpacing(12)
-
-        # Row 1: Table selection
+        # Row 0 & 1: Table (left) and Column (right)
         lbl_table = QLabel("Table Name:")
         lbl_table.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
         self.combo_table = QComboBox()
         self.combo_table.setEditable(True)
-        self.combo_table.setPlaceholderText("Select or enter table name (e.g. Sales)")
+        self.combo_table.setPlaceholderText("Select or enter table")
         self.combo_table.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 5px 8px; font-size: 12px; color: #0F172A; } "
+            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
             "QComboBox:focus { border-color: #1668DC; }"
         )
         self.combo_table.currentTextChanged.connect(self._on_table_changed)
-        f_layout.addWidget(lbl_table)
-        f_layout.addWidget(self.combo_table)
 
-        # Row 2: Column selection
         lbl_col = QLabel("Column Name:")
         lbl_col.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
         self.combo_column = QComboBox()
         self.combo_column.setEditable(True)
-        self.combo_column.setPlaceholderText("Select or enter column name (e.g. Year or Status)")
+        self.combo_column.setPlaceholderText("Select or enter column")
         self.combo_column.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 5px 8px; font-size: 12px; color: #0F172A; } "
+            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
             "QComboBox:focus { border-color: #1668DC; }"
         )
         self.combo_column.currentTextChanged.connect(lambda _: self._update_preview())
-        f_layout.addWidget(lbl_col)
-        f_layout.addWidget(self.combo_column)
 
-        # Row 3: Operator / Condition
+        grid.addWidget(lbl_table, 0, 0)
+        grid.addWidget(lbl_col, 0, 1)
+        grid.addWidget(self.combo_table, 1, 0)
+        grid.addWidget(self.combo_column, 1, 1)
+
+        # Row 2 & 3: Condition (left) and Value (right)
         lbl_op = QLabel("Condition / Operator:")
         lbl_op.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
         self.combo_operator = QComboBox()
@@ -364,56 +360,49 @@ class FilterBuilderDialog(QDialog):
             self.combo_operator.addItem(label, op_code)
         self.combo_operator.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 5px 8px; font-size: 12px; color: #0F172A; } "
+            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
             "QComboBox:focus { border-color: #1668DC; }"
         )
         self.combo_operator.currentIndexChanged.connect(self._on_operator_changed)
-        f_layout.addWidget(lbl_op)
-        f_layout.addWidget(self.combo_operator)
 
-        # Row 4: Value input
         self.lbl_value = QLabel("Filter Value:")
         self.lbl_value.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
         self.input_value = QLineEdit()
-        self.input_value.setPlaceholderText("e.g. Completed or 2024 or 500")
+        self.input_value.setPlaceholderText("e.g. Completed or 2024")
         self.input_value.setStyleSheet(
             "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 5px 8px; font-size: 12px; color: #0F172A; } "
+            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
             "QLineEdit:focus { border-color: #1668DC; } "
             "QLineEdit:disabled { background: #F1F5F9; color: #94A3B8; }"
         )
         self.input_value.textChanged.connect(lambda _: self._update_preview())
 
-        self.lbl_value_tip = QLabel(
-            "Tip: Numbers are kept bare (e.g. 2024). Text values are automatically enclosed in quotes."
-        )
-        self.lbl_value_tip.setStyleSheet("font-size: 10px; color: #64748B; font-style: italic;")
+        grid.addWidget(lbl_op, 2, 0)
+        grid.addWidget(self.lbl_value, 2, 1)
+        grid.addWidget(self.combo_operator, 3, 0)
+        grid.addWidget(self.input_value, 3, 1)
 
-        f_layout.addWidget(self.lbl_value)
-        f_layout.addWidget(self.input_value)
-        f_layout.addWidget(self.lbl_value_tip)
+        main_layout.addWidget(self.grid_container)
 
-        main_layout.addWidget(form_card)
-
-        # Advanced / Custom DAX toggle
+        # 3. Custom DAX toggle and input
         custom_box = QFrame()
         c_layout = QVBoxLayout(custom_box)
         c_layout.setContentsMargins(0, 0, 0, 0)
-        c_layout.setSpacing(6)
+        c_layout.setSpacing(4)
 
-        self.chk_custom_dax = QCheckBox("Edit custom DAX expression directly (Advanced)")
+        self.chk_custom_dax = QCheckBox("Custom DAX expression")
         self.chk_custom_dax.setStyleSheet(
-            "QCheckBox { font-size: 11px; font-weight: 600; color: #475569; } "
-            "QCheckBox::indicator { width: 14px; height: 14px; }"
+            "QCheckBox { font-size: 11px; font-weight: 500; color: #475569; } "
+            "QCheckBox::indicator { width: 13px; height: 13px; }"
         )
         self.chk_custom_dax.toggled.connect(self._on_custom_toggle)
         c_layout.addWidget(self.chk_custom_dax)
 
         self.input_custom_dax = QLineEdit()
-        self.input_custom_dax.setPlaceholderText("Write any valid DAX filter expression (e.g. 'Dates'[Year] = 2024)")
+        self.input_custom_dax.setPlaceholderText("Write DAX expression (e.g. 'Dates'[Year] = 2024)")
         self.input_custom_dax.setStyleSheet(
             "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 5px 8px; font-size: 11px; font-family: Consolas, monospace; color: #0F172A; } "
+            "padding: 4px 7px; font-size: 11px; font-family: Consolas, monospace; color: #0F172A; } "
             "QLineEdit:focus { border-color: #1668DC; }"
         )
         self.input_custom_dax.setVisible(False)
@@ -422,39 +411,39 @@ class FilterBuilderDialog(QDialog):
 
         main_layout.addWidget(custom_box)
 
-        # Live DAX Preview Box
+        # 4. Sleek DAX Preview Box
         preview_card = QFrame()
         preview_card.setStyleSheet(
-            "QFrame { background: #0F172A; border: 1px solid #1E293B; border-radius: 6px; padding: 10px; }"
+            "QFrame { background: #0F172A; border-radius: 5px; padding: 6px 10px; }"
         )
-        p_layout = QVBoxLayout(preview_card)
-        p_layout.setContentsMargins(6, 6, 6, 6)
-        p_layout.setSpacing(4)
+        p_layout = QHBoxLayout(preview_card)
+        p_layout.setContentsMargins(4, 2, 4, 2)
+        p_layout.setSpacing(8)
 
-        lbl_prev_title = QLabel("DAX FILTER EXPRESSION PREVIEW:")
-        lbl_prev_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #94A3B8; letter-spacing: 0.5px;")
+        lbl_prev_title = QLabel("DAX:")
+        lbl_prev_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #94A3B8; font-family: Consolas;")
         p_layout.addWidget(lbl_prev_title)
 
         self.lbl_preview_code = QLabel("- (Empty filter)")
         self.lbl_preview_code.setStyleSheet(
-            "font-family: Consolas, 'Courier New', monospace; font-size: 12px; font-weight: 600; color: #38BDF8;"
+            "font-family: Consolas, 'Courier New', monospace; font-size: 11px; font-weight: 600; color: #38BDF8;"
         )
         self.lbl_preview_code.setWordWrap(True)
         self.lbl_preview_code.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        p_layout.addWidget(self.lbl_preview_code)
+        p_layout.addWidget(self.lbl_preview_code, 1)
 
         main_layout.addWidget(preview_card)
 
-        # Action Buttons
+        # 5. Action Buttons
         btn_layout = QHBoxLayout()
-        btn_layout.setContentsMargins(0, 8, 0, 0)
-        btn_layout.setSpacing(10)
+        btn_layout.setContentsMargins(0, 4, 0, 0)
+        btn_layout.setSpacing(8)
 
         self.btn_clear = QPushButton("Clear Filter")
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear.setStyleSheet(
             "QPushButton { background: #FFFFFF; color: #DC2626; border: 1px solid #FCA5A5; "
-            "border-radius: 4px; padding: 6px 14px; font-size: 12px; font-weight: 600; } "
+            "border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: 600; } "
             "QPushButton:hover { background: #FEF2F2; border-color: #EF4444; }"
         )
         self.btn_clear.clicked.connect(self._handle_clear)
@@ -466,7 +455,7 @@ class FilterBuilderDialog(QDialog):
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel.setStyleSheet(
             "QPushButton { background: #FFFFFF; color: #475569; border: 1px solid #CBD5E1; "
-            "border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 500; } "
+            "border-radius: 4px; padding: 5px 14px; font-size: 11px; font-weight: 500; } "
             "QPushButton:hover { background: #F8FAFC; color: #1E293B; }"
         )
         self.btn_cancel.clicked.connect(self.reject)
@@ -476,7 +465,7 @@ class FilterBuilderDialog(QDialog):
         self.btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_apply.setStyleSheet(
             "QPushButton { background: #1668DC; color: #FFFFFF; border: 1px solid #1668DC; "
-            "border-radius: 4px; padding: 6px 18px; font-size: 12px; font-weight: 700; } "
+            "border-radius: 4px; padding: 5px 16px; font-size: 11px; font-weight: 700; } "
             "QPushButton:hover { background: #1D4ED8; border-color: #1D4ED8; } "
             "QPushButton:disabled { background: #93C5FD; border-color: #93C5FD; color: #EFF6FF; }"
         )
@@ -608,19 +597,12 @@ class FilterBuilderDialog(QDialog):
         if op in (OPERATOR_IS_BLANK, OPERATOR_IS_NOT_BLANK):
             self.input_value.setEnabled(False)
             self.input_value.setPlaceholderText("(Not required for blank checks)")
-            self.lbl_value_tip.setText("No value needed. Evaluates whether the column is blank.")
         elif op in (OPERATOR_IN, OPERATOR_NOT_IN):
             self.input_value.setEnabled(True)
-            self.input_value.setPlaceholderText('e.g. "US", "UK", "Canada" or 10, 20, 30')
-            self.lbl_value_tip.setText(
-                'Separate multiple values with commas. Example: "Completed", "In Transit"'
-            )
+            self.input_value.setPlaceholderText('e.g. "US", "UK" or 10, 20')
         else:
             self.input_value.setEnabled(True)
-            self.input_value.setPlaceholderText('e.g. "Completed" or 2024 or 500')
-            self.lbl_value_tip.setText(
-                "Tip: Numbers are kept bare (e.g. 2024). Text values are automatically enclosed in quotes."
-            )
+            self.input_value.setPlaceholderText('e.g. Completed or 2024')
         self._update_preview()
 
     def _on_custom_toggle(self, checked: bool) -> None:
