@@ -269,7 +269,7 @@ class RunComparisonDialog(QDialog):
         kpi_row = QHBoxLayout()
         kpi_row.setSpacing(10)
 
-        # Regressions Card
+        # 1. Worsened Card (formerly Regressions)
         self.c_reg = QFrame()
         self.c_reg.setObjectName("CardReg")
         self.c_reg.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -281,9 +281,31 @@ class RunComparisonDialog(QDialog):
         lay_reg = QVBoxLayout(self.c_reg)
         lay_reg.setContentsMargins(14, 12, 14, 12)
         lay_reg.setSpacing(4)
-        lbl_r_t = QLabel("REGRESSIONS")
+
+        head_reg = QHBoxLayout()
+        head_reg.setContentsMargins(0, 0, 0, 0)
+        head_reg.setSpacing(6)
+        lbl_r_t = QLabel("WORSENED")
         lbl_r_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #B91C1C; letter-spacing: 0.5px;")
-        lay_reg.addWidget(lbl_r_t)
+        head_reg.addWidget(lbl_r_t)
+
+        tip_worsened = "Checks that previously passed or had no issues, but failed or degraded in recent runs."
+        btn_r_info = QPushButton("i")
+        btn_r_info.setFixedSize(16, 16)
+        btn_r_info.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_r_info.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_r_info.setToolTip(tip_worsened)
+        btn_r_info.setStyleSheet(
+            "QPushButton { border: 1px solid #FCA5A5; border-radius: 8px; "
+            "font-size: 10px; font-weight: 700; font-family: Segoe UI, sans-serif; "
+            "color: #B91C1C; background: #FFFFFF; padding: 0; margin: 0; } "
+            "QPushButton:hover { background: #FEE2E2; border-color: #EF4444; }"
+        )
+        btn_r_info.clicked.connect(lambda: self._filter_by_card("REGRESSION"))
+        head_reg.addWidget(btn_r_info)
+        head_reg.addStretch()
+        lay_reg.addLayout(head_reg)
+
         self.lbl_r_c = QLabel(str(self._cmp.regressions_count))
         self.lbl_r_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #B91C1C;")
         lay_reg.addWidget(self.lbl_r_c)
@@ -291,9 +313,10 @@ class RunComparisonDialog(QDialog):
         lbl_r_sub.setStyleSheet("font-size: 11px; color: #991B1B;")
         lay_reg.addWidget(lbl_r_sub)
         self.c_reg.mousePressEvent = lambda _e: self._filter_by_card("REGRESSION")
+        self.c_reg.setToolTip(tip_worsened)
         kpi_row.addWidget(self.c_reg, stretch=1)
 
-        # Improvements Card
+        # 2. Improvements Card
         self.c_imp = QFrame()
         self.c_imp.setObjectName("CardImp")
         self.c_imp.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -305,9 +328,31 @@ class RunComparisonDialog(QDialog):
         lay_imp = QVBoxLayout(self.c_imp)
         lay_imp.setContentsMargins(14, 12, 14, 12)
         lay_imp.setSpacing(4)
+
+        head_imp = QHBoxLayout()
+        head_imp.setContentsMargins(0, 0, 0, 0)
+        head_imp.setSpacing(6)
         lbl_i_t = QLabel("IMPROVEMENTS")
         lbl_i_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #15803D; letter-spacing: 0.5px;")
-        lay_imp.addWidget(lbl_i_t)
+        head_imp.addWidget(lbl_i_t)
+
+        tip_improvements = "Checks that previously failed or had errors, but are now passing in recent runs."
+        btn_i_info = QPushButton("i")
+        btn_i_info.setFixedSize(16, 16)
+        btn_i_info.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_i_info.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_i_info.setToolTip(tip_improvements)
+        btn_i_info.setStyleSheet(
+            "QPushButton { border: 1px solid #86EFAC; border-radius: 8px; "
+            "font-size: 10px; font-weight: 700; font-family: Segoe UI, sans-serif; "
+            "color: #15803D; background: #FFFFFF; padding: 0; margin: 0; } "
+            "QPushButton:hover { background: #DCFCE7; border-color: #22C55E; }"
+        )
+        btn_i_info.clicked.connect(lambda: self._filter_by_card("IMPROVEMENT"))
+        head_imp.addWidget(btn_i_info)
+        head_imp.addStretch()
+        lay_imp.addLayout(head_imp)
+
         self.lbl_i_c = QLabel(str(self._cmp.improvements_count))
         self.lbl_i_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #15803D;")
         lay_imp.addWidget(self.lbl_i_c)
@@ -315,9 +360,10 @@ class RunComparisonDialog(QDialog):
         lbl_i_sub.setStyleSheet("font-size: 11px; color: #166534;")
         lay_imp.addWidget(lbl_i_sub)
         self.c_imp.mousePressEvent = lambda _e: self._filter_by_card("IMPROVEMENT")
+        self.c_imp.setToolTip(tip_improvements)
         kpi_row.addWidget(self.c_imp, stretch=1)
 
-        # Unchanged Card
+        # 3. Unchanged Card
         self.c_unc = QFrame()
         self.c_unc.setObjectName("CardUnc")
         self.c_unc.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -329,9 +375,31 @@ class RunComparisonDialog(QDialog):
         lay_unc = QVBoxLayout(self.c_unc)
         lay_unc.setContentsMargins(14, 12, 14, 12)
         lay_unc.setSpacing(4)
+
+        head_unc = QHBoxLayout()
+        head_unc.setContentsMargins(0, 0, 0, 0)
+        head_unc.setSpacing(6)
         lbl_u_t = QLabel("UNCHANGED")
         lbl_u_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.5px;")
-        lay_unc.addWidget(lbl_u_t)
+        head_unc.addWidget(lbl_u_t)
+
+        tip_unchanged = "Checks whose validation status remained identical across all compared runs."
+        btn_u_info = QPushButton("i")
+        btn_u_info.setFixedSize(16, 16)
+        btn_u_info.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_u_info.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_u_info.setToolTip(tip_unchanged)
+        btn_u_info.setStyleSheet(
+            "QPushButton { border: 1px solid #CBD5E1; border-radius: 8px; "
+            "font-size: 10px; font-weight: 700; font-family: Segoe UI, sans-serif; "
+            "color: #475569; background: #FFFFFF; padding: 0; margin: 0; } "
+            "QPushButton:hover { background: #F1F5F9; border-color: #94A3B8; }"
+        )
+        btn_u_info.clicked.connect(lambda: self._filter_by_card("UNCHANGED"))
+        head_unc.addWidget(btn_u_info)
+        head_unc.addStretch()
+        lay_unc.addLayout(head_unc)
+
         self.lbl_u_c = QLabel(str(self._cmp.unchanged_count))
         self.lbl_u_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #334155;")
         lay_unc.addWidget(self.lbl_u_c)
@@ -339,9 +407,10 @@ class RunComparisonDialog(QDialog):
         lbl_u_sub.setStyleSheet("font-size: 11px; color: #94A3B8;")
         lay_unc.addWidget(lbl_u_sub)
         self.c_unc.mousePressEvent = lambda _e: self._filter_by_card("UNCHANGED")
+        self.c_unc.setToolTip(tip_unchanged)
         kpi_row.addWidget(self.c_unc, stretch=1)
 
-        # New / Removed Card
+        # 4. New / Removed Card
         self.c_mod = QFrame()
         self.c_mod.setObjectName("CardMod")
         self.c_mod.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -353,9 +422,31 @@ class RunComparisonDialog(QDialog):
         lay_mod = QVBoxLayout(self.c_mod)
         lay_mod.setContentsMargins(14, 12, 14, 12)
         lay_mod.setSpacing(4)
+
+        head_mod = QHBoxLayout()
+        head_mod.setContentsMargins(0, 0, 0, 0)
+        head_mod.setSpacing(6)
         lbl_m_t = QLabel("NEW / REMOVED RULES")
         lbl_m_t.setStyleSheet("font-size: 11px; font-weight: 700; color: #1D4ED8; letter-spacing: 0.5px;")
-        lay_mod.addWidget(lbl_m_t)
+        head_mod.addWidget(lbl_m_t)
+
+        tip_modified = "Validation rules that were newly added (+) or removed (-) between the compared runs."
+        btn_m_info = QPushButton("i")
+        btn_m_info.setFixedSize(16, 16)
+        btn_m_info.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_m_info.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_m_info.setToolTip(tip_modified)
+        btn_m_info.setStyleSheet(
+            "QPushButton { border: 1px solid #93C5FD; border-radius: 8px; "
+            "font-size: 10px; font-weight: 700; font-family: Segoe UI, sans-serif; "
+            "color: #1D4ED8; background: #FFFFFF; padding: 0; margin: 0; } "
+            "QPushButton:hover { background: #DBEAFE; border-color: #3B82F6; }"
+        )
+        btn_m_info.clicked.connect(lambda: self._filter_by_card("MODIFIED"))
+        head_mod.addWidget(btn_m_info)
+        head_mod.addStretch()
+        lay_mod.addLayout(head_mod)
+
         self.lbl_m_c = QLabel(f"+{self._cmp.new_rules_count} / -{self._cmp.removed_rules_count}")
         self.lbl_m_c.setStyleSheet("font-size: 24px; font-weight: 700; color: #1D4ED8;")
         lay_mod.addWidget(self.lbl_m_c)
@@ -363,6 +454,8 @@ class RunComparisonDialog(QDialog):
         lbl_m_sub.setStyleSheet("font-size: 11px; color: #1E40AF;")
         lay_mod.addWidget(lbl_m_sub)
         self.c_mod.mousePressEvent = lambda _e: self._filter_by_card("MODIFIED")
+        self.c_mod.setToolTip(tip_modified)
+        kpi_row.addWidget(self.c_mod, stretch=1)
         kpi_row.addWidget(self.c_mod, stretch=1)
 
         layout.addLayout(kpi_row)
@@ -385,7 +478,7 @@ class RunComparisonDialog(QDialog):
         self.combo_filter = QComboBox()
         self.combo_filter.setStyleSheet("padding: 5px 8px; font-size: 12px;")
         self.combo_filter.addItem("All Changes", "ALL")
-        self.combo_filter.addItem("Regressions Only", "REGRESSION")
+        self.combo_filter.addItem("Worsened Only", "REGRESSION")
         self.combo_filter.addItem("Improvements Only", "IMPROVEMENT")
         self.combo_filter.addItem("New Rules Only", "NEW")
         self.combo_filter.addItem("Removed Rules Only", "REMOVED")

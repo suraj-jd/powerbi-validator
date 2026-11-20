@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHeaderView, QPushButton
+from PySide6.QtWidgets import QHeaderView, QLabel, QPushButton
 import pytest
 
 from app.core.status import ValidationStatus
@@ -394,5 +394,28 @@ def test_backup_maintenance_dialog_stats_and_actions(qtbot, tmp_path):
     assert "Database Compacted" in dialog.banner.current_message or "defragmented" in dialog.banner.current_message
 
     db.dispose()
+
+
+def test_run_comparison_kpi_worsened_and_info_tooltips(qtbot):
+    run1 = _make_dummy_run(1, ValidationStatus.PASS)
+    run2 = _make_dummy_run(2, ValidationStatus.FAIL)
+    cmp = compare_validation_runs(run1, run2)
+    dialog = RunComparisonDialog(cmp)
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    # Verify Worsened card header
+    labels = dialog.c_reg.findChildren(QLabel)
+    assert any(lbl.text() == "WORSENED" for lbl in labels)
+
+    # Verify 'i' buttons exist with explanatory tooltips
+    info_buttons = [b for b in dialog.findChildren(QPushButton) if b.text() == "i"]
+    assert len(info_buttons) == 4
+    for b in info_buttons:
+        assert len(b.toolTip()) > 10
+
+    # Verify tooltip explains degraded checks
+    assert "failed or degraded" in dialog.c_reg.toolTip().lower()
+
 
 
