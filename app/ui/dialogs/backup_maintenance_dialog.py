@@ -89,7 +89,7 @@ class BackupMaintenanceDialog(QDialog):
         self.card_stats = QFrame()
         self.card_stats.setObjectName("Card")
         self.card_stats.setStyleSheet(
-            "background-color: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 8px; padding: 14px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 8px; padding: 14px; }"
         )
         lay_s = QVBoxLayout(self.card_stats)
         lay_s.setContentsMargins(14, 12, 14, 12)
@@ -138,7 +138,7 @@ class BackupMaintenanceDialog(QDialog):
         box_backup = QFrame()
         box_backup.setObjectName("Card")
         box_backup.setStyleSheet(
-            "background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
         )
         lay_b = QVBoxLayout(box_backup)
         lay_b.setContentsMargins(14, 12, 14, 12)
@@ -156,9 +156,14 @@ class BackupMaintenanceDialog(QDialog):
         lbl_b_d.setWordWrap(True)
         lay_b.addWidget(lbl_b_d)
 
-        btn_backup = QPushButton("💾  Create Database Backup...")
+        btn_backup = QPushButton("💾  Save")
         btn_backup.setObjectName("PrimaryButton")
         btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_backup.setStyleSheet(
+            "QPushButton#PrimaryButton { background-color: #1668DC; color: #FFFFFF; font-weight: 700; "
+            "font-size: 13px; border: none; border-radius: 6px; padding: 8px 22px; } "
+            "QPushButton#PrimaryButton:hover { background-color: #1357BA; }"
+        )
         btn_backup.clicked.connect(self._handle_create_backup)
         lay_b.addWidget(btn_backup, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(box_backup)
@@ -167,7 +172,7 @@ class BackupMaintenanceDialog(QDialog):
         box_restore = QFrame()
         box_restore.setObjectName("Card")
         box_restore.setStyleSheet(
-            "background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
         )
         lay_r = QVBoxLayout(box_restore)
         lay_r.setContentsMargins(14, 12, 14, 12)
@@ -208,7 +213,7 @@ class BackupMaintenanceDialog(QDialog):
         box_prune = QFrame()
         box_prune.setObjectName("Card")
         box_prune.setStyleSheet(
-            "background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
         )
         lay_p = QVBoxLayout(box_prune)
         lay_p.setContentsMargins(14, 12, 14, 12)

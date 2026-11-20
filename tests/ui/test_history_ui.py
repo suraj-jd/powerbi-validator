@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHeaderView
+from PySide6.QtWidgets import QHeaderView, QPushButton
 import pytest
 
 from app.core.status import ValidationStatus
@@ -153,6 +153,12 @@ def test_backup_maintenance_dialog_ui(qtbot, tmp_path):
 
     assert "Database Backup" in dialog.windowTitle()
     assert dialog.spin_retention.value() == 90
+
+    # Verify Save Backup button has bold "Save" text with floppy disk icon
+    save_btns = [btn for btn in dialog.findChildren(QPushButton) if "💾" in btn.text()]
+    assert len(save_btns) == 1
+    assert "Save" in save_btns[0].text()
+    assert "font-weight: 700" in save_btns[0].styleSheet()
 
     db.dispose()
 
