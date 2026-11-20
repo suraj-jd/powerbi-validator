@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def format_duration(duration_ms: int | None) -> str:
     """Format duration in milliseconds into a concise readable string."""
     if duration_ms is None:
-        return "— (In Progress)"
+        return "- (In Progress)"
 
     total_seconds = int(duration_ms / 1000)
     hours, remainder = divmod(total_seconds, 3600)
@@ -57,13 +57,13 @@ class RefreshRecordDTO:
     @property
     def start_time_display(self) -> str:
         if self.start_time is None:
-            return "—"
+            return "-"
         return self.start_time.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     @property
     def end_time_display(self) -> str:
         if self.end_time is None:
-            return "—"
+            return "-"
         return self.end_time.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     @property
@@ -459,7 +459,7 @@ class RefreshService(QObject):
             expected_value=expected_str,
             deviation=None,
             result_summary=f"Refresh completed successfully ({target_record.duration_display}, {target_record.age_hours}h ago).",
-            detailed_message=f"Refresh ID: {target_record.refresh_id or '—'}\nStart: {target_record.start_time_display}\nEnd: {target_record.end_time_display}",
+            detailed_message=f"Refresh ID: {target_record.refresh_id or '-'}\nStart: {target_record.start_time_display}\nEnd: {target_record.end_time_display}",
             refresh_record=target_record,
         )
 

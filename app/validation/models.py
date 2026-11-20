@@ -39,7 +39,7 @@ class CheckEvaluationResult:
         target_type: str,
         error_message: str,
         started_at: datetime,
-        expected_value: str = "—",
+        expected_value: str = "-",
         detailed_message: str | None = None,
         duration_ms: int | None = None,
     ) -> CheckEvaluationResult:

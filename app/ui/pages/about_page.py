@@ -174,7 +174,7 @@ class AboutPage(QWidget):
 
         subtitle = QLabel(
             "Enterprise desktop platform for automated Microsoft Power BI semantic model validation, "
-            "quality assurance, and data anomaly detection — 100% local, private, and credential-safe."
+            "quality assurance, and data anomaly detection: 100% local, private, and credential-safe."
         )
         subtitle.setObjectName("PageSubtitle")
         subtitle.setStyleSheet("font-size: 12px; color: #475569;")
@@ -243,7 +243,7 @@ class AboutPage(QWidget):
             self._create_step_card(
                 step_num=3,
                 title="Build Rules in the Excel-Style Validation Sheet",
-                subtitle="Spreadsheet view designed for business analysts — no code required",
+                subtitle="Spreadsheet view designed for business analysts: no code required",
                 description=(
                     "Configure validation checks in a spreadsheet-like interface. Select workspaces, reports, tables, and columns "
                     "using smart cascading dropdowns that automatically discover schema objects from your live Power BI models."
@@ -379,7 +379,7 @@ class AboutPage(QWidget):
         title_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
         header_row.addWidget(title_lbl)
 
-        sub_lbl = QLabel(f" —  {subtitle}")
+        sub_lbl = QLabel(f": {subtitle}")
         sub_lbl.setStyleSheet("font-size: 12px; color: #64748B;")
         header_row.addWidget(sub_lbl)
         header_row.addStretch(1)
@@ -847,7 +847,7 @@ class AboutPage(QWidget):
         c_icon = QLabel("⚡")
         c_icon.setStyleSheet("font-size: 16px;")
         title_row.addWidget(c_icon)
-        c_title = QLabel("Quick Formula Reference — 'Test to Do' in Validation Sheet")
+        c_title = QLabel("Quick Formula Reference: 'Test to Do' in Validation Sheet")
         c_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
         title_row.addWidget(c_title)
         title_row.addStretch(1)

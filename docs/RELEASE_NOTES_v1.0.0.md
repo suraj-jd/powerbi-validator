@@ -1,4 +1,4 @@
-# Power BI Validation Tool — Release Notes v1.0.0
+# Power BI Validation Tool: Release Notes v1.0.0
 
 **Release Date:** November 2026  
 **Build Status:** Production Ready (All 15 Stages Complete)  
@@ -52,7 +52,7 @@ The **Power BI Validation Tool** is an enterprise-grade, local-first Windows des
 
 ### Stage 8: Power BI Refresh Monitoring & SLA Tracking
 - Background refresh history synchronization tracking latest attempt vs latest successful refresh.
-- In-progress protection: in-progress refreshes return `duration_ms = None` and render `— (In Progress)` (never false completed duration).
+- In-progress protection: in-progress refreshes return `duration_ms = None` and render `- (In Progress)` (never false completed duration).
 - Interactive `RefreshDetailsDialog` with live history table and JSON error diagnostics.
 
 ### Stage 9: DAX Query Execution Foundation

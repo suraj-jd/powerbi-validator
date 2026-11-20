@@ -159,7 +159,7 @@ class DaxInspectorDialog(QDialog):
         res_header.addWidget(res_title)
         res_header.addStretch(1)
 
-        self.lbl_duration = QLabel("Duration: —")
+        self.lbl_duration = QLabel("Duration: -")
         self.lbl_duration.setStyleSheet("color: #64748B; font-size: 11px;")
         res_header.addWidget(self.lbl_duration)
         res_layout.addLayout(res_header)
@@ -168,7 +168,7 @@ class DaxInspectorDialog(QDialog):
         val_box = QHBoxLayout()
         val_box.setSpacing(12)
 
-        self.lbl_value_result = QLabel("—")
+        self.lbl_value_result = QLabel("-")
         self.lbl_value_result.setStyleSheet("color: #0F172A; font-size: 22px; font-weight: 700;")
         val_box.addWidget(self.lbl_value_result)
 

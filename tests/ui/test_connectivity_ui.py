@@ -79,4 +79,4 @@ def test_home_page_populates_workspaces_datasets_and_displays_verification(qtbot
     assert page.verification_banner.isVisible()
     assert page.verification_details_label.isVisible()
     assert "Contributor" in page.verification_details_label.text()
-    assert "Bosch Analytics — Contributor" in page.auth_banner.details_label.text()
+    assert "Bosch Analytics - Contributor" in page.auth_banner.details_label.text()

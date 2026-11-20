@@ -64,7 +64,7 @@ def make_change_table_item(change_type: str) -> QTableWidgetItem:
 def make_status_table_item(status: ValidationStatus | str | None) -> QTableWidgetItem:
     """Create a crisp, bold, colorful table item for validation status (no widget shrink)."""
     if not status:
-        item = QTableWidgetItem("—")
+        item = QTableWidgetItem("-")
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         item.setForeground(QColor("#94A3B8"))
         return item
@@ -148,7 +148,7 @@ class RunComparisonDialog(QDialog):
         self._current_search_query = ""
 
         run_ids_str = " vs ".join(f"Run #{r.id}" for r in comparison.active_runs)
-        self.setWindowTitle(f"Run Comparison — {run_ids_str}")
+        self.setWindowTitle(f"Run Comparison: {run_ids_str}")
         self.setMinimumSize(1000, 620)
         self.resize(1180, 700)
         self._build_ui()
@@ -520,7 +520,7 @@ class RunComparisonDialog(QDialog):
         self._cmp = new_cmp
 
         run_ids_str = " vs ".join(f"Run #{r.id}" for r in new_cmp.active_runs)
-        self.setWindowTitle(f"Run Comparison — {run_ids_str}")
+        self.setWindowTitle(f"Run Comparison: {run_ids_str}")
         self.title_label.setText(
             f"Validation Run Comparison: {' vs '.join(f'#{r.id}' for r in new_cmp.active_runs)}"
         )
@@ -609,13 +609,13 @@ class RunComparisonDialog(QDialog):
                     act = item.actual_d
                 else:
                     act = None
-                self.diff_table.setItem(row_idx, col_curr, QTableWidgetItem(act or "—"))
+                self.diff_table.setItem(row_idx, col_curr, QTableWidgetItem(act or "-"))
                 col_curr += 1
 
             # Deviation for Target Run B
             dev_str = item.deviation_b
             if not dev_str or dev_str == "None":
-                dev_str = "—"
+                dev_str = "-"
             it_dev = QTableWidgetItem(dev_str)
             it_dev.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.diff_table.setItem(row_idx, col_curr, it_dev)

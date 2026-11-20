@@ -1,6 +1,6 @@
 # Local SQLite Database Backup & Restore Design Notes
 
-**Status:** Design specification (Stage 2) — full UI & automation scheduled for **Stage 14**.
+**Status:** Design specification (Stage 2) - full UI & automation scheduled for **Stage 14**.
 
 ## Goals
 - Protect user-configured workspace registrations, validation rules, and immutable run history against accidental deletion, corruption, or schema upgrade failures.

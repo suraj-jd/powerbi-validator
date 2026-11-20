@@ -244,7 +244,7 @@ class HomePage(QWidget):
 
         header_row.addLayout(title_block, stretch=1)
 
-        badge = QLabel("Stage 13 — Health Dashboard Active", container)
+        badge = QLabel("Stage 13: Health Dashboard Active", container)
         badge.setObjectName("StageBadge")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
@@ -356,7 +356,7 @@ class HomePage(QWidget):
 
         if result.workspace_accessible:
             self.auth_banner.set_workspace_access_label(
-                f"{ws_label} — {result.effective_access_level}"
+                f"{ws_label} - {result.effective_access_level}"
             )
         else:
             self.auth_banner.set_workspace_access_label("Not Accessible")
@@ -451,10 +451,10 @@ class HomePage(QWidget):
         p_layout.addStretch(1)
         lay_att.addWidget(self.home_attempt_pill_container)
 
-        self.home_attempt_start = QLabel("Start: —")
+        self.home_attempt_start = QLabel("Start: -")
         self.home_attempt_start.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_att.addWidget(self.home_attempt_start)
-        self.home_attempt_duration = QLabel("Duration: —")
+        self.home_attempt_duration = QLabel("Duration: -")
         self.home_attempt_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
         lay_att.addWidget(self.home_attempt_duration)
         kpi_row.addWidget(card_attempt)
@@ -473,13 +473,13 @@ class HomePage(QWidget):
         lbl_suc_title.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
         lay_suc.addWidget(lbl_suc_title)
 
-        self.home_success_time = QLabel("—")
+        self.home_success_time = QLabel("-")
         self.home_success_time.setStyleSheet("color: #059669; font-size: 14px; font-weight: 700;")
         lay_suc.addWidget(self.home_success_time)
-        self.home_success_age = QLabel("Age: —")
+        self.home_success_age = QLabel("Age: -")
         self.home_success_age.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_suc.addWidget(self.home_success_age)
-        self.home_success_duration = QLabel("Duration: —")
+        self.home_success_duration = QLabel("Duration: -")
         self.home_success_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
         lay_suc.addWidget(self.home_success_duration)
         kpi_row.addWidget(card_success)
@@ -581,20 +581,20 @@ class HomePage(QWidget):
             self.home_attempt_duration.setText(f"Duration: {latest.duration_display}")
         else:
             self._reset_attempt_pill()
-            self.home_attempt_start.setText("Start: —")
-            self.home_attempt_duration.setText("Duration: —")
+            self.home_attempt_start.setText("Start: -")
+            self.home_attempt_duration.setText("Duration: -")
 
         # Update Latest Success
         latest_success = summary.latest_successful
         if latest_success is not None:
             self.home_success_time.setText(latest_success.end_time_display)
-            age_str = f"Age: {latest_success.age_hours}h ago" if latest_success.age_hours is not None else "Age: —"
+            age_str = f"Age: {latest_success.age_hours}h ago" if latest_success.age_hours is not None else "Age: -"
             self.home_success_age.setText(age_str)
             self.home_success_duration.setText(f"Duration: {latest_success.duration_display}")
         else:
             self.home_success_time.setText("None Recorded")
-            self.home_success_age.setText("Age: —")
-            self.home_success_duration.setText("Duration: —")
+            self.home_success_age.setText("Age: -")
+            self.home_success_duration.setText("Duration: -")
 
         # Update Reliability
         self.home_reliability_rate.setText(summary.success_rate_display)
@@ -607,11 +607,11 @@ class HomePage(QWidget):
 
     def _reset_refresh_cards(self) -> None:
         self._reset_attempt_pill()
-        self.home_attempt_start.setText("Start: —")
-        self.home_attempt_duration.setText("Duration: —")
-        self.home_success_time.setText("—")
-        self.home_success_age.setText("Age: —")
-        self.home_success_duration.setText("Duration: —")
+        self.home_attempt_start.setText("Start: -")
+        self.home_attempt_duration.setText("Duration: -")
+        self.home_success_time.setText("-")
+        self.home_success_age.setText("Age: -")
+        self.home_success_duration.setText("Duration: -")
         self.home_reliability_rate.setText("No Data")
         self.home_reliability_detail.setText("Recorded Runs: 0")
 
@@ -803,7 +803,7 @@ class HomePage(QWidget):
         ov_p_lay.addStretch(1)
         lay_ov.addWidget(self.home_overall_pill_container)
 
-        self.home_overall_timing = QLabel("Last Run: —")
+        self.home_overall_timing = QLabel("Last Run: -")
         self.home_overall_timing.setStyleSheet("color: #94A3B8; font-size: 11px;")
         lay_ov.addWidget(self.home_overall_timing)
         kpi_row.addWidget(card_ov, stretch=1)
@@ -999,7 +999,7 @@ class HomePage(QWidget):
     def _reset_validation_ui(self) -> None:
         update_validation_status_pill(self.home_overall_pill, "NOT RUN")
 
-        self.home_overall_timing.setText("Last Run: —")
+        self.home_overall_timing.setText("Last Run: -")
         self.home_passed_count.setText("0")
         self.home_failed_count.setText("0")
         self.home_warning_count.setText("0")
@@ -1169,10 +1169,10 @@ class HomePage(QWidget):
             self.results_table.setItem(row_idx, 3, QTableWidgetItem(res.validation_type))
 
             # 4: Actual Value
-            self.results_table.setItem(row_idx, 4, QTableWidgetItem(res.actual_value or "—"))
+            self.results_table.setItem(row_idx, 4, QTableWidgetItem(res.actual_value or "-"))
 
             # 5: Expected Value
-            self.results_table.setItem(row_idx, 5, QTableWidgetItem(res.expected_value or "—"))
+            self.results_table.setItem(row_idx, 5, QTableWidgetItem(res.expected_value or "-"))
 
             # 6: Deviation
             self.results_table.setItem(row_idx, 6, QTableWidgetItem(res.deviation or "None"))

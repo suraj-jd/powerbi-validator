@@ -57,7 +57,7 @@ def main() -> None:
             column_name="SalesOrderID",
             filter_1="'Fact_SalesOrders'[Status] = \"Shipped\"",
             config={"null_threshold_count": 0, "null_threshold_pct": 0.0},
-            rule_name="Sales Orders — Primary Key Null Check",
+            rule_name="Sales Orders - Primary Key Null Check",
         ),
         SheetRowDTO(
             sr_no=2,
@@ -72,7 +72,7 @@ def main() -> None:
             table_name="Dim_Customer",
             column_name="CustomerAlternateKey",
             config={"duplicate_threshold_count": 0},
-            rule_name="Customer Dimension — Unique Key Check",
+            rule_name="Customer Dimension - Unique Key Check",
         ),
         SheetRowDTO(
             sr_no=3,
@@ -88,7 +88,7 @@ def main() -> None:
             column_name="OrderDate",
             filter_1="'Fact_SalesOrders'[Year] = 2024",
             config={"max_age_days": 1, "disallow_future_dates": True},
-            rule_name="Order Date — Freshness SLA (24h)",
+            rule_name="Order Date - Freshness SLA (24h)",
         ),
         SheetRowDTO(
             sr_no=4,
@@ -104,7 +104,7 @@ def main() -> None:
             filter_1="'Dates'[Year] = 2024",
             filter_2="'Geography'[Region] = \"North America\"",
             config={"expected_value_str": "0.245", "max_percentage_deviation": 5.0},
-            rule_name="Net Profit Margin — Baseline DAX Check",
+            rule_name="Net Profit Margin - Baseline DAX Check",
         ),
         SheetRowDTO(
             sr_no=5,
@@ -118,7 +118,7 @@ def main() -> None:
             validation_type=VALIDATION_TYPE_ROW_COUNT,
             table_name="Fact_ProductInventory",
             config={"min_row_count": 50000, "max_row_count": 2000000},
-            rule_name="Product Inventory — Min Row Count SLA",
+            rule_name="Product Inventory - Min Row Count SLA",
         ),
         SheetRowDTO(
             sr_no=6,
@@ -251,7 +251,7 @@ def main() -> None:
 
     # Synchronize Home Page
     home = window.home_page
-    home.auth_banner.set_workspace_access_label("Global Enterprise Analytics — Admin")
+    home.auth_banner.set_workspace_access_label("Global Enterprise Analytics - Admin")
     home.reload_registered_models()
 
     # Update Home refresh monitoring card

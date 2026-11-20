@@ -116,7 +116,7 @@ class SettingsPage(QWidget):
         title_col.addWidget(subtitle)
         header_row.addLayout(title_col, stretch=1)
 
-        badge = QLabel("Stage 9 — DAX Query Execution Active")
+        badge = QLabel("Stage 9: DAX Query Execution Active")
         badge.setObjectName("StageBadge")
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header_row)

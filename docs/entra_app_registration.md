@@ -16,9 +16,9 @@ The Power BI Validation Tool signs in interactively as a **Public Client (Deskto
 ## 2. Configure Delegated Power BI API Permissions
 1. Go to **API permissions** → **Add a permission** → **Power BI Service** → **Delegated permissions**.
 2. Select only the minimal read permissions needed:
-   - `Workspace.Read.All` — list accessible workspaces and verify access
-   - `Dataset.Read.All` — read semantic model metadata, refresh history, and execute DAX validation queries
-   - `Report.Read.All` — read report metadata linked to semantic models
+   - `Workspace.Read.All` - list accessible workspaces and verify access
+   - `Dataset.Read.All` - read semantic model metadata, refresh history, and execute DAX validation queries
+   - `Report.Read.All` - read report metadata linked to semantic models
 3. If required by your organization's tenant policy, ask a Microsoft Entra administrator to grant admin consent.
 
 ## 3. Configure in the Application

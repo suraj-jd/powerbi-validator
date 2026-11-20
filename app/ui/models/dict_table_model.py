@@ -98,7 +98,7 @@ class DictTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.DisplayRole:
             if raw_value is None or raw_value == "":
-                return "—"
+                return "-"
             return str(raw_value)
 
         if role == Qt.ItemDataRole.TextAlignmentRole:

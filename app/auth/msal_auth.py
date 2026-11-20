@@ -164,7 +164,7 @@ class AuthAccount:
 
     @property
     def initials(self) -> str:
-        """Compute 1–2 character avatar initials from display name or email."""
+        """Compute 1-2 character avatar initials from display name or email."""
         source = (self.display_name or self.username or "?").strip()
         parts = [p for p in re.split(r"[\s._-]+", source.split("@")[0]) if p]
         if len(parts) >= 2:
@@ -389,7 +389,7 @@ class MsalAuthClient:
             logger.info("Restored Microsoft session silently for %s", self._active_account.username)
             return self.state
 
-        # Cached account exists, but token expired or was revoked — prompt reauth cleanly.
+        # Cached account exists, but token expired or was revoked; prompt reauth cleanly.
         self._active_msal_account = cached_account
         self._active_account = _extract_account_info(cached_account, result)
         self._status = AuthStatus.EXPIRED

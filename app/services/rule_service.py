@@ -92,10 +92,10 @@ class RuleRecord:
         if self.target_type == TARGET_TYPE_MODEL:
             return "Semantic Model"
         if self.target_type == TARGET_TYPE_MEASURE:
-            return self.measure_name or "—"
+            return self.measure_name or "-"
         if self.table_name and self.column_name:
             return f"{self.table_name}[{self.column_name}]"
-        return self.table_name or self.column_name or "—"
+        return self.table_name or self.column_name or "-"
 
     @property
     def conditions_summary(self) -> str:

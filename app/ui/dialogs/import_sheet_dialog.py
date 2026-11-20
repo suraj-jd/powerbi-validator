@@ -163,8 +163,8 @@ class ImportSheetDialog(QDialog):
 
         demo_samples = [
             ("1", "Sales Operations", "31696f1e-...", "Executive Sales", "6935123a-...", "Null / Blank Check", "Orders", "OrderID"),
-            ("2", "Finance Team", "a8c9b3e1-...", "Revenue Model", "f7b198c2-...", "Row Count Check", "Transactions", "—"),
-            ("3", "DAXX (Operations)", "31696f1e-...", "Dax_Practice", "6935123a-...", "Power BI Refresh SLA", "—", "—"),
+            ("2", "Finance Team", "a8c9b3e1-...", "Revenue Model", "f7b198c2-...", "Row Count Check", "Transactions", "-"),
+            ("3", "DAXX (Operations)", "31696f1e-...", "Dax_Practice", "6935123a-...", "Power BI Refresh SLA", "-", "-"),
         ]
         self.demo_table.setRowCount(len(demo_samples))
         self.demo_table.setShowGrid(True)

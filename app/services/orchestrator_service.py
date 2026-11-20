@@ -128,7 +128,7 @@ class ValidationRunSummaryDTO:
             rule_name = rule_record.rule_name if rule_record else "Rule (Deleted)"
             val_type = rule_record.validation_type if rule_record else "unknown"
             t_type = rule_record.target_type if rule_record else "UNKNOWN"
-            t_disp = RuleRecord.from_orm(rule_record).target_display if rule_record else "—"
+            t_disp = RuleRecord.from_orm(rule_record).target_display if rule_record else "-"
 
             try:
                 st = ValidationStatus(r.status)

@@ -216,12 +216,12 @@ class ValidationRulesTableWidget(QFrame):
             self.table.setItem(row_idx, 3, type_item)
 
             # 4. Table
-            tbl_item = QTableWidgetItem(rule.table_name or "—")
+            tbl_item = QTableWidgetItem(rule.table_name or "-")
             self.table.setItem(row_idx, 4, tbl_item)
 
             # 5. Column / Measure
-            col_meas = rule.measure_name if rule.target_type == TARGET_TYPE_MEASURE else (rule.column_name or "—")
-            cm_item = QTableWidgetItem(col_meas or "—")
+            col_meas = rule.measure_name if rule.target_type == TARGET_TYPE_MEASURE else (rule.column_name or "-")
+            cm_item = QTableWidgetItem(col_meas or "-")
             self.table.setItem(row_idx, 5, cm_item)
 
             # 6. Validation Check

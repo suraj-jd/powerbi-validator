@@ -110,16 +110,16 @@ def test_refresh_details_dialog_loads_persisted_records_and_displays_kpis(
 
     # 1. Verify KPI summary cards
     assert "In Progress" in dialog.lbl_attempt_pill.text()
-    assert "— (In Progress)" in dialog.lbl_attempt_duration.text()
+    assert "- (In Progress)" in dialog.lbl_attempt_duration.text()
     assert "8m 0s" in dialog.lbl_success_duration.text()
     assert "50.0% (1/2)" in dialog.lbl_rate.text()
 
     # 2. Verify Table rows
     assert dialog.table.rowCount() == 2
-    # In-progress row duration must be '— (In Progress)', never false completed duration
+    # In-progress row duration must be '- (In Progress)', never false completed duration
     item_dur_0 = dialog.table.item(0, 3)
     assert item_dur_0 is not None
-    assert item_dur_0.text() == "— (In Progress)"
+    assert item_dur_0.text() == "- (In Progress)"
 
     item_dur_1 = dialog.table.item(1, 3)
     assert item_dur_1 is not None

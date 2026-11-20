@@ -26,7 +26,7 @@ Explore the application screens and core capabilities below:
 
 ---
 
-### 2. 📝 Validation Sheet — Spreadsheet-Style Test Designer
+### 2. 📝 Validation Sheet - Spreadsheet-Style Test Designer
 > **Configure, parameterize, and manage all your validation tests in an intuitive Excel-style spreadsheet interface.**
 
 ![Validation Sheet](docs/screenshots/02_validation_sheet.png)
@@ -122,11 +122,11 @@ The **Power BI Validation Tool** provides a local-first, zero-trust data quality
 - **Row Count Check**: Compares dataset size against fixed baselines, min/max ranges, or previous run row counts.
 - **Power BI Refresh SLA Check**: Enforces model refresh SLAs and status (`Completed`, `Failed`, `Unknown`).
 - **DAX Measure Check**: Evaluates measures against fixed baselines, percentage deviations, or boundaries.
-- **Historical Anomaly Engine**: Statistical anomaly detection using Z-scores ($\sigma$), historical mean/median, lookback windows (7–90 days), weekend filtering, and directional alerts.
+- **Historical Anomaly Engine**: Statistical anomaly detection using Z-scores ($\sigma$), historical mean/median, lookback windows (7-90 days), weekend filtering, and directional alerts.
 
 ### 3. Refresh Monitoring & SLA Tracking (Stage 8)
 - Synchronizes and persists Power BI dataset refresh history.
-- **In-Progress Protection**: In-progress refreshes return `duration_ms = None` and render `— (In Progress)` (never false completed duration).
+- **In-Progress Protection**: In-progress refreshes return `duration_ms = None` and render `- (In Progress)` (never false completed duration).
 - Interactive **Refresh Details Dialog** with live history table, reliability rate, and JSON error diagnostics.
 
 ### 4. DAX Query Execution & Inspection (Stage 9)

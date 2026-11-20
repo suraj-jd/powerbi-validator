@@ -203,23 +203,23 @@ def export_comparison_to_csv(comparison: RunComparisonDTO, destination: Path | s
                 c.target_display,
             ]
             # Statuses
-            row.append(c.status_a.value if c.status_a else "—")
-            row.append(c.status_b.value if c.status_b else "—")
+            row.append(c.status_a.value if c.status_a else "-")
+            row.append(c.status_b.value if c.status_b else "-")
             if comparison.run_c:
-                row.append(c.status_c.value if c.status_c else "—")
+                row.append(c.status_c.value if c.status_c else "-")
             if comparison.run_d:
-                row.append(c.status_d.value if c.status_d else "—")
+                row.append(c.status_d.value if c.status_d else "-")
 
             # Actuals
-            row.append(c.actual_a or "—")
-            row.append(c.actual_b or "—")
+            row.append(c.actual_a or "-")
+            row.append(c.actual_b or "-")
             if comparison.run_c:
-                row.append(c.actual_c or "—")
+                row.append(c.actual_c or "-")
             if comparison.run_d:
-                row.append(c.actual_d or "—")
+                row.append(c.actual_d or "-")
 
             # Deviation (Target Run B)
-            row.append(c.deviation_b or "—")
+            row.append(c.deviation_b or "-")
 
             writer.writerow(row)
     return dest

@@ -29,7 +29,7 @@ def test_dict_table_model_crud_and_blank_formatting() -> None:
     assert model.columnCount() == 3
     assert model.headerData(1, Qt.Orientation.Horizontal) == "Check"
     assert model.data(model.index(0, 1)) == "Null Check"
-    assert model.data(model.index(1, 1)) == "—"
+    assert model.data(model.index(1, 1)) == "-"
 
     # Status column returns foreground and background brushes
     assert model.data(model.index(0, 2), Qt.ItemDataRole.ForegroundRole) is not None

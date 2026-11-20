@@ -100,7 +100,7 @@ def test_calculate_refresh_duration_and_in_progress() -> None:
 
     # In-progress refresh (end_time is None) must return None without false duration
     assert calculate_refresh_duration(t1, None) is None
-    assert format_duration(None) == "— (In Progress)"
+    assert format_duration(None) == "- (In Progress)"
 
 
 def test_parse_service_exception_json() -> None:

@@ -67,7 +67,7 @@ class QuickAddWorkspacesDialog(QDialog):
 
         hint = QLabel(
             "Select a workspace to view its semantic models and reports. "
-            "Check the models you want to register and click 'Register Selected'—no copying GUIDs required."
+            "Check the models you want to register and click 'Register Selected'. No GUID copying required."
         )
         hint.setObjectName("InfoBanner")
         hint.setWordWrap(True)

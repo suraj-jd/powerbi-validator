@@ -230,30 +230,30 @@ class RefreshDetailsDialog(QDialog):
         lbl_attempt_layout.addStretch(1)
 
         self.card_latest_attempt.layout().addWidget(self.lbl_attempt_status_container)
-        self.lbl_attempt_start = QLabel("Start: —")
+        self.lbl_attempt_start = QLabel("Start: -")
         self.lbl_attempt_start.setStyleSheet("color: #475569; font-size: 11px;")
         self.card_latest_attempt.layout().addWidget(self.lbl_attempt_start)
-        self.lbl_attempt_duration = QLabel("Duration: —")
+        self.lbl_attempt_duration = QLabel("Duration: -")
         self.lbl_attempt_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
         self.card_latest_attempt.layout().addWidget(self.lbl_attempt_duration)
         kpi_row.addWidget(self.card_latest_attempt)
 
         # Card 2: Latest Success
         self.card_latest_success = self._create_kpi_card("LATEST SUCCESSFUL REFRESH")
-        self.lbl_success_time = QLabel("—")
+        self.lbl_success_time = QLabel("-")
         self.lbl_success_time.setStyleSheet("color: #065F46; font-size: 15px; font-weight: 700;")
         self.card_latest_success.layout().addWidget(self.lbl_success_time)
-        self.lbl_success_age = QLabel("Age: —")
+        self.lbl_success_age = QLabel("Age: -")
         self.lbl_success_age.setStyleSheet("color: #475569; font-size: 11px;")
         self.card_latest_success.layout().addWidget(self.lbl_success_age)
-        self.lbl_success_duration = QLabel("Duration: —")
+        self.lbl_success_duration = QLabel("Duration: -")
         self.lbl_success_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
         self.card_latest_success.layout().addWidget(self.lbl_success_duration)
         kpi_row.addWidget(self.card_latest_success)
 
         # Card 3: Reliability
         self.card_reliability = self._create_kpi_card("REFRESH RELIABILITY")
-        self.lbl_rate = QLabel("—")
+        self.lbl_rate = QLabel("-")
         self.lbl_rate.setStyleSheet("color: #1668DC; font-size: 15px; font-weight: 700;")
         self.card_reliability.layout().addWidget(self.lbl_rate)
         self.lbl_rate_detail = QLabel("Recorded Runs: 0")
@@ -403,20 +403,20 @@ class RefreshDetailsDialog(QDialog):
             self.lbl_attempt_start.setText(f"Start: {latest.start_time_display}")
             self.lbl_attempt_duration.setText(f"Duration: {latest.duration_display}")
         else:
-            self.lbl_attempt_start.setText("Start: —")
-            self.lbl_attempt_duration.setText("Duration: —")
+            self.lbl_attempt_start.setText("Start: -")
+            self.lbl_attempt_duration.setText("Duration: -")
 
         # Latest Success
         latest_success = summary.latest_successful
         if latest_success is not None:
             self.lbl_success_time.setText(latest_success.end_time_display)
-            age_str = f"Age: {latest_success.age_hours}h ago" if latest_success.age_hours is not None else "Age: —"
+            age_str = f"Age: {latest_success.age_hours}h ago" if latest_success.age_hours is not None else "Age: -"
             self.lbl_success_age.setText(age_str)
             self.lbl_success_duration.setText(f"Duration: {latest_success.duration_display}")
         else:
             self.lbl_success_time.setText("None Recorded")
-            self.lbl_success_age.setText("Age: —")
-            self.lbl_success_duration.setText("Duration: —")
+            self.lbl_success_age.setText("Age: -")
+            self.lbl_success_duration.setText("Duration: -")
 
         # Reliability
         self.lbl_rate.setText(summary.success_rate_display)
@@ -443,18 +443,18 @@ class RefreshDetailsDialog(QDialog):
             item_end.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             self.table.setItem(row, 2, item_end)
 
-            # Column 3: Duration (In-progress is explicitly formatted as '— (In Progress)')
+            # Column 3: Duration (In-progress is explicitly formatted as '- (In Progress)')
             item_dur = QTableWidgetItem(rec.duration_display)
             item_dur.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             self.table.setItem(row, 3, item_dur)
 
             # Column 4: Type
-            item_type = QTableWidgetItem(rec.refresh_type or "—")
+            item_type = QTableWidgetItem(rec.refresh_type or "-")
             item_type.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             self.table.setItem(row, 4, item_type)
 
             # Column 5: Refresh ID
-            item_id = QTableWidgetItem(rec.refresh_id or "—")
+            item_id = QTableWidgetItem(rec.refresh_id or "-")
             item_id.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             self.table.setItem(row, 5, item_id)
 
@@ -470,8 +470,8 @@ class RefreshDetailsDialog(QDialog):
         if 0 <= row < len(self._records):
             rec = self._records[row]
             lines = [
-                f"Refresh ID: {rec.refresh_id or '—'}",
-                f"Status: {rec.status.value}  |  Type: {rec.refresh_type or '—'}",
+                f"Refresh ID: {rec.refresh_id or '-'}",
+                f"Status: {rec.status.value}  |  Type: {rec.refresh_type or '-'}",
                 f"Start: {rec.start_time_display}  |  End: {rec.end_time_display}  |  Duration: {rec.duration_display}",
             ]
             if rec.error_details:

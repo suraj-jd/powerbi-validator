@@ -27,7 +27,7 @@ _BANNER_PALETTES: dict[AuthStatus, dict[str, str]] = {
         "border": "#FDE68A",
         "accent": "#B45309",
         "icon": "!",
-        "headline": "Session Expired — Re-authentication Required",
+        "headline": "Session Expired: Please Sign In Again",
     },
     AuthStatus.ERROR: {
         "bg": "#FEF2F2",

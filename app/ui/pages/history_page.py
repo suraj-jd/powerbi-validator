@@ -70,7 +70,7 @@ class NumericTableWidgetItem(QTableWidgetItem):
 def make_status_table_item(status: ValidationStatus | str | None) -> NumericTableWidgetItem:
     """Create a crisp, bold, colorful table item for validation status (no widget shrink)."""
     if not status:
-        item = NumericTableWidgetItem("—")
+        item = NumericTableWidgetItem("-")
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         item.setForeground(QColor("#94A3B8"))
         item.setData(Qt.ItemDataRole.UserRole, "")
@@ -157,7 +157,7 @@ class HistoryPage(QWidget):
         title_block.addWidget(subtitle_label)
         header_row.addLayout(title_block, stretch=1)
 
-        badge = QLabel("Stage 14 — History & Export Active", container)
+        badge = QLabel("Stage 14: History and Export Active", container)
         badge.setObjectName("StageBadge")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
@@ -533,7 +533,7 @@ class HistoryPage(QWidget):
                 self.runs_table.setItem(row_idx, 8, item_t)
 
                 # Col 9: Version
-                item_v = QTableWidgetItem(run.app_version or "—")
+                item_v = QTableWidgetItem(run.app_version or "-")
                 item_v.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.runs_table.setItem(row_idx, 9, item_v)
         finally:
@@ -568,7 +568,7 @@ class HistoryPage(QWidget):
 
     def _display_drawer_results(self, run: ValidationRunSummaryDTO) -> None:
         self.drawer_title.setText(
-            f"Run #{run.id} Results — {run.overall_status.value} ({run.started_at_display}, duration: {run.duration_display})"
+            f"Run #{run.id} Results - {run.overall_status.value} ({run.started_at_display}, duration: {run.duration_display})"
         )
         self.results_table.setSortingEnabled(False)
         try:
@@ -605,12 +605,12 @@ class HistoryPage(QWidget):
                 self.results_table.setItem(r_idx, 3, item_ct)
 
                 # Col 4: Actual
-                item_act = QTableWidgetItem(res.actual_value or "—")
+                item_act = QTableWidgetItem(res.actual_value or "-")
                 item_act.setData(Qt.ItemDataRole.EditRole, res.actual_value or "")
                 self.results_table.setItem(r_idx, 4, item_act)
 
                 # Col 5: Expected
-                item_exp = QTableWidgetItem(res.expected_value or "—")
+                item_exp = QTableWidgetItem(res.expected_value or "-")
                 item_exp.setData(Qt.ItemDataRole.EditRole, res.expected_value or "")
                 self.results_table.setItem(r_idx, 5, item_exp)
 

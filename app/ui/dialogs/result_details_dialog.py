@@ -95,7 +95,7 @@ def update_validation_status_pill(pill: QLabel, status: ValidationStatus | str) 
 def make_status_table_item(status: ValidationStatus | str | None) -> QTableWidgetItem:
     """Create a crisp, bold, colorful QTableWidgetItem for validation status without widget shrink."""
     if not status:
-        item = QTableWidgetItem("—")
+        item = QTableWidgetItem("-")
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         item.setForeground(QColor("#94A3B8"))
         item.setData(Qt.ItemDataRole.UserRole, "")
@@ -138,7 +138,7 @@ class ResultDetailsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._result = result
-        self.setWindowTitle(f"Validation Diagnostics — {result.rule_name}")
+        self.setWindowTitle(f"Validation Diagnostics: {result.rule_name}")
         self.setMinimumSize(680, 520)
         self.resize(740, 580)
         self._build_ui()
@@ -200,7 +200,7 @@ class ResultDetailsDialog(QDialog):
         lbl_e_title = QLabel("EXPECTED")
         lbl_e_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B;")
         lay_exp.addWidget(lbl_e_title)
-        lbl_e_val = QLabel(self._result.expected_value or "—")
+        lbl_e_val = QLabel(self._result.expected_value or "-")
         lbl_e_val.setStyleSheet("font-size: 12px; font-weight: 600; color: #0F172A;")
         lbl_e_val.setWordWrap(True)
         lay_exp.addWidget(lbl_e_val)
@@ -215,7 +215,7 @@ class ResultDetailsDialog(QDialog):
         lbl_a_title = QLabel("ACTUAL OBSERVED")
         lbl_a_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B;")
         lay_act.addWidget(lbl_a_title)
-        lbl_a_val = QLabel(self._result.actual_value or "—")
+        lbl_a_val = QLabel(self._result.actual_value or "-")
         lbl_a_val.setStyleSheet("font-size: 12px; font-weight: 600; color: #0F172A;")
         lbl_a_val.setWordWrap(True)
         lay_act.addWidget(lbl_a_val)

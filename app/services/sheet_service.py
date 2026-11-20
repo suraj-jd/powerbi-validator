@@ -77,14 +77,14 @@ def generate_rule_name(
     test_title = FRIENDLY_TEST_NAMES.get(validation_type, "Validation Check")
     if validation_type == VALIDATION_TYPE_REFRESH:
         target = report_name or "Semantic Model"
-        return f"{target} — {test_title}"
+        return f"{target} - {test_title}"
     if measure_name:
-        return f"[{measure_name}] — {test_title}"
+        return f"[{measure_name}] - {test_title}"
     if table_name and column_name:
-        return f"{table_name}[{column_name}] — {test_title}"
+        return f"{table_name}[{column_name}] - {test_title}"
     if table_name:
-        return f"{table_name} — {test_title}"
-    return f"{report_name or 'Target'} — {test_title}"
+        return f"{table_name} - {test_title}"
+    return f"{report_name or 'Target'} - {test_title}"
 
 
 @dataclass
@@ -142,7 +142,7 @@ class SheetRowDTO:
             return f"[{self.measure_name}]"
         if self.table_name and self.column_name:
             return f"{self.table_name}[{self.column_name}]"
-        return self.table_name or self.column_name or "—"
+        return self.table_name or self.column_name or "-"
 
     def effective_rule_name(self) -> str:
         if self.rule_name and self.rule_name.strip():

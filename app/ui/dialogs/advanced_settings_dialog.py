@@ -52,7 +52,7 @@ class AdvancedSettingsDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"Advanced Settings — {rule_name}")
+        self.setWindowTitle(f"Advanced Settings: {rule_name}")
         self.setModal(True)
         self.setMinimumWidth(560)
         self.setObjectName("ConfirmDialog")

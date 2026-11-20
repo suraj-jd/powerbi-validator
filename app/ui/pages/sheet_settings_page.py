@@ -165,7 +165,7 @@ class SheetSettingsPage(QWidget):
 
         sub_lbl = QLabel(
             "Configure and maintain Power BI validation checks in a clean, spreadsheet view. "
-            "Select workspaces and reports from dropdowns — no technical IDs required."
+            "Select workspaces and reports from dropdowns. No technical IDs needed."
         )
         sub_lbl.setObjectName("PageSubtitle")
         title_block.addWidget(sub_lbl)
@@ -758,7 +758,7 @@ class SheetSettingsPage(QWidget):
         if validation_type == VALIDATION_TYPE_REFRESH:
             combo.setCurrentIndex(-1)
             combo.setEditText("")
-            combo.setPlaceholderText("— (Model SLA)")
+            combo.setPlaceholderText("- (Model SLA)")
             combo.blockSignals(False)
             return
 
@@ -1081,18 +1081,18 @@ class SheetSettingsPage(QWidget):
         if vtype == VALIDATION_TYPE_REFRESH:
             tbl_input.setEnabled(False)
             if hasattr(tbl_input, "setPlaceholderText"):
-                tbl_input.setPlaceholderText("— (Model SLA)")
+                tbl_input.setPlaceholderText("- (Model SLA)")
             col_input.setEnabled(False)
             if hasattr(col_input, "setPlaceholderText"):
-                col_input.setPlaceholderText("— (Model SLA)")
+                col_input.setPlaceholderText("- (Model SLA)")
             if filter_edits:
                 for fe in filter_edits:
                     fe.setEnabled(False)
-                    fe.setPlaceholderText("— (N/A)")
+                    fe.setPlaceholderText("- (N/A)")
         elif vtype == VALIDATION_TYPE_DAX_MEASURE:
             tbl_input.setEnabled(False)
             if hasattr(tbl_input, "setPlaceholderText"):
-                tbl_input.setPlaceholderText("— (DAX Measure)")
+                tbl_input.setPlaceholderText("- (DAX Measure)")
             col_input.setEnabled(True)
             if hasattr(col_input, "setPlaceholderText"):
                 col_input.setPlaceholderText("Measure, e.g. [Sales]")

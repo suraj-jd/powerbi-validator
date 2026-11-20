@@ -118,7 +118,7 @@ def export_run_to_xlsx(summary: ValidationRunSummaryDTO, destination: Path | str
     }
 
     # Title block
-    ws_results["A1"] = f"{APP_NAME} — Validation Execution Report"
+    ws_results["A1"] = f"{APP_NAME} - Validation Execution Report"
     ws_results["A1"].font = title_font
 
     meta_items = [
@@ -176,8 +176,8 @@ def export_run_to_xlsx(summary: ValidationRunSummaryDTO, destination: Path | str
             res.rule_name,
             res.target_display,
             res.validation_type,
-            res.actual_value or "—",
-            res.expected_value or "—",
+            res.actual_value or "-",
+            res.expected_value or "-",
             res.deviation or "None",
             res.duration_ms,
             res.result_summary,

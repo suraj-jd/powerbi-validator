@@ -154,7 +154,7 @@ class AnomalyValidator(BaseValidator):
                     f"Actual Observed Value: {actual_display}\n"
                     f"Minimum Baseline Threshold: {min_b:,.2f}\n"
                     f"Deficit: {abs(diff):,.2f} ({abs(pct):.1f}%)\n"
-                    f"Evaluation: FAIL (Baseline Floor Violated — Immediate Anomaly)"
+                    f"Evaluation: FAIL (Below minimum baseline (anomaly detected))"
                 ),
                 started_at=t_start,
                 completed_at=now,
@@ -185,7 +185,7 @@ class AnomalyValidator(BaseValidator):
                     f"Actual Observed Value: {actual_display}\n"
                     f"Maximum Baseline Threshold: {max_b:,.2f}\n"
                     f"Excess: {abs(diff):,.2f} ({abs(pct):.1f}%)\n"
-                    f"Evaluation: FAIL (Baseline Ceiling Violated — Immediate Anomaly)"
+                    f"Evaluation: FAIL (Above maximum baseline (anomaly detected))"
                 ),
                 started_at=t_start,
                 completed_at=now,

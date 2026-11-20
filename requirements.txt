@@ -1,4 +1,4 @@
-# Core runtime dependencies (Stages 0–5)
+# Core runtime dependencies (Stages 0-5)
 PySide6>=6.8.0,<6.11.0
 pydantic>=2.10.0,<3.0.0
 SQLAlchemy>=2.0.36,<3.0.0

@@ -101,7 +101,7 @@ class SheetRuleConfigDialog(QDialog):
         layout.addLayout(header_row)
 
         target_desc = self._target_display if self._target_display else "Selected Target"
-        sub_banner = QLabel(f"Target: <b>{target_desc}</b> — Configure what this test should verify.")
+        sub_banner = QLabel(f"Target: <b>{target_desc}</b>: Configure what this test should verify.")
         sub_banner.setObjectName("InfoBanner")
         sub_banner.setStyleSheet(
             "background-color: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A; "
