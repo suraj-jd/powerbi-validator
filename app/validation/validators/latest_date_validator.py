@@ -10,8 +10,10 @@ from app.core.status import ValidationStatus
 from app.database.models import utc_now
 from app.integrations.powerbi.dax_client import (
     DaxQueryClient,
+    build_table_expression,
     escape_column_reference,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.services.rule_service import RuleRecord
 from app.validation.base import BaseValidator
@@ -105,18 +107,27 @@ class LatestDateValidator(BaseValidator):
         tbl_name = escape_table_name(rule.table_name)
         col_ref = escape_column_reference(rule.column_name, rule.table_name)
 
-        table_expr = tbl_name
-        if filter_cond and filter_cond.strip():
-            table_expr = f"FILTER({tbl_name}, {filter_cond.strip()})"
+        filters = extract_rule_filters(cfg)
+        table_expr = build_table_expression(rule.table_name, filters)
 
-        # Query max and min date and row count
-        query = (
-            f"EVALUATE ROW(\n"
-            f'    "LatestDate", MAX({col_ref}),\n'
-            f'    "EarliestDate", MIN({col_ref}),\n'
-            f'    "TotalRows", COUNTROWS({table_expr})\n'
-            f")"
-        )
+        # Query max and min date and row count with filters applied
+        if filters:
+            filters_dax = ", ".join(filters)
+            query = (
+                f"EVALUATE ROW(\n"
+                f'    "LatestDate", CALCULATE(MAX({col_ref}), {filters_dax}),\n'
+                f'    "EarliestDate", CALCULATE(MIN({col_ref}), {filters_dax}),\n'
+                f'    "TotalRows", COUNTROWS({table_expr})\n'
+                f")"
+            )
+        else:
+            query = (
+                f"EVALUATE ROW(\n"
+                f'    "LatestDate", MAX({col_ref}),\n'
+                f'    "EarliestDate", MIN({col_ref}),\n'
+                f'    "TotalRows", COUNTROWS({table_expr})\n'
+                f")"
+            )
 
         dax_res = dax_client.execute_raw_dax(workspace_id, dataset_id, query)
         now = utc_now()

@@ -70,19 +70,63 @@ def escape_column_reference(column_name: str, table_name: str | None = None) -> 
     return f"[{clean_col}]"
 
 
-def build_measure_query(measure_name: str, filter_context: str | None = None) -> str:
+def extract_rule_filters(cfg: dict[str, Any] | None) -> list[str]:
+    """Collect non-empty Filter 1, Filter 2, Filter 3, Filter 4 expressions from rule config.
+
+    Supports:
+      - filter_1, filter_2, filter_3, filter_4
+      - legacy filter_context or filter_condition
+    """
+    if not cfg:
+        return []
+    filters: list[str] = []
+    for key in ("filter_1", "filter_2", "filter_3", "filter_4"):
+        val = cfg.get(key)
+        if val is not None and str(val).strip():
+            clean = str(val).strip()
+            if clean not in filters:
+                filters.append(clean)
+    legacy = cfg.get("filter_context") or cfg.get("filter_condition")
+    if legacy and str(legacy).strip() and str(legacy).strip() not in filters:
+        filters.append(str(legacy).strip())
+    return filters
+
+
+def build_table_expression(table_name: str, filters: list[str] | None = None) -> str:
+    """Build a DAX table expression, wrapping in CALCULATETABLE if filter expressions are present."""
+    tbl_name = escape_table_name(table_name)
+    if filters:
+        active = [f.strip() for f in filters if f and str(f).strip()]
+        if active:
+            return f"CALCULATETABLE({tbl_name}, {', '.join(active)})"
+    return tbl_name
+
+
+def build_measure_query(
+    measure_name: str,
+    filter_context: str | None = None,
+    filters: list[str] | None = None,
+) -> str:
     """Construct a safe DAX query returning a single measure value in a tabular row.
 
     Example without filter:
         EVALUATE ROW("Value", [Total Sales])
 
     Example with filter:
-        EVALUATE ROW("Value", CALCULATE([Total Sales], Dates[Year] = 2024))
+        EVALUATE ROW("Value", CALCULATE([Total Sales], Dates[Year] = 2024, Customer[Region] = "US"))
     """
     escaped_measure = escape_measure_name(measure_name)
+    all_filters: list[str] = []
     if filter_context and filter_context.strip():
-        clean_filter = filter_context.strip()
-        return f'EVALUATE ROW("Value", CALCULATE({escaped_measure}, {clean_filter}))'
+        all_filters.append(filter_context.strip())
+    if filters:
+        for f in filters:
+            if f and str(f).strip() and str(f).strip() not in all_filters:
+                all_filters.append(str(f).strip())
+
+    if all_filters:
+        filters_dax = ", ".join(all_filters)
+        return f'EVALUATE ROW("Value", CALCULATE({escaped_measure}, {filters_dax}))'
     return f'EVALUATE ROW("Value", {escaped_measure})'
 
 

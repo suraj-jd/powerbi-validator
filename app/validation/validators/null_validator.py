@@ -9,8 +9,10 @@ from app.core.status import ValidationStatus
 from app.database.models import utc_now
 from app.integrations.powerbi.dax_client import (
     DaxQueryClient,
+    build_table_expression,
     escape_column_reference,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.services.rule_service import RuleRecord
 from app.validation.base import BaseValidator
@@ -61,10 +63,9 @@ class NullValidator(BaseValidator):
             cond_parts.append(f'TRIM({col_ref}) = ""')
         is_blank_expr = " || ".join(cond_parts)
 
-        # Base table expression
-        table_expr = tbl_name
-        if filter_cond and filter_cond.strip():
-            table_expr = f"FILTER({tbl_name}, {filter_cond.strip()})"
+        # Base table expression with filters applied
+        filters = extract_rule_filters(cfg)
+        table_expr = build_table_expression(rule.table_name, filters)
 
         # DAX query returning both TotalRows and BlankCount in one roundtrip
         query = (

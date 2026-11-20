@@ -302,7 +302,7 @@ class SheetSettingsPage(QWidget):
     def _build_sheet_table(self) -> QTableWidget:
         table = QTableWidget()
         table.setObjectName("SheetTable")
-        table.setColumnCount(9)
+        table.setColumnCount(13)
         table.setHorizontalHeaderLabels([
             "Sr.",
             "Enabled",
@@ -311,6 +311,10 @@ class SheetSettingsPage(QWidget):
             "Test to Do",
             "Table Name",
             "Column or Measure",
+            "Filter 1",
+            "Filter 2",
+            "Filter 3",
+            "Filter 4",
             "Test Rule & Settings ⚙️",
             "Action",
         ])
@@ -318,15 +322,20 @@ class SheetSettingsPage(QWidget):
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(False)
-        header.resizeSection(0, 42)   # Sr.
-        header.resizeSection(1, 60)   # Enabled
-        header.resizeSection(2, 180)  # Workspace
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Report / Dataset
-        header.resizeSection(4, 165)  # Test to Do
+        header.resizeSection(0, 38)   # Sr.
+        header.resizeSection(1, 55)   # Enabled
+        header.resizeSection(2, 140)  # Workspace
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(3, 170)  # Report / Dataset
+        header.resizeSection(4, 150)  # Test to Do
         header.resizeSection(5, 120)  # Table Name
-        header.resizeSection(6, 140)  # Column or Measure
-        header.resizeSection(7, 210)  # Settings
-        header.resizeSection(8, 48)   # Action
+        header.resizeSection(6, 130)  # Column or Measure
+        header.resizeSection(7, 130)  # Filter 1
+        header.resizeSection(8, 130)  # Filter 2
+        header.resizeSection(9, 130)  # Filter 3
+        header.resizeSection(10, 130) # Filter 4
+        header.resizeSection(11, 180) # Settings
+        header.resizeSection(12, 45)  # Action
 
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -585,22 +594,43 @@ class SheetSettingsPage(QWidget):
         )
         self.sheet_table.setCellWidget(row_idx, 6, col_combo)
 
-        # Col 7: ⚙️ Gear Rule Configuration Button
+        # Cols 7-10: Filter 1, Filter 2, Filter 3, Filter 4
+        filter_edits: list[QLineEdit] = []
+        for f_idx, col_num in enumerate(range(7, 11), start=1):
+            prop_name = f"filter_{f_idx}"
+            cur_val = getattr(dto, prop_name, "") or dto.config.get(prop_name, "") or ""
+            f_edit = QLineEdit(str(cur_val))
+            f_edit.setObjectName(f"FilterInput_{f_idx}")
+            f_edit.setPlaceholderText(f"Filter {f_idx} (e.g. 'Dates'[Year]=2024)")
+            f_edit.setToolTip(f"DAX filter condition {f_idx} passed to CALCULATE / CALCULATETABLE (e.g. 'Table'[Col] = \"Val\")")
+            f_edit.setStyleSheet(
+                "QLineEdit { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 3px; "
+                "padding: 2px 5px; font-size: 11px; font-family: Consolas, 'Courier New', monospace; color: #0F172A; } "
+                "QLineEdit:focus { border: 1px solid #1668DC; background: #F8FAFC; } "
+                "QLineEdit:disabled { background: #F1F5F9; color: #94A3B8; border-color: #E2E8F0; }"
+            )
+            f_edit.textChanged.connect(
+                lambda txt, r=dto, p=prop_name: self._on_row_filter_changed(txt, r, p)
+            )
+            self.sheet_table.setCellWidget(row_idx, col_num, f_edit)
+            filter_edits.append(f_edit)
+
+        # Col 11: ⚙️ Gear Rule Configuration Button
         btn_gear = QPushButton(f"⚙️  {dto.conditions_summary}")
         btn_gear.setObjectName("SheetCellGear")
         btn_gear.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_gear.clicked.connect(
             lambda _, b=btn_gear, r=dto: self._open_gear_dialog(b, r)
         )
-        self.sheet_table.setCellWidget(row_idx, 7, btn_gear)
+        self.sheet_table.setCellWidget(row_idx, 11, btn_gear)
 
-        # Col 8: Action Delete Button
+        # Col 12: Action Delete Button
         btn_del = QPushButton("🗑️")
         btn_del.setObjectName("SheetCellDelete")
         btn_del.setToolTip("Delete this rule row")
         btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_del.clicked.connect(lambda _, r=dto, idx=row_idx: self._handle_delete_row(r, idx))
-        self.sheet_table.setCellWidget(row_idx, 8, btn_del)
+        self.sheet_table.setCellWidget(row_idx, 12, btn_del)
 
         self.sheet_table.setRowHeight(row_idx, 32)
 
@@ -622,11 +652,11 @@ class SheetSettingsPage(QWidget):
             lambda txt, r=dto: self._on_row_column_measure_changed(txt, r)
         )
         test_combo.currentIndexChanged.connect(
-            lambda _, tc=test_combo, ti=tbl_combo, ci=col_combo, bg=btn_gear, r=dto: self._on_test_type_changed(
-                tc, ti, ci, bg, r
+            lambda _, tc=test_combo, ti=tbl_combo, ci=col_combo, fe=filter_edits, bg=btn_gear, r=dto: self._on_test_type_changed(
+                tc, ti, ci, fe, bg, r
             )
         )
-        self._apply_test_type_rules(test_combo.currentData(), tbl_combo, col_combo)
+        self._apply_test_type_rules(test_combo.currentData(), tbl_combo, col_combo, filter_edits)
 
     # =========================================================================
     # Cascading Dropdowns & Control Handlers
@@ -987,6 +1017,15 @@ class SheetSettingsPage(QWidget):
         if dto.column_name != old_col or dto.measure_name != old_meas:
             self._mark_dirty()
 
+    def _on_row_filter_changed(self, txt: str, dto: SheetRowDTO, prop_name: str) -> None:
+        clean = txt.strip()
+        setattr(dto, prop_name, clean)
+        if clean:
+            dto.config[prop_name] = clean
+        else:
+            dto.config.pop(prop_name, None)
+        self._mark_dirty()
+
     def _on_col_measure_changed(self, txt: str, dto: SheetRowDTO) -> None:
         raw = txt.strip()
         if dto.validation_type == VALIDATION_TYPE_DAX_MEASURE or (raw.startswith("[") and raw.endswith("]")):
@@ -1001,6 +1040,7 @@ class SheetSettingsPage(QWidget):
         test_combo: QComboBox,
         tbl_combo: QWidget,
         col_combo: QWidget,
+        filter_edits: list[QLineEdit] | None,
         btn_gear: QPushButton,
         dto: SheetRowDTO,
     ) -> None:
@@ -1009,7 +1049,7 @@ class SheetSettingsPage(QWidget):
             dto.validation_type = new_vtype
             self._mark_dirty()
 
-            self._apply_test_type_rules(new_vtype, tbl_combo, col_combo)
+            self._apply_test_type_rules(new_vtype, tbl_combo, col_combo, filter_edits)
 
             if isinstance(col_combo, EditableCellCombo):
                 self._populate_column_measure_combo(
@@ -1031,7 +1071,13 @@ class SheetSettingsPage(QWidget):
 
             btn_gear.setText(f"⚙️  {dto.conditions_summary}")
 
-    def _apply_test_type_rules(self, vtype: str, tbl_input: QWidget, col_input: QWidget) -> None:
+    def _apply_test_type_rules(
+        self,
+        vtype: str,
+        tbl_input: QWidget,
+        col_input: QWidget,
+        filter_edits: list[QLineEdit] | None = None,
+    ) -> None:
         if vtype == VALIDATION_TYPE_REFRESH:
             tbl_input.setEnabled(False)
             if hasattr(tbl_input, "setPlaceholderText"):
@@ -1039,6 +1085,10 @@ class SheetSettingsPage(QWidget):
             col_input.setEnabled(False)
             if hasattr(col_input, "setPlaceholderText"):
                 col_input.setPlaceholderText("— (Model SLA)")
+            if filter_edits:
+                for fe in filter_edits:
+                    fe.setEnabled(False)
+                    fe.setPlaceholderText("— (N/A)")
         elif vtype == VALIDATION_TYPE_DAX_MEASURE:
             tbl_input.setEnabled(False)
             if hasattr(tbl_input, "setPlaceholderText"):
@@ -1046,6 +1096,10 @@ class SheetSettingsPage(QWidget):
             col_input.setEnabled(True)
             if hasattr(col_input, "setPlaceholderText"):
                 col_input.setPlaceholderText("Measure, e.g. [Sales]")
+            if filter_edits:
+                for idx, fe in enumerate(filter_edits, start=1):
+                    fe.setEnabled(True)
+                    fe.setPlaceholderText(f"Filter {idx} (e.g. 'Dates'[Year]=2024)")
         else:
             tbl_input.setEnabled(True)
             if hasattr(tbl_input, "setPlaceholderText"):
@@ -1053,6 +1107,10 @@ class SheetSettingsPage(QWidget):
             col_input.setEnabled(True)
             if hasattr(col_input, "setPlaceholderText"):
                 col_input.setPlaceholderText("Column, e.g. Amount")
+            if filter_edits:
+                for idx, fe in enumerate(filter_edits, start=1):
+                    fe.setEnabled(True)
+                    fe.setPlaceholderText(f"Filter {idx} (e.g. 'Dates'[Year]=2024)")
 
     def _open_gear_dialog(self, btn_gear: QPushButton, dto: SheetRowDTO) -> None:
         dialog = SheetRuleConfigDialog(
@@ -1454,6 +1512,10 @@ class SheetSettingsPage(QWidget):
                 "Test to Do",
                 "Table Name",
                 "Column or Measure",
+                "Filter 1",
+                "Filter 2",
+                "Filter 3",
+                "Filter 4",
                 "Conditions Summary",
             ])
             for r in self._rows:
@@ -1467,6 +1529,10 @@ class SheetSettingsPage(QWidget):
                     r.validation_type_display,
                     r.table_name or "",
                     r.measure_name or r.column_name or "",
+                    r.filter_1 or "",
+                    r.filter_2 or "",
+                    r.filter_3 or "",
+                    r.filter_4 or "",
                     r.conditions_summary,
                 ])
 
@@ -1491,6 +1557,10 @@ class SheetSettingsPage(QWidget):
             "Test to Do",
             "Table Name",
             "Column or Measure",
+            "Filter 1",
+            "Filter 2",
+            "Filter 3",
+            "Filter 4",
             "Conditions Summary",
         ]
         ws.append(headers)
@@ -1510,6 +1580,10 @@ class SheetSettingsPage(QWidget):
                 r.validation_type_display,
                 r.table_name or "",
                 r.measure_name or r.column_name or "",
+                r.filter_1 or "",
+                r.filter_2 or "",
+                r.filter_3 or "",
+                r.filter_4 or "",
                 r.conditions_summary,
             ])
 
@@ -1577,6 +1651,20 @@ class SheetSettingsPage(QWidget):
         target = str(item.get("Column or Measure", "") or "").strip()
         is_measure = vtype == VALIDATION_TYPE_DAX_MEASURE or (target.startswith("[") and target.endswith("]"))
 
+        f1 = str(item.get("Filter 1", "") or "").strip()
+        f2 = str(item.get("Filter 2", "") or "").strip()
+        f3 = str(item.get("Filter 3", "") or "").strip()
+        f4 = str(item.get("Filter 4", "") or "").strip()
+        cfg: dict[str, Any] = {}
+        if f1:
+            cfg["filter_1"] = f1
+        if f2:
+            cfg["filter_2"] = f2
+        if f3:
+            cfg["filter_3"] = f3
+        if f4:
+            cfg["filter_4"] = f4
+
         return SheetRowDTO(
             sr_no=len(self._rows) + 1,
             enabled=str(item.get("Enabled", "TRUE")).strip().upper() != "FALSE",
@@ -1589,7 +1677,11 @@ class SheetSettingsPage(QWidget):
             table_name=str(item.get("Table Name", "") or "").strip() or None,
             column_name=None if is_measure else (target or None),
             measure_name=target.strip("[]") if is_measure else None,
-            config={},
+            filter_1=f1,
+            filter_2=f2,
+            filter_3=f3,
+            filter_4=f4,
+            config=cfg,
         )
 
     # =========================================================================
@@ -1607,7 +1699,7 @@ class SheetSettingsPage(QWidget):
                 continue
 
             r = self._rows[row_idx]
-            blob = f"{r.workspace_name} {r.report_name} {r.validation_type_display} {r.table_name} {r.column_name} {r.measure_name} {r.conditions_summary}".lower()
+            blob = f"{r.workspace_name} {r.report_name} {r.validation_type_display} {r.table_name} {r.column_name} {r.measure_name} {r.filter_1} {r.filter_2} {r.filter_3} {r.filter_4} {r.conditions_summary}".lower()
             self.sheet_table.setRowHidden(row_idx, q not in blob)
 
     def _update_stats_label(self) -> None:

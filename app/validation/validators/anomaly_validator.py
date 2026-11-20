@@ -11,9 +11,11 @@ from app.database.models import utc_now
 from app.integrations.powerbi.dax_client import (
     DaxQueryClient,
     build_measure_query,
+    build_table_expression,
     escape_column_reference,
     escape_measure_name,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.services.rule_service import RuleRecord, TARGET_TYPE_MEASURE
 from app.validation.base import BaseValidator
@@ -55,8 +57,8 @@ class AnomalyValidator(BaseValidator):
                     started_at=t_start,
                 )
             target_name = escape_measure_name(rule.measure_name)
-            filter_context = cfg.get("filter_context") or cfg.get("filter_condition")
-            query = build_measure_query(target_name, filter_context=filter_context)
+            filters = extract_rule_filters(cfg)
+            query = build_measure_query(target_name, filters=filters)
         else:
             if not rule.table_name or not rule.column_name:
                 return CheckEvaluationResult.create_error(
@@ -70,10 +72,8 @@ class AnomalyValidator(BaseValidator):
             agg = str(cfg.get("aggregation_func", "SUM")).strip().upper()
             tbl_name = escape_table_name(rule.table_name)
             col_ref = escape_column_reference(rule.column_name, rule.table_name)
-            filter_cond = cfg.get("filter_condition")
-            table_expr = tbl_name
-            if filter_cond and filter_cond.strip():
-                table_expr = f"FILTER({tbl_name}, {filter_cond.strip()})"
+            filters = extract_rule_filters(cfg)
+            table_expr = build_table_expression(rule.table_name, filters)
             target_name = f"{agg}({col_ref})"
             query = f'EVALUATE ROW("Value", {agg}X({table_expr}, {col_ref}))' if agg in ("SUM", "AVERAGE", "MIN", "MAX") else f'EVALUATE ROW("Value", {agg}({col_ref}))'
 

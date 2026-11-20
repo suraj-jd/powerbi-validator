@@ -113,11 +113,17 @@ def test_sheet_settings_page_initial_ui(qtbot, db: DatabaseManager, sample_regis
     assert "Export..." in page.btn_export.text()
 
     # Table columns
-    assert page.sheet_table.columnCount() == 9
+    assert page.sheet_table.columnCount() == 13
     assert page.sheet_table.horizontalHeaderItem(0).text() == "Sr."
     assert page.sheet_table.horizontalHeaderItem(2).text() == "Workspace"
     assert page.sheet_table.horizontalHeaderItem(4).text() == "Test to Do"
-    assert page.sheet_table.horizontalHeaderItem(7).text() == "Test Rule & Settings ⚙️"
+    assert page.sheet_table.horizontalHeaderItem(6).text() == "Column or Measure"
+    assert page.sheet_table.horizontalHeaderItem(7).text() == "Filter 1"
+    assert page.sheet_table.horizontalHeaderItem(8).text() == "Filter 2"
+    assert page.sheet_table.horizontalHeaderItem(9).text() == "Filter 3"
+    assert page.sheet_table.horizontalHeaderItem(10).text() == "Filter 4"
+    assert page.sheet_table.horizontalHeaderItem(11).text() == "Test Rule & Settings ⚙️"
+    assert page.sheet_table.horizontalHeaderItem(12).text() == "Action"
 
 
 def test_sheet_settings_page_add_and_save_flow(qtbot, db: DatabaseManager, sample_registration: int) -> None:
@@ -172,8 +178,8 @@ def test_sheet_settings_page_row_deletion(qtbot, db: DatabaseManager, sample_reg
 
     assert page.sheet_table.rowCount() == 1
 
-    # Click row delete button in column 8
-    btn_del = page.sheet_table.cellWidget(0, 8)
+    # Click row delete button in column 12
+    btn_del = page.sheet_table.cellWidget(0, 12)
     assert isinstance(btn_del, QPushButton)
     qtbot.mouseClick(btn_del, Qt.MouseButton.LeftButton)
 
@@ -478,6 +484,47 @@ def test_sheet_settings_cascading_metadata_dropdowns(qtbot, db: DatabaseManager)
     # Column/Measure combo should now be populated with discovered measures
     assert col_combo.count() == 1
     assert col_combo.itemText(0) == "[Total Revenue]"
+
+
+def test_sheet_settings_filters_flow(qtbot, db: DatabaseManager, sample_registration: int) -> None:
+    page = SheetSettingsPage(db=db)
+    qtbot.addWidget(page)
+    page.show()
+
+    qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
+    assert page.sheet_table.rowCount() == 1
+
+    f1 = page.sheet_table.cellWidget(0, 7)
+    f2 = page.sheet_table.cellWidget(0, 8)
+    f3 = page.sheet_table.cellWidget(0, 9)
+    f4 = page.sheet_table.cellWidget(0, 10)
+
+    assert isinstance(f1, QLineEdit)
+    assert isinstance(f2, QLineEdit)
+    assert isinstance(f3, QLineEdit)
+    assert isinstance(f4, QLineEdit)
+
+    tbl_input = page.sheet_table.cellWidget(0, 5)
+    col_input = page.sheet_table.cellWidget(0, 6)
+    tbl_input.setText("Orders")
+    col_input.setText("OrderID")
+
+    f1.setText("'Dates'[Year] = 2024")
+    f2.setText("'Geography'[Country] = \"US\"")
+    f3.setText("'Product'[Category] = \"Bikes\"")
+    f4.setText("'Sales'[Status] = \"Active\"")
+
+    qtbot.mouseClick(page.btn_save_sheet, Qt.MouseButton.LeftButton)
+
+    # Verify persistence
+    sheet_service = SheetService(db=db)
+    rows = sheet_service.load_sheet_rows()
+    assert len(rows) == 1
+    assert rows[0].filter_1 == "'Dates'[Year] = 2024"
+    assert rows[0].filter_2 == "'Geography'[Country] = \"US\""
+    assert rows[0].filter_3 == "'Product'[Category] = \"Bikes\""
+    assert rows[0].filter_4 == "'Sales'[Status] = \"Active\""
+    assert rows[0].config["filter_1"] == "'Dates'[Year] = 2024"
 
 
 

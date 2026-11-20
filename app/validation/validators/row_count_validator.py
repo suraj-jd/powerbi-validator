@@ -9,7 +9,9 @@ from app.core.status import ValidationStatus
 from app.database.models import utc_now
 from app.integrations.powerbi.dax_client import (
     DaxQueryClient,
+    build_table_expression,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.services.rule_service import RuleRecord
 from app.validation.base import BaseValidator
@@ -48,9 +50,8 @@ class RowCountValidator(BaseValidator):
         baseline_method = str(cfg.get("baseline_method", "fixed")).strip().lower()
         allowed_dev_pct = float(cfg.get("allowed_deviation_pct", 5.0))
 
-        table_expr = tbl_name
-        if filter_cond and filter_cond.strip():
-            table_expr = f"FILTER({tbl_name}, {filter_cond.strip()})"
+        filters = extract_rule_filters(cfg)
+        table_expr = build_table_expression(rule.table_name, filters)
 
         query = f'EVALUATE ROW("RowCount", COUNTROWS({table_expr}))'
 

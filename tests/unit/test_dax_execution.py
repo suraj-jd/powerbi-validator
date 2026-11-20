@@ -12,10 +12,12 @@ from app.integrations.powerbi.dax_client import (
     RestExecuteQueriesConnector,
     XmlaAdomdConnector,
     build_measure_query,
+    build_table_expression,
     build_test_query,
     escape_column_reference,
     escape_measure_name,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.integrations.powerbi.rest_client import PowerBIHttpError
 from app.services.dax_service import DaxQueryService
@@ -59,6 +61,17 @@ def test_safe_dax_identifiers_and_queries() -> None:
 
     # 5. Minimal test probe query
     assert build_test_query() == 'EVALUATE ROW("TestValue", 1)'
+
+    # 6. Multiple filters in build_measure_query (Filter 1, 2, 3, 4)
+    q_multi = build_measure_query("Total Revenue", filters=["'Dates'[Year] = 2024", "'Region'[Country] = \"US\""])
+    assert q_multi == 'EVALUATE ROW("Value", CALCULATE([Total Revenue], \'Dates\'[Year] = 2024, \'Region\'[Country] = "US"))'
+
+    # 7. extract_rule_filters
+    cfg = {"filter_1": "Dates[Year] = 2024", "filter_2": "Customer[Segment] = \"Consumer\"", "filter_3": "", "filter_4": None}
+    assert extract_rule_filters(cfg) == ["Dates[Year] = 2024", "Customer[Segment] = \"Consumer\""]
+
+    # 8. build_table_expression
+    assert build_table_expression("Sales", ["Dates[Year] = 2024"]) == "CALCULATETABLE('Sales', Dates[Year] = 2024)"
 
 
 def test_dax_result_parser_distinguishes_blank_from_zero() -> None:

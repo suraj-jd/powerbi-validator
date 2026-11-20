@@ -253,6 +253,7 @@ class AboutPage(QWidget):
                     "Select your target Workspace and Report / Dataset from the dropdowns.",
                     "Choose the Test to Do (Null, Duplicate, Freshness, Row Count, Refresh SLA, DAX Measure, or Anomaly).",
                     "Pick the target Table Name and Column or Measure directly from the cascading dropdown list.",
+                    "Filter 1, 2, 3, 4: Specify up to four DAX filter expressions (e.g. 'Dates'[Year] = 2024, 'Customer'[Country] = \"US\") applied directly inside CALCULATE / CALCULATETABLE.",
                     "Non-technical: All technical GUIDs and dataset IDs are linked automatically in the background.",
                 ],
                 tip="Dropdowns are editable! You can pick from discovered Power BI tables/columns or type custom names freely.",

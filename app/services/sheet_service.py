@@ -107,6 +107,20 @@ class SheetRowDTO:
     measure_name: str | None = None
     config: dict[str, Any] = field(default_factory=dict)
     rule_name: str | None = None
+    filter_1: str = ""
+    filter_2: str = ""
+    filter_3: str = ""
+    filter_4: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.filter_1 and "filter_1" in self.config:
+            self.filter_1 = str(self.config["filter_1"] or "")
+        if not self.filter_2 and "filter_2" in self.config:
+            self.filter_2 = str(self.config["filter_2"] or "")
+        if not self.filter_3 and "filter_3" in self.config:
+            self.filter_3 = str(self.config["filter_3"] or "")
+        if not self.filter_4 and "filter_4" in self.config:
+            self.filter_4 = str(self.config["filter_4"] or "")
 
     @property
     def target_type(self) -> str:
@@ -159,6 +173,10 @@ class SheetRowDTO:
             "table_name": self.table_name or "",
             "column_name": self.column_name or "",
             "measure_name": self.measure_name or "",
+            "filter_1": self.filter_1 or "",
+            "filter_2": self.filter_2 or "",
+            "filter_3": self.filter_3 or "",
+            "filter_4": self.filter_4 or "",
             "target_display": self.target_display,
             "conditions_summary": self.conditions_summary,
             "rule_name": self.effective_rule_name(),
@@ -221,6 +239,10 @@ class SheetService:
                     measure_name=rule.measure_name,
                     config=dict(rule.config),
                     rule_name=rule.rule_name,
+                    filter_1=str(rule.config.get("filter_1", "") or ""),
+                    filter_2=str(rule.config.get("filter_2", "") or ""),
+                    filter_3=str(rule.config.get("filter_3", "") or ""),
+                    filter_4=str(rule.config.get("filter_4", "") or ""),
                 )
                 rows.append(dto)
                 sr_counter += 1
@@ -269,6 +291,20 @@ class SheetService:
 
         rule_name = row.effective_rule_name()
         target_type = infer_target_type(row.validation_type, row.column_name, row.measure_name)
+
+        # Synchronize filter_1..4 into row.config for persistence
+        cfg_dict = dict(row.config)
+        for f_key, f_val in [
+            ("filter_1", row.filter_1),
+            ("filter_2", row.filter_2),
+            ("filter_3", row.filter_3),
+            ("filter_4", row.filter_4),
+        ]:
+            if f_val and str(f_val).strip():
+                cfg_dict[f_key] = str(f_val).strip()
+            elif f_key in cfg_dict and not str(f_val or "").strip():
+                cfg_dict.pop(f_key, None)
+        row.config = cfg_dict
 
         rule_input = RuleInput(
             workspace_registration_id=reg.id,

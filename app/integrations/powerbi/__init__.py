@@ -7,10 +7,12 @@ from app.integrations.powerbi.dax_client import (
     RestExecuteQueriesConnector,
     XmlaAdomdConnector,
     build_measure_query,
+    build_table_expression,
     build_test_query,
     escape_column_reference,
     escape_measure_name,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.integrations.powerbi.dataset_client import DatasetClient
 from app.integrations.powerbi.metadata_client import MetadataClient

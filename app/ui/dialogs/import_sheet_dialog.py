@@ -520,6 +520,20 @@ class ImportSheetDialog(QDialog):
         sr_str = _get_val("SR", "Sr.", "Sr", "Row")
         sr_no = int(sr_str) if sr_str.isdigit() else 1
 
+        f1 = _get_val("Filter 1", "Filter1", "Filter_1")
+        f2 = _get_val("Filter 2", "Filter2", "Filter_2")
+        f3 = _get_val("Filter 3", "Filter3", "Filter_3")
+        f4 = _get_val("Filter 4", "Filter4", "Filter_4")
+        cfg: dict[str, Any] = {}
+        if f1:
+            cfg["filter_1"] = f1
+        if f2:
+            cfg["filter_2"] = f2
+        if f3:
+            cfg["filter_3"] = f3
+        if f4:
+            cfg["filter_4"] = f4
+
         return SheetRowDTO(
             sr_no=sr_no,
             enabled=enabled,
@@ -532,5 +546,9 @@ class ImportSheetDialog(QDialog):
             table_name=tbl,
             column_name=col,
             measure_name=meas,
-            config={},
+            filter_1=f1,
+            filter_2=f2,
+            filter_3=f3,
+            filter_4=f4,
+            config=cfg,
         )

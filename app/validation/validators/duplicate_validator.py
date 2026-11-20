@@ -9,8 +9,10 @@ from app.core.status import ValidationStatus
 from app.database.models import utc_now
 from app.integrations.powerbi.dax_client import (
     DaxQueryClient,
+    build_table_expression,
     escape_column_reference,
     escape_table_name,
+    extract_rule_filters,
 )
 from app.services.rule_service import RuleRecord
 from app.validation.base import BaseValidator
@@ -66,10 +68,9 @@ class DuplicateValidator(BaseValidator):
         allowed_count = int(cfg.get("allowed_duplicate_count", 0))
         allowed_pct = float(cfg.get("allowed_duplicate_percentage", 0.0))
 
-        # Base table expression
-        table_expr = tbl_name
-        if filter_cond and filter_cond.strip():
-            table_expr = f"FILTER({tbl_name}, {filter_cond.strip()})"
+        # Base table expression with filters applied
+        filters = extract_rule_filters(cfg)
+        table_expr = build_table_expression(rule.table_name, filters)
 
         col_refs = [escape_column_reference(col, rule.table_name) for col in key_columns]
         summarize_cols = ", ".join(col_refs)

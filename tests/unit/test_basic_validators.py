@@ -70,6 +70,24 @@ def test_null_validator_passes_when_under_threshold():
     assert res.duration_ms == 25
 
 
+def test_null_validator_with_filters():
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows(
+        [{"[TotalRows]": 100, "[BlankCount]": 0}], duration_ms=25
+    )
+
+    validator = NullValidator()
+    rule = _make_rule(
+        VALIDATION_TYPE_NULL,
+        config={"allowed_blank_count": 0, "filter_1": "'Dates'[Year] = 2024", "filter_2": "'Region'[Country] = \"US\""},
+    )
+
+    res = validator.validate(rule=rule, dax_client=client, workspace_id="ws1", dataset_id="ds1")
+    assert res.status == ValidationStatus.PASS
+    executed_query = client.execute_raw_dax.call_args[0][2]
+    assert "CALCULATETABLE('Sales', 'Dates'[Year] = 2024, 'Region'[Country] = \"US\")" in executed_query
+
+
 def test_null_validator_fails_when_count_exceeded():
     client = MagicMock(spec=DaxQueryClient)
     client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows(

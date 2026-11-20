@@ -11,6 +11,7 @@ from app.integrations.powerbi.dax_client import (
     DaxQueryClient,
     build_measure_query,
     escape_measure_name,
+    extract_rule_filters,
 )
 from app.services.rule_service import RuleRecord
 from app.validation.base import BaseValidator
@@ -46,12 +47,13 @@ class DaxMeasureValidator(BaseValidator):
 
         cfg = rule.config or {}
         filter_context = cfg.get("filter_context") or cfg.get("filter_condition")
+        filters = extract_rule_filters(cfg)
         expected_method = str(cfg.get("expected_method", "fixed")).strip().lower()
         allowed_dev_pct = float(cfg.get("allowed_deviation_pct", 5.0))
         allowed_dev_abs = float(cfg["allowed_deviation_abs"]) if "allowed_deviation_abs" in cfg and cfg["allowed_deviation_abs"] is not None else None
 
         clean_measure = escape_measure_name(rule.measure_name, rule.table_name)
-        query = build_measure_query(clean_measure, filter_context=filter_context)
+        query = build_measure_query(clean_measure, filter_context=filter_context, filters=filters)
 
         dax_res = dax_client.execute_raw_dax(workspace_id, dataset_id, query)
         now = utc_now()

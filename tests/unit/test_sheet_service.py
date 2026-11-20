@@ -125,3 +125,7 @@ def test_sheet_service_crud_flow(db: DatabaseManager) -> None:
     assert len(dicts) == 1
     assert dicts[0]["workspace_name"] == "Finance Workspace"
     assert dicts[0]["validation_type"] == VALIDATION_TYPE_REFRESH
+    assert "filter_1" in dicts[0]
+    assert "filter_2" in dicts[0]
+    assert "filter_3" in dicts[0]
+    assert "filter_4" in dicts[0]

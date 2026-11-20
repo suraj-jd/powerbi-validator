@@ -130,6 +130,27 @@ def test_dax_measure_fixed_baseline_passes():
     assert "2.50% deviation" in res.deviation
 
 
+def test_dax_measure_executes_with_filters():
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 500.0}], duration_ms=25)
+
+    validator = DaxMeasureValidator()
+    rule = _make_measure_rule({
+        "expected_value": 500.0,
+        "filter_1": "'Dates'[Year] = 2024",
+        "filter_2": "'Region'[Country] = \"US\"",
+        "filter_3": "'Product'[Category] = \"Bikes\"",
+    })
+
+    res = validator.validate(rule=rule, dax_client=client, workspace_id="ws1", dataset_id="ds1")
+    assert res.status == ValidationStatus.PASS
+    executed_query = client.execute_raw_dax.call_args[0][2]
+    assert "CALCULATE(" in executed_query
+    assert "'Dates'[Year] = 2024" in executed_query
+    assert "'Region'[Country] = \"US\"" in executed_query
+    assert "'Product'[Category] = \"Bikes\"" in executed_query
+
+
 def test_dax_measure_fixed_baseline_fails_deviation():
     client = MagicMock(spec=DaxQueryClient)
     client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 1200.0}], duration_ms=25)
