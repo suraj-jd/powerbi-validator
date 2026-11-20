@@ -520,10 +520,10 @@ class ImportSheetDialog(QDialog):
         sr_str = _get_val("SR", "Sr.", "Sr", "Row")
         sr_no = int(sr_str) if sr_str.isdigit() else 1
 
-        f1 = _get_val("Filter 1", "Filter1", "Filter_1")
-        f2 = _get_val("Filter 2", "Filter2", "Filter_2")
-        f3 = _get_val("Filter 3", "Filter3", "Filter_3")
-        f4 = _get_val("Filter 4", "Filter4", "Filter_4")
+        f1 = _get_val("Filter 1 (Opt)", "Filter 1 (Optional)", "Filter 1", "Filter1", "Filter_1")
+        f2 = _get_val("Filter 2 (Opt)", "Filter 2 (Optional)", "Filter 2", "Filter2", "Filter_2")
+        f3 = _get_val("Filter 3 (Opt)", "Filter 3 (Optional)", "Filter 3", "Filter3", "Filter_3")
+        f4 = _get_val("Filter 4 (Opt)", "Filter 4 (Optional)", "Filter 4", "Filter4", "Filter_4")
         cfg: dict[str, Any] = {}
         if f1:
             cfg["filter_1"] = f1

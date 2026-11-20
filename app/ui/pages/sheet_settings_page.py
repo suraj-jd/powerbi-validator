@@ -311,10 +311,10 @@ class SheetSettingsPage(QWidget):
             "Test to Do",
             "Table Name",
             "Column or Measure",
-            "Filter 1",
-            "Filter 2",
-            "Filter 3",
-            "Filter 4",
+            "Filter 1 (Opt)",
+            "Filter 2 (Opt)",
+            "Filter 3 (Opt)",
+            "Filter 4 (Opt)",
             "Test Rule & Settings ⚙️",
             "Action",
         ])
@@ -601,8 +601,8 @@ class SheetSettingsPage(QWidget):
             cur_val = getattr(dto, prop_name, "") or dto.config.get(prop_name, "") or ""
             f_edit = QLineEdit(str(cur_val))
             f_edit.setObjectName(f"FilterInput_{f_idx}")
-            f_edit.setPlaceholderText(f"Filter {f_idx} (e.g. 'Dates'[Year]=2024)")
-            f_edit.setToolTip(f"DAX filter condition {f_idx} passed to CALCULATE / CALCULATETABLE (e.g. 'Table'[Col] = \"Val\")")
+            f_edit.setPlaceholderText(f"Filter {f_idx} (Optional)")
+            f_edit.setToolTip(f"Optional DAX filter condition {f_idx} for CALCULATE (e.g. 'Dates'[Year] = 2024). Leave blank if not needed.")
             f_edit.setStyleSheet(
                 "QLineEdit { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 3px; "
                 "padding: 2px 5px; font-size: 11px; font-family: Consolas, 'Courier New', monospace; color: #0F172A; } "
@@ -1099,7 +1099,7 @@ class SheetSettingsPage(QWidget):
             if filter_edits:
                 for idx, fe in enumerate(filter_edits, start=1):
                     fe.setEnabled(True)
-                    fe.setPlaceholderText(f"Filter {idx} (e.g. 'Dates'[Year]=2024)")
+                    fe.setPlaceholderText(f"Filter {idx} (Optional)")
         else:
             tbl_input.setEnabled(True)
             if hasattr(tbl_input, "setPlaceholderText"):
@@ -1110,7 +1110,7 @@ class SheetSettingsPage(QWidget):
             if filter_edits:
                 for idx, fe in enumerate(filter_edits, start=1):
                     fe.setEnabled(True)
-                    fe.setPlaceholderText(f"Filter {idx} (e.g. 'Dates'[Year]=2024)")
+                    fe.setPlaceholderText(f"Filter {idx} (Optional)")
 
     def _open_gear_dialog(self, btn_gear: QPushButton, dto: SheetRowDTO) -> None:
         dialog = SheetRuleConfigDialog(
@@ -1651,10 +1651,10 @@ class SheetSettingsPage(QWidget):
         target = str(item.get("Column or Measure", "") or "").strip()
         is_measure = vtype == VALIDATION_TYPE_DAX_MEASURE or (target.startswith("[") and target.endswith("]"))
 
-        f1 = str(item.get("Filter 1", "") or "").strip()
-        f2 = str(item.get("Filter 2", "") or "").strip()
-        f3 = str(item.get("Filter 3", "") or "").strip()
-        f4 = str(item.get("Filter 4", "") or "").strip()
+        f1 = str(item.get("Filter 1 (Opt)") or item.get("Filter 1 (Optional)") or item.get("Filter 1") or "").strip()
+        f2 = str(item.get("Filter 2 (Opt)") or item.get("Filter 2 (Optional)") or item.get("Filter 2") or "").strip()
+        f3 = str(item.get("Filter 3 (Opt)") or item.get("Filter 3 (Optional)") or item.get("Filter 3") or "").strip()
+        f4 = str(item.get("Filter 4 (Opt)") or item.get("Filter 4 (Optional)") or item.get("Filter 4") or "").strip()
         cfg: dict[str, Any] = {}
         if f1:
             cfg["filter_1"] = f1

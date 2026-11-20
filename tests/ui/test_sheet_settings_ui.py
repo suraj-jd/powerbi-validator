@@ -157,10 +157,10 @@ def test_sheet_settings_page_initial_ui(qtbot, db: DatabaseManager, sample_regis
     assert page.sheet_table.horizontalHeaderItem(2).text() == "Workspace"
     assert page.sheet_table.horizontalHeaderItem(4).text() == "Test to Do"
     assert page.sheet_table.horizontalHeaderItem(6).text() == "Column or Measure"
-    assert page.sheet_table.horizontalHeaderItem(7).text() == "Filter 1"
-    assert page.sheet_table.horizontalHeaderItem(8).text() == "Filter 2"
-    assert page.sheet_table.horizontalHeaderItem(9).text() == "Filter 3"
-    assert page.sheet_table.horizontalHeaderItem(10).text() == "Filter 4"
+    assert "Filter 1" in page.sheet_table.horizontalHeaderItem(7).text()
+    assert "Filter 2" in page.sheet_table.horizontalHeaderItem(8).text()
+    assert "Filter 3" in page.sheet_table.horizontalHeaderItem(9).text()
+    assert "Filter 4" in page.sheet_table.horizontalHeaderItem(10).text()
     assert page.sheet_table.horizontalHeaderItem(11).text() == "Test Rule & Settings ⚙️"
     assert page.sheet_table.horizontalHeaderItem(12).text() == "Action"
 
@@ -564,6 +564,47 @@ def test_sheet_settings_filters_flow(qtbot, db: DatabaseManager, sample_registra
     assert rows[0].filter_3 == "'Product'[Category] = \"Bikes\""
     assert rows[0].filter_4 == "'Sales'[Status] = \"Active\""
     assert rows[0].config["filter_1"] == "'Dates'[Year] = 2024"
+
+
+def test_sheet_filters_optional_and_backend_unmanipulated(qtbot, db: DatabaseManager, sample_registration: int) -> None:
+    from app.integrations.powerbi.dax_client import build_measure_query, extract_rule_filters
+
+    page = SheetSettingsPage(db=db)
+    qtbot.addWidget(page)
+    page.show()
+
+    # 1. Add row with NO filters (all optional left blank)
+    qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
+    tbl_input = page.sheet_table.cellWidget(0, 5)
+    col_input = page.sheet_table.cellWidget(0, 6)
+    tbl_input.setText("Orders")
+    col_input.setText("Revenue")
+
+    # Leave Filter 1..4 completely empty
+    f1 = page.sheet_table.cellWidget(0, 7)
+    assert f1.text() == ""
+    assert "Optional" in f1.placeholderText()
+
+    # Save
+    qtbot.mouseClick(page.btn_save_sheet, Qt.MouseButton.LeftButton)
+
+    sheet_service = SheetService(db=db)
+    rows = sheet_service.load_sheet_rows()
+    assert len(rows) == 1
+    # Verify optional filters are empty and NOT in config
+    assert rows[0].filter_1 == ""
+    assert rows[0].filter_2 == ""
+    assert rows[0].filter_3 == ""
+    assert rows[0].filter_4 == ""
+    assert "filter_1" not in rows[0].config
+    assert "filter_2" not in rows[0].config
+
+    # Verify backend DAX execution is completely unmanipulated (no CALCULATE wrapper)
+    extracted = extract_rule_filters(rows[0].config)
+    assert extracted == []
+    query = build_measure_query("[Total Revenue]", filters=extracted)
+    assert query == 'EVALUATE ROW("Value", [Total Revenue])'
+    assert "CALCULATE" not in query
 
 
 
