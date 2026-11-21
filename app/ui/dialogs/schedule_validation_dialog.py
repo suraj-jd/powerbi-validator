@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, time
 import logging
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QPoint, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -40,6 +40,10 @@ class ToggleSwitch(QCheckBox):
         super().__init__(parent)
         self.setFixedSize(58, 28)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def hitButton(self, pos: QPoint) -> bool:
+        """Allow clicking anywhere on the full 58x28 switch capsule."""
+        return self.rect().contains(pos)
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -145,8 +149,10 @@ class ScheduleValidationDialog(QDialog):
 
         # 2. Master Toggle Row (Green/Red ON-OFF Switch)
         self.toggle_card = QFrame()
+        self.toggle_card.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_card.setStyleSheet(
-            "QFrame { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 7px; padding: 6px 12px; }"
+            "QFrame { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 7px; padding: 6px 12px; } "
+            "QFrame:hover { border-color: #CBD5E1; }"
         )
         t_lay = QHBoxLayout(self.toggle_card)
         t_lay.setContentsMargins(2, 2, 2, 2)
@@ -158,15 +164,16 @@ class ScheduleValidationDialog(QDialog):
 
         lbl_toggle_title = QLabel("Keep your validations up to date")
         lbl_toggle_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
-        lbl_toggle_title.setCursor(Qt.CursorShape.PointingHandCursor)
-        lbl_toggle_title.mousePressEvent = lambda _: self.chk_enabled.toggle()
+        lbl_toggle_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         t_lay.addWidget(lbl_toggle_title)
 
         lbl_toggle_sub = QLabel("(Executes in the background without requiring manual clicks)")
         lbl_toggle_sub.setStyleSheet("font-size: 11px; color: #64748B;")
+        lbl_toggle_sub.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         t_lay.addWidget(lbl_toggle_sub)
         t_lay.addStretch(1)
 
+        self.toggle_card.mousePressEvent = self._on_toggle_card_clicked
         layout.addWidget(self.toggle_card)
 
         # 3. Schedule Settings Card
@@ -338,8 +345,15 @@ class ScheduleValidationDialog(QDialog):
         if self._rule_count == 0:
             self.chk_enabled.setChecked(False)
             self.chk_enabled.setEnabled(False)
+            self.toggle_card.setCursor(Qt.CursorShape.ArrowCursor)
             self.btn_save.setEnabled(False)
             self.btn_save.setToolTip("Cannot activate scheduler: Validation Sheet is empty.")
+
+    def _on_toggle_card_clicked(self, event) -> None:
+        """Handle clicks on the master toggle card rectangle."""
+        if event.button() == Qt.MouseButton.LeftButton and self.chk_enabled.isEnabled():
+            self.chk_enabled.toggle()
+        event.accept()
 
     def _on_enabled_toggled(self, enabled: bool) -> None:
         """Enable or disable scheduling configuration widgets and style them in gray when OFF."""
