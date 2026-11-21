@@ -12,11 +12,7 @@ A local-first Windows desktop application for automating Power BI semantic model
 
 ## 🎬 Software Tour & Video Walkthrough
 
-<video src="docs/videos/powerbi-validator.mp4" controls width="100%"></video>
-
-> 📹 **Watch the end-to-end software tour:** Live walkthrough of Microsoft Entra ID sign-in, metadata discovery, spreadsheet-style test authoring, real-time DAX execution against Power BI, side-by-side run comparisons, and database maintenance.
-> 
-> *(Direct video file link: [docs/videos/powerbi-validator.mp4](docs/videos/powerbi-validator.mp4))*
+<video src="https://github.com/suraj-jd/powerbi-validator/raw/main/docs/videos/powerbi-validator.mp4" controls width="100%"></video>
 
 ---
 
