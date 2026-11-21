@@ -200,15 +200,22 @@ C:\Users\suraj\.venvs\powerbi-validation-tool\Scripts\Activate.ps1
 # 4. Install dependencies
 pip install -r requirements.txt
 
-# 5. Launch the application
+# 5. Launch the application (CLI)
 python -m app.main
 ```
+
+### 🚀 Double-Click Launch (No Terminal Required)
+You can launch the application directly without opening a terminal:
+* **Desktop Shortcut**: Double-click the **Power BI Validator** icon on your Desktop.
+* **Silent Launcher**: Double-click `Launch App.vbs` in the project root to start the app with zero console flicker.
+* **Batch Launcher**: Double-click `Launch App.bat` in the project root.
+* **Recreate Shortcut**: Run `create_desktop_shortcut.bat` at any time to generate a fresh Desktop shortcut.
 
 ---
 
 ## 🧪 Automated Testing
 
-Run the complete automated test suite (224 unit and UI tests):
+Run the complete automated test suite (255 unit and UI tests):
 
 ```powershell
 # Run all tests
