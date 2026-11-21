@@ -21,8 +21,8 @@ def test_teams_dialog_initial_state_and_toggle_clicks(qtbot):
     svc = TeamsAlertService(db=None)
     account = AuthAccount(
         home_account_id="id1",
-        display_name="Suraj jd",
-        username="cisam55573@exespay.com",
+        display_name="Alex Morgan",
+        username="alex.morgan@contoso.com",
         tenant_id="tenant-1",
         is_personal_account=False,
     )
@@ -31,7 +31,7 @@ def test_teams_dialog_initial_state_and_toggle_clicks(qtbot):
     qtbot.addWidget(dlg)
     dlg.show()
 
-    assert "Connected: cisam55573@exespay.com" in dlg.lbl_account_text.text()
+    assert "Connected: alex.morgan@contoso.com" in dlg.lbl_account_text.text()
     assert dlg.chk_enabled.isChecked() is False
     assert dlg.settings_card.isEnabled() is False
 

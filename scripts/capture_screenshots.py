@@ -11,8 +11,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtGui import QFontMetrics, QPainter, QPixmap
+from PySide6.QtWidgets import QApplication, QWidget
 
 from app.auth.msal_auth import AuthAccount, AuthStateSnapshot, AuthStatus
 from app.bootstrap import bootstrap_application
@@ -32,6 +33,69 @@ from app.services.sheet_service import (
 )
 from app.ui.dialogs.backup_maintenance_dialog import BackupMaintenanceDialog
 from app.ui.dialogs.run_comparison_dialog import RunComparisonDialog
+
+
+def apply_email_privacy_blur(pixmap: QPixmap, window: QWidget) -> QPixmap:
+    """Apply a frosted privacy blur over the email portion in the banner and sidebar."""
+    img = pixmap.toImage()
+
+    # 1. Blur the email in details_label of auth_banner (only on Home page)
+    if getattr(window, "_current_page_key", "") == "home":
+        headline = getattr(getattr(window, "home_page", None), "auth_banner", None)
+        if headline is not None and hasattr(headline, "details_label") and headline.isVisible():
+            dl = headline.details_label
+            pos = dl.mapTo(window, QPoint(0, 0))
+            fm = QFontMetrics(dl.font())
+            text = dl.text()
+            if "(" in text and ")" in text:
+                start_idx = text.find("(")
+                end_idx = text.find(")") + 1
+                prefix_w = fm.horizontalAdvance(text[:start_idx])
+                email_w = fm.horizontalAdvance(text[start_idx:end_idx]) + 8
+                blur_rect = QRect(pos.x() + prefix_w - 2, pos.y(), email_w, max(1, dl.height()))
+
+                sub = img.copy(blur_rect)
+                if sub.width() > 0 and sub.height() > 0:
+                    small = sub.scaled(
+                        max(1, sub.width() // 8),
+                        max(1, sub.height() // 8),
+                        Qt.AspectRatioMode.IgnoreAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    blurred = small.scaled(
+                        sub.width(),
+                        sub.height(),
+                        Qt.AspectRatioMode.IgnoreAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    p = QPainter(img)
+                    p.drawImage(blur_rect.topLeft(), blurred)
+                    p.end()
+
+    # 2. Blur the sidebar email label
+    sidebar_email = getattr(window, "_sidebar_user_email", None)
+    if sidebar_email is not None and sidebar_email.isVisible():
+        pos = sidebar_email.mapTo(window, QPoint(0, 0))
+        blur_rect = QRect(pos.x() - 2, pos.y(), sidebar_email.width() + 4, max(1, sidebar_email.height()))
+        sub = img.copy(blur_rect)
+        if sub.width() > 0 and sub.height() > 0:
+            small = sub.scaled(
+                max(1, sub.width() // 8),
+                max(1, sub.height() // 8),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            blurred = small.scaled(
+                sub.width(),
+                sub.height(),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            p = QPainter(img)
+            p.drawImage(blur_rect.topLeft(), blurred)
+            p.end()
+
+    return QPixmap.fromImage(img)
 
 
 def main() -> None:
@@ -272,15 +336,15 @@ def main() -> None:
 
     window.resize(1340, 860)
 
-    # Set authenticated user profile matching live session
+    # Set authenticated user profile with anonymized generic enterprise identity
     window.apply_auth_state(
         AuthStateSnapshot(
             status=AuthStatus.AUTHENTICATED,
             account=AuthAccount(
-                home_account_id="suraj-jd-account",
-                display_name="Suraj jd",
-                username="cisam55573@exespay.com",
-                tenant_id="e11878ed-ea6b-4a97-9022-c835a991e474",
+                home_account_id="enterprise-admin-account",
+                display_name="Enterprise Administrator",
+                username="admin@contoso.com",
+                tenant_id="contoso-tenant-guid",
             ),
             client_id_configured=True,
         )
@@ -312,7 +376,7 @@ def main() -> None:
     # 1. Capture Dashboard / Home Page
     window.navigate_to("home")
     app.processEvents()
-    pm_home = window.grab()
+    pm_home = apply_email_privacy_blur(window.grab(), window)
     pm_home.save(str(out_dir / "01_dashboard_home.png"))
     print("[+] Saved 01_dashboard_home.png")
 
@@ -320,7 +384,7 @@ def main() -> None:
     window.navigate_to("sheet_settings")
     window.sheet_settings_page.reload_sheet()
     app.processEvents()
-    pm_sheet = window.grab()
+    pm_sheet = apply_email_privacy_blur(window.grab(), window)
     pm_sheet.save(str(out_dir / "02_validation_sheet.png"))
     print("[+] Saved 02_validation_sheet.png")
 
@@ -329,7 +393,7 @@ def main() -> None:
     window.history_page.refresh_history()
     window.history_page.runs_table.selectRow(0)
     app.processEvents()
-    pm_hist = window.grab()
+    pm_hist = apply_email_privacy_blur(window.grab(), window)
     pm_hist.save(str(out_dir / "03_history_explorer.png"))
     print("[+] Saved 03_history_explorer.png")
 
@@ -358,7 +422,7 @@ def main() -> None:
     # 6. Capture About Page (clean professional look)
     window.navigate_to("about")
     app.processEvents()
-    pm_about = window.grab()
+    pm_about = apply_email_privacy_blur(window.grab(), window)
     pm_about.save(str(out_dir / "06_about_page.png"))
     print("[+] Saved 06_about_page.png")
 
