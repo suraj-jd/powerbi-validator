@@ -13,7 +13,6 @@ from typing import Any
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
@@ -23,7 +22,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
-    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -36,7 +34,6 @@ from app.services.rule_service import (
     VALIDATION_TYPE_NULL,
     VALIDATION_TYPE_REFRESH,
     VALIDATION_TYPE_ROW_COUNT,
-    VALIDATION_TYPES,
 )
 from app.services.sheet_service import FRIENDLY_TEST_NAMES
 from app.ui.widgets.animated_combo import AnimatedComboBox
@@ -58,7 +55,7 @@ class SheetRuleConfigDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setModal(True)
-        self.setMinimumWidth(540)
+        self.setMinimumWidth(560)
         self.setObjectName("ConfirmDialog")
 
         self._validation_type = validation_type
@@ -312,47 +309,20 @@ class SheetRuleConfigDialog(QDialog):
             form.addRow("Allowed Deviation %:", self.dax_dev_pct)
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
-            # 1. Baseline Floor (Min)
-            self.anom_chk_min = QCheckBox("Enable Minimum Baseline (Floor):")
-            self.anom_chk_min.setStyleSheet("font-weight: 600; color: #1E293B;")
-            self.anom_chk_min.setToolTip("Turn on a minimum lower bound. Any value below this number is flagged as an anomaly.")
-            self.anom_spin_min = QDoubleSpinBox()
-            self.anom_spin_min.setRange(-1e12, 1e12)
-            self.anom_spin_min.setDecimals(2)
-            self.anom_spin_min.setToolTip("Minimum allowed numerical value (floor).")
-            has_min = self._config.get("min_baseline") is not None or self._config.get("min_value") is not None
-            cur_min = float(self._config.get("min_baseline") if self._config.get("min_baseline") is not None else self._config.get("min_value", 0.0))
-            self.anom_spin_min.setValue(cur_min)
-            self.anom_spin_min.setEnabled(has_min)
-            self.anom_chk_min.setChecked(has_min)
-            self.anom_chk_min.toggled.connect(self.anom_spin_min.setEnabled)
+            # Explanatory Guidance Banner
+            anom_info_card = QLabel(
+                "<b>How Baseline & Limit Checks Work:</b><br>"
+                "• <b>Detection Method:</b> Evaluates actual values against a target or past runs (for example: within ±10% of target).<br>"
+                "• <b>Safety Floor & Ceiling:</b> Optional absolute cutoffs. If enabled, any value outside these boundaries fails immediately, even if the percentage check passes."
+            )
+            anom_info_card.setStyleSheet(
+                "background-color: #F0F9FF; border: 1px solid #BAE6FD; color: #0369A1; "
+                "border-radius: 6px; padding: 10px 12px; font-size: 12px;"
+            )
+            anom_info_card.setWordWrap(True)
+            form.addRow(anom_info_card)
 
-            h_min = QHBoxLayout()
-            h_min.addWidget(self.anom_chk_min)
-            h_min.addWidget(self.anom_spin_min, stretch=1)
-            form.addRow("Minimum Floor:", h_min)
-
-            # 2. Baseline Ceiling (Max)
-            self.anom_chk_max = QCheckBox("Enable Maximum Baseline (Ceiling):")
-            self.anom_chk_max.setStyleSheet("font-weight: 600; color: #1E293B;")
-            self.anom_chk_max.setToolTip("Turn on a maximum upper bound. Any value above this number is flagged as an anomaly.")
-            self.anom_spin_max = QDoubleSpinBox()
-            self.anom_spin_max.setRange(-1e12, 1e12)
-            self.anom_spin_max.setDecimals(2)
-            self.anom_spin_max.setToolTip("Maximum allowed numerical value (ceiling).")
-            has_max = self._config.get("max_baseline") is not None or self._config.get("max_value") is not None
-            cur_max = float(self._config.get("max_baseline") if self._config.get("max_baseline") is not None else self._config.get("max_value", 0.0))
-            self.anom_spin_max.setValue(cur_max)
-            self.anom_spin_max.setEnabled(has_max)
-            self.anom_chk_max.setChecked(has_max)
-            self.anom_chk_max.toggled.connect(self.anom_spin_max.setEnabled)
-
-            h_max = QHBoxLayout()
-            h_max.addWidget(self.anom_chk_max)
-            h_max.addWidget(self.anom_spin_max, stretch=1)
-            form.addRow("Maximum Ceiling:", h_max)
-
-            # 3. Secondary Anomaly Detection Check Method
+            # 1. Primary Detection Method
             self.anom_method_combo = AnimatedComboBox()
             anom_method_items = [
                 ("Baseline Thresholds Only (Min / Max)", "threshold_only", "Only checks against minimum floor and maximum ceiling limits."),
@@ -364,9 +334,9 @@ class SheetRuleConfigDialog(QDialog):
             for text, val, tip in anom_method_items:
                 self.anom_method_combo.addItem(text, val)
                 self.anom_method_combo.setItemData(self.anom_method_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
-            self.anom_method_combo.setToolTip("Method used to detect statistical anomalies.")
+            self.anom_method_combo.setToolTip("Select how to evaluate this metric.")
             self.anom_method_combo.currentIndexChanged.connect(
-                lambda idx: self.anom_method_combo.setToolTip(self.anom_method_combo.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Method used to detect statistical anomalies.")
+                lambda idx: self.anom_method_combo.setToolTip(self.anom_method_combo.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Select how to evaluate this metric.")
             )
 
             cur_m = str(self._config.get("comparison_method", "z_score")).strip().lower()
@@ -390,7 +360,7 @@ class SheetRuleConfigDialog(QDialog):
             self.anom_fixed_baseline.setRange(-1e12, 1e12)
             self.anom_fixed_baseline.setDecimals(2)
             self.anom_fixed_baseline.setValue(float(self._config.get("baseline_value", 0.0)))
-            self.anom_fixed_baseline.setToolTip("Fixed baseline target value to calculate percentage deviation against.")
+            self.anom_fixed_baseline.setToolTip("Target benchmark value (for example: 100.00). Used to calculate percentage deviation.")
             self.anom_fixed_baseline_row_lbl = QLabel("Fixed Baseline Value:")
             form.addRow(self.anom_fixed_baseline_row_lbl, self.anom_fixed_baseline)
 
@@ -400,7 +370,7 @@ class SheetRuleConfigDialog(QDialog):
             self.anom_dev_pct.setDecimals(1)
             self.anom_dev_pct.setSuffix(" %")
             self.anom_dev_pct.setValue(float(self._config.get("allowed_deviation_pct", 10.0)))
-            self.anom_dev_pct.setToolTip("Maximum allowed percentage change before flagging an anomaly.")
+            self.anom_dev_pct.setToolTip("Maximum allowed percentage change from baseline before flagging an anomaly (for example: 10.0%).")
             self.anom_dev_pct_row_lbl = QLabel("Allowed Deviation %:")
             form.addRow(self.anom_dev_pct_row_lbl, self.anom_dev_pct)
 
@@ -447,6 +417,142 @@ class SheetRuleConfigDialog(QDialog):
             self.anom_lookback_row_lbl = QLabel("Historical Lookback:")
             form.addRow(self.anom_lookback_row_lbl, self.anom_lookback)
 
+            # Section Separator & Header for Safety Floor / Ceiling
+            self.anom_guardrails_hdr = QLabel("Safety Limits (Floor & Ceiling):")
+            self.anom_guardrails_hdr.setStyleSheet("font-weight: 700; color: #1E293B; font-size: 12px; margin-top: 6px;")
+            self.anom_guardrails_sub = QLabel(
+                "Optional absolute cutoffs. If enabled, values outside these limits fail immediately, even if within allowed % change."
+            )
+            self.anom_guardrails_sub.setStyleSheet("color: #64748B; font-size: 11px;")
+            self.anom_guardrails_sub.setWordWrap(True)
+
+            form.addRow(self.anom_guardrails_hdr)
+            form.addRow(self.anom_guardrails_sub)
+
+            # 2. Baseline Floor (Min)
+            self.anom_chk_min = QCheckBox("Enable Lower Limit (Floor):")
+            self.anom_chk_min.setStyleSheet("font-weight: 600; color: #1E293B;")
+            self.anom_chk_min.setToolTip("Hard lower cutoff. Any value below this number fails immediately as an anomaly.")
+            self.anom_spin_min = QDoubleSpinBox()
+            self.anom_spin_min.setRange(-1e12, 1e12)
+            self.anom_spin_min.setDecimals(2)
+            self.anom_spin_min.setToolTip("Minimum allowed numerical value (floor).")
+            raw_min = self._config.get("min_baseline")
+            if raw_min is None:
+                raw_min = self._config.get("min_value")
+            has_min = raw_min is not None
+            cur_min = float(raw_min) if raw_min is not None else 0.0
+            self.anom_spin_min.setValue(cur_min)
+            self.anom_spin_min.setEnabled(has_min)
+            self.anom_chk_min.setChecked(has_min)
+            self.anom_chk_min.toggled.connect(self.anom_spin_min.setEnabled)
+
+            h_min = QHBoxLayout()
+            h_min.addWidget(self.anom_chk_min)
+            h_min.addWidget(self.anom_spin_min, stretch=1)
+            form.addRow("Minimum Floor:", h_min)
+
+            # 3. Baseline Ceiling (Max)
+            self.anom_chk_max = QCheckBox("Enable Upper Limit (Ceiling):")
+            self.anom_chk_max.setStyleSheet("font-weight: 600; color: #1E293B;")
+            self.anom_chk_max.setToolTip("Hard upper cutoff. Any value above this number fails immediately as an anomaly.")
+            self.anom_spin_max = QDoubleSpinBox()
+            self.anom_spin_max.setRange(-1e12, 1e12)
+            self.anom_spin_max.setDecimals(2)
+            self.anom_spin_max.setToolTip("Maximum allowed numerical value (ceiling).")
+            raw_max = self._config.get("max_baseline")
+            if raw_max is None:
+                raw_max = self._config.get("max_value")
+            has_max = raw_max is not None
+            cur_max = float(raw_max) if raw_max is not None else 0.0
+            self.anom_spin_max.setValue(cur_max)
+            self.anom_spin_max.setEnabled(has_max)
+            self.anom_chk_max.setChecked(has_max)
+            self.anom_chk_max.toggled.connect(self.anom_spin_max.setEnabled)
+
+            h_max = QHBoxLayout()
+            h_max.addWidget(self.anom_chk_max)
+            h_max.addWidget(self.anom_spin_max, stretch=1)
+            form.addRow("Maximum Ceiling:", h_max)
+
+            # Live Preview / Rule Summary Card
+            self.anom_live_summary = QLabel()
+            self.anom_live_summary.setStyleSheet(
+                "background-color: #F8FAFC; border: 1px dashed #CBD5E1; color: #1E293B; "
+                "border-radius: 6px; padding: 8px 10px; font-size: 11px; margin-top: 6px;"
+            )
+            self.anom_live_summary.setWordWrap(True)
+            form.addRow(self.anom_live_summary)
+
+            def _update_live_summary() -> None:
+                meth = self.anom_method_combo.currentData()
+                has_floor = self.anom_chk_min.isChecked()
+                has_ceil = self.anom_chk_max.isChecked()
+                floor_v = self.anom_spin_min.value()
+                ceil_v = self.anom_spin_max.value()
+
+                if has_floor and has_ceil:
+                    guard_str = f"between {floor_v:,.2f} and {ceil_v:,.2f}"
+                elif has_floor:
+                    guard_str = f">= {floor_v:,.2f}"
+                elif has_ceil:
+                    guard_str = f"<= {ceil_v:,.2f}"
+                else:
+                    guard_str = ""
+
+                if meth == "threshold_only":
+                    self.anom_guardrails_hdr.setText("Threshold Limits (Required Minimum and/or Maximum):")
+                    self.anom_guardrails_sub.setText("Values falling below the minimum floor or above the maximum ceiling are flagged as failed.")
+                    self.anom_chk_min.setText("Enable Minimum Floor:")
+                    self.anom_chk_max.setText("Enable Maximum Ceiling:")
+                    if guard_str:
+                        msg = f"<b>How this evaluates:</b> Passes if actual value is {guard_str}."
+                    else:
+                        msg = "<b>How this evaluates:</b> Please enable at least one threshold limit (Floor or Ceiling)."
+                else:
+                    self.anom_guardrails_hdr.setText("Safety Limits (Optional Hard Floor & Ceiling):")
+                    self.anom_guardrails_sub.setText("Optional absolute cutoffs. If enabled, values outside these limits fail immediately, even if within allowed % change.")
+                    self.anom_chk_min.setText("Enable Hard Floor:")
+                    self.anom_chk_max.setText("Enable Hard Ceiling:")
+
+                    if meth == "percentage":
+                        base_v = self.anom_fixed_baseline.value()
+                        pct = self.anom_dev_pct.value()
+                        low = base_v * (1.0 - pct / 100.0)
+                        high = base_v * (1.0 + pct / 100.0)
+                        msg = f"<b>How this evaluates:</b> Passes if within ±{pct:.1f}% of {base_v:,.2f} ({low:,.2f} to {high:,.2f})"
+                        if guard_str:
+                            msg += f", AND within safety limits ({guard_str})."
+                        else:
+                            msg += "."
+                    elif meth == "previous_run":
+                        pct = self.anom_dev_pct.value()
+                        msg = f"<b>How this evaluates:</b> Passes if value changes by at most ±{pct:.1f}% vs previous run"
+                        if guard_str:
+                            msg += f", AND within safety limits ({guard_str})."
+                        else:
+                            msg += "."
+                    elif meth == "median":
+                        pct = self.anom_dev_pct.value()
+                        days = self.anom_lookback.currentData() or 30
+                        msg = f"<b>How this evaluates:</b> Passes if within ±{pct:.1f}% of {days}-day historical median"
+                        if guard_str:
+                            msg += f", AND within safety limits ({guard_str})."
+                        else:
+                            msg += "."
+                    else:
+                        # z_score
+                        z_data = self.anom_sensitivity.currentData()
+                        z_val = 2.0 if z_data == "z_score_high" else (3.0 if z_data == "z_score_tolerant" else 2.5)
+                        days = self.anom_lookback.currentData() or 30
+                        msg = f"<b>How this evaluates:</b> Passes if within statistical ±{z_val:.1f}σ of {days}-day rolling mean"
+                        if guard_str:
+                            msg += f", AND within safety limits ({guard_str})."
+                        else:
+                            msg += "."
+
+                self.anom_live_summary.setText(msg)
+
             def _update_method_visibility():
                 meth = self.anom_method_combo.currentData()
                 is_pct = meth == "percentage"
@@ -466,7 +572,18 @@ class SheetRuleConfigDialog(QDialog):
                 self.anom_lookback_row_lbl.setVisible(is_med or is_z)
                 self.anom_lookback.setVisible(is_med or is_z)
 
+                _update_live_summary()
+
             self.anom_method_combo.currentIndexChanged.connect(lambda _: _update_method_visibility())
+            self.anom_fixed_baseline.valueChanged.connect(lambda _: _update_live_summary())
+            self.anom_dev_pct.valueChanged.connect(lambda _: _update_live_summary())
+            self.anom_chk_min.toggled.connect(lambda _: _update_live_summary())
+            self.anom_spin_min.valueChanged.connect(lambda _: _update_live_summary())
+            self.anom_chk_max.toggled.connect(lambda _: _update_live_summary())
+            self.anom_spin_max.valueChanged.connect(lambda _: _update_live_summary())
+            self.anom_sensitivity.currentIndexChanged.connect(lambda _: _update_live_summary())
+            self.anom_lookback.currentIndexChanged.connect(lambda _: _update_live_summary())
+
             _update_method_visibility()
 
         layout.addLayout(form)
