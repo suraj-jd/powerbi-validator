@@ -10,6 +10,25 @@ A local-first Windows desktop application for automating Power BI semantic model
 
 ---
 
+## ⚡ The Problem: Why This Tool Is Essential
+
+Managing enterprise Power BI environments often forces BI teams and data engineers to manually inspect dozens or hundreds of reports every single morning:
+
+* **2 to 3 Hours Wasted Daily**: Teams spend hours clicking through workspaces just to verify whether overnight dataset refreshes completed on schedule or failed silently.
+* **False-Positive "Successful" Refreshes**: A Power BI dataset refresh might complete successfully with a green checkmark, even when underlying source tables loaded zero rows, missing primary keys, or thousands of duplicate records.
+* **Undetected Metric & KPI Drift**: Subtle upstream schema changes or ETL logic shifts can distort critical DAX measures (like gross margin or revenue) without triggering any pipeline error.
+* **No Historical Diff or Regression Tracking**: When leadership asks *"Why does this metric differ from yesterday?"*, teams rarely have an audit history to compare validation runs side by side and pinpoint exactly which rule worsened.
+
+### 💡 The Solution: Automated 60-Second Quality Assurance
+The **Power BI Validation Tool** automates your entire morning audit routine into a single one-click workflow:
+1. **Power BI Refresh SLA Monitoring**: Automatically captures refresh statuses, run durations, and completion ages across all models.
+2. **Comprehensive Data Quality Checks**: Enforces row count floors/ceilings, null thresholds, duplicate primary key constraints, and transaction freshness dates.
+3. **Live DAX Measure & Baseline Testing**: Directly evaluates complex measures against fixed tolerances or statistical baselines with multi-column filter contexts.
+4. **Side-by-Side Run Comparison**: Instantly diff any two validation runs to spot regressions (worsened checks), resolved checks, and schema additions.
+5. **Zero-Trust, Local-First Security**: Runs entirely on your local Windows PC using your corporate Microsoft Entra ID. No proprietary data or tokens are ever sent to third-party clouds.
+
+---
+
 ## 🎬 Software Tour & Video Walkthrough
 
 <video src="https://github.com/suraj-jd/powerbi-validator/raw/main/docs/videos/powerbi-validator.mp4" controls width="100%"></video>
