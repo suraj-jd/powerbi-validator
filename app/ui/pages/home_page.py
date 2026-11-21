@@ -108,7 +108,15 @@ class HomePage(QWidget):
         self._workspace_assets: dict[str, tuple[list[PowerBIDataset], list[PowerBIReport]]] = {}
         self._datasets: list[PowerBIDataset] = []
         self._reports: list[PowerBIReport] = []
+
+        from app.services.scheduler_service import ValidationSchedulerService
+        db = getattr(self._orchestrator_service, "_db", None) if self._orchestrator_service else None
+        self._scheduler_service = ValidationSchedulerService(db=db, parent=self)
+        self._scheduler_service.schedule_triggered.connect(self._on_schedule_triggered)
+        self._scheduler_service.schedule_config_changed.connect(self._update_schedule_badge)
+
         self._build_ui()
+        self._update_schedule_badge()
         self._connect_refresh_service()
         self._connect_validation_service()
         self.reload_registered_models()
@@ -739,6 +747,20 @@ class HomePage(QWidget):
 
         card_header.addStretch(1)
 
+        # Automated Scheduler status badge and trigger button (Power BI refresh style)
+        self.schedule_badge = QLabel()
+        self.schedule_badge.setStyleSheet(
+            "font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;"
+        )
+        card_header.addWidget(self.schedule_badge)
+
+        self.schedule_validation_button = QPushButton("⏱  Schedule...")
+        self.schedule_validation_button.setObjectName("SecondaryButton")
+        self.schedule_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.schedule_validation_button.setToolTip("Configure automated recurring validation runs (Power BI refresh style).")
+        self.schedule_validation_button.clicked.connect(self._open_schedule_dialog)
+        card_header.addWidget(self.schedule_validation_button)
+
         self.cancel_validation_button = QPushButton("✕ Cancel")
         self.cancel_validation_button.setObjectName("SecondaryButton")
         self.cancel_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1026,6 +1048,98 @@ class HomePage(QWidget):
         self.results_table.hide()
         self.empty_results_label.show()
         self._current_results = []
+
+    @property
+    def scheduler_service(self):
+        return self._scheduler_service
+
+    def _get_enabled_sheet_rules_count(self) -> int:
+        """Count how many validation rules are active and enabled in the Validation Sheet."""
+        db = getattr(self._orchestrator_service, "_db", None) if self._orchestrator_service else None
+        if db is not None:
+            try:
+                from app.services.sheet_service import SheetService
+                sheet_svc = SheetService(
+                    db=db,
+                    registry_service=self._registry_service,
+                    rule_service=self._rule_service,
+                )
+                rows = sheet_svc.load_sheet_rows()
+                return sum(1 for r in rows if r.enabled and r.workspace_id and r.dataset_id)
+            except Exception as exc:
+                logger.debug("Error checking sheet rows count: %s", exc)
+        elif self._rule_service is not None and self._registry_service is not None:
+            regs = self._registry_service.list_registrations(active_only=True)
+            cnt = 0
+            for reg in regs:
+                cnt += len(self._rule_service.list_rules(reg.id, enabled_only=True))
+            return cnt
+        return 0
+
+    def _update_schedule_badge(self, config: Any = None) -> None:
+        """Render the schedule status badge next to the Run Validation button."""
+        if not hasattr(self, "schedule_badge"):
+            return
+        cfg = config or self._scheduler_service.config
+        if not cfg.enabled:
+            self.schedule_badge.setText("○ Schedule Off")
+            self.schedule_badge.setStyleSheet(
+                "color: #64748B; background: #F1F5F9; font-size: 11px; font-weight: 600; "
+                "border: 1px solid #E2E8F0; border-radius: 5px; padding: 4px 8px;"
+            )
+            self.schedule_badge.setToolTip("Automated validation scheduling is turned off.")
+        else:
+            status_text = self._scheduler_service.get_status_text()
+            self.schedule_badge.setText(f"● {status_text}")
+            self.schedule_badge.setStyleSheet(
+                "color: #15803D; background: #DCFCE7; font-size: 11px; font-weight: 600; "
+                "border: 1px solid #BBF7D0; border-radius: 5px; padding: 4px 8px;"
+            )
+            self.schedule_badge.setToolTip(f"Automated Schedule Active: {status_text}")
+
+    def _open_schedule_dialog(self) -> None:
+        """Open the Power BI-style recurring schedule configuration dialog."""
+        rule_count = self._get_enabled_sheet_rules_count()
+        if rule_count == 0:
+            self.validation_banner.show_message(
+                "Cannot configure schedule: The Validation Sheet is currently empty. "
+                "Please add at least one validation rule in the 'Validation Sheet' tab before scheduling automated runs.",
+                level=NotificationLevel.WARNING,
+                title="Validation Sheet Empty",
+            )
+            return
+
+        from app.ui.dialogs.schedule_validation_dialog import ScheduleValidationDialog
+
+        dlg = ScheduleValidationDialog(
+            scheduler_service=self._scheduler_service,
+            rule_count=rule_count,
+            parent=self,
+        )
+        if dlg.exec():
+            self._update_schedule_badge()
+
+    def _on_schedule_triggered(self) -> None:
+        """Handle background timer event to trigger recurring validation."""
+        logger.info("Scheduler triggered automated validation run.")
+        if self._get_enabled_sheet_rules_count() == 0:
+            self.validation_banner.show_message(
+                "Scheduled validation skipped: No enabled checks found in the Validation Sheet.",
+                level=NotificationLevel.WARNING,
+                title="Schedule Skipped",
+            )
+            return
+
+        if self._validation_worker is not None and self._validation_worker.isRunning():
+            logger.info("Validation already in progress, skipping scheduled trigger.")
+            return
+
+        self._run_validation()
+        self.validation_banner.show_message(
+            f"Automated scheduled validation run started at {datetime.now().strftime('%H:%M:%S')}.",
+            level=NotificationLevel.INFO,
+            title="Scheduled Run Started",
+        )
 
     def _run_validation(self) -> None:
         if self._orchestrator_service is None:
