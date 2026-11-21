@@ -33,8 +33,6 @@ The **Power BI Validation Tool** automates your entire morning audit routine int
 
 [![Power BI Validation Tool - End-to-End Walkthrough](https://img.youtube.com/vi/JnB3j8Ujp7k/maxresdefault.jpg)](https://www.youtube.com/watch?v=JnB3j8Ujp7k)
 
-
-
 ---
 
 ## 📸 Application Tour & Interface Showcase
