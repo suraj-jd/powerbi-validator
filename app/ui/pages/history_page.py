@@ -851,21 +851,34 @@ class HistoryPage(QWidget):
         elif len(selected_rows) == 1:
             sel_run = _get_run_for_row(selected_rows[0].row())
             if sel_run:
-                other_run = next((r for r in self._runs if r.id != sel_run.id), self._runs[0])
-                if sel_run.id > other_run.id:
-                    run_a, run_b = other_run, sel_run
+                # Find the previous run chronologically (id immediately lower than sel_run.id)
+                older_runs = [r for r in self._runs if r.id < sel_run.id]
+                if older_runs:
+                    run_a = max(older_runs, key=lambda x: x.id)
+                    run_b = sel_run
                 else:
-                    run_a, run_b = sel_run, other_run
+                    newer_runs = [r for r in self._runs if r.id > sel_run.id]
+                    if newer_runs:
+                        run_a = sel_run
+                        run_b = min(newer_runs, key=lambda x: x.id)
+                    else:
+                        run_a = self._runs[1] if len(self._runs) > 1 else sel_run
+                        run_b = sel_run
             else:
-                run_b = self._runs[0]
                 run_a = self._runs[1]
+                run_b = self._runs[0]
         else:
-            run_b = self._runs[0]
+            # Default: compare previous run (baseline) with newest run (target)
             run_a = self._runs[1]
+            run_b = self._runs[0]
 
         if not run_a or not run_b:
-            run_b = self._runs[0]
             run_a = self._runs[1]
+            run_b = self._runs[0]
+
+        # Chronological guarantee: Baseline (run_a) is earlier than Target (run_b)
+        if run_a.id > run_b.id:
+            run_a, run_b = run_b, run_a
 
         comparison = compare_validation_runs(run_a, run_b, run_c, run_d)
         dialog = RunComparisonDialog(comparison, all_runs=self._runs, parent=self)

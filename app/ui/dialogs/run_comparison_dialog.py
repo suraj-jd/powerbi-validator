@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -195,38 +196,46 @@ class RunComparisonDialog(QDialog):
         row1 = QHBoxLayout()
         row1.setSpacing(10)
 
-        lbl_a = QLabel("Run 1 (Baseline)*:")
+        lbl_a = QLabel("Baseline Run (Before):")
         lbl_a.setStyleSheet("font-size: 12px; font-weight: 600; color: #1E293B;")
         row1.addWidget(lbl_a)
 
         self.combo_run_a = QComboBox()
         self.combo_run_a.setMinimumWidth(220)
-        self.combo_run_a.setToolTip("Select the baseline validation run to compare from.")
+        self.combo_run_a.setToolTip("Select the earlier baseline run to compare from.")
         self.combo_run_a.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row1.addWidget(self.combo_run_a)
 
-        self.btn_swap = QPushButton("⇄ Swap 1 && 2")
+        self.btn_swap = QPushButton("⇄ Swap")
         self.btn_swap.setObjectName("SecondaryButton")
         self.btn_swap.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_swap.setToolTip("Swap Run 1 (Baseline) and Run 2 (Target).")
+        self.btn_swap.setToolTip("Swap Baseline (Before) and Current (After) runs.")
         self.btn_swap.clicked.connect(self._handle_swap_runs)
         row1.addWidget(self.btn_swap)
 
-        lbl_b = QLabel("Run 2 (Target)*:")
+        lbl_b = QLabel("Current Run (After):")
         lbl_b.setStyleSheet("font-size: 12px; font-weight: 600; color: #1E293B;")
         row1.addWidget(lbl_b)
 
         self.combo_run_b = QComboBox()
         self.combo_run_b.setMinimumWidth(220)
-        self.combo_run_b.setToolTip("Select the target validation run to compare against.")
+        self.combo_run_b.setToolTip("Select the newer target run to compare against.")
         self.combo_run_b.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row1.addWidget(self.combo_run_b)
 
         row1.addStretch(1)
+
+        self.chk_trend_mode = QCheckBox("Multi-Run Trend (Up to 4 runs)")
+        self.chk_trend_mode.setStyleSheet("font-size: 12px; color: #475569; font-weight: 500;")
+        self.chk_trend_mode.setToolTip("Toggle comparing 3 or 4 runs side-by-side.")
+        row1.addWidget(self.chk_trend_mode)
+
         sel_layout.addLayout(row1)
 
-        # Row 2: Optional Run 3 and Run 4
-        row2 = QHBoxLayout()
+        # Row 2: Optional Run 3 and Run 4 (hidden by default unless Multi-Run is toggled)
+        self.row2_container = QWidget()
+        row2 = QHBoxLayout(self.row2_container)
+        row2.setContentsMargins(0, 4, 0, 0)
         row2.setSpacing(10)
 
         lbl_c = QLabel("Run 3 (Optional):")
@@ -257,7 +266,18 @@ class RunComparisonDialog(QDialog):
         row2.addWidget(self.btn_clear_optional)
 
         row2.addStretch(1)
-        sel_layout.addLayout(row2)
+        sel_layout.addWidget(self.row2_container)
+
+        has_trend = self._cmp.run_c is not None or self._cmp.run_d is not None
+        self.chk_trend_mode.setChecked(has_trend)
+        self.row2_container.setVisible(has_trend)
+
+        def _on_trend_toggled(checked: bool) -> None:
+            self.row2_container.setVisible(checked)
+            if not checked:
+                self._handle_clear_optional()
+
+        self.chk_trend_mode.toggled.connect(_on_trend_toggled)
 
         layout.addWidget(sel_card)
 
@@ -602,6 +622,12 @@ class RunComparisonDialog(QDialog):
     def _handle_clear_optional(self) -> None:
         self.combo_run_c.setCurrentIndex(0)
         self.combo_run_d.setCurrentIndex(0)
+        if hasattr(self, "chk_trend_mode"):
+            self.chk_trend_mode.blockSignals(True)
+            self.chk_trend_mode.setChecked(False)
+            self.chk_trend_mode.blockSignals(False)
+        if hasattr(self, "row2_container"):
+            self.row2_container.setVisible(False)
 
     def _on_run_selection_changed(self) -> None:
         id_a = self.combo_run_a.currentData()
@@ -611,6 +637,14 @@ class RunComparisonDialog(QDialog):
 
         if id_a is None or id_b is None:
             return
+
+        if id_c is not None or id_d is not None:
+            if hasattr(self, "chk_trend_mode"):
+                self.chk_trend_mode.blockSignals(True)
+                self.chk_trend_mode.setChecked(True)
+                self.chk_trend_mode.blockSignals(False)
+            if hasattr(self, "row2_container"):
+                self.row2_container.setVisible(True)
 
         run_a = next((r for r in self._all_runs if r.id == id_a), None)
         run_b = next((r for r in self._all_runs if r.id == id_b), None)
@@ -638,27 +672,49 @@ class RunComparisonDialog(QDialog):
 
     def _update_table_headers(self) -> None:
         active = self._cmp.active_runs
-        headers = ["Change", "Rule Name", "Target"]
-        for r in active:
-            headers.append(f"Run #{r.id}")
-        for r in active:
-            headers.append(f"Run #{r.id} Actual")
-        headers.append(f"Run #{self._cmp.run_b.id} Dev")
+        if len(active) == 2:
+            headers = [
+                "Change",
+                "Rule Name",
+                "Target",
+                f"Run #{self._cmp.run_a.id} (Before)",
+                f"Run #{self._cmp.run_b.id} (After)",
+                f"Run #{self._cmp.run_a.id} Value",
+                f"Run #{self._cmp.run_b.id} Value",
+                f"Run #{self._cmp.run_b.id} Dev",
+            ]
+            self.diff_table.setColumnCount(8)
+            self.diff_table.setHorizontalHeaderLabels(headers)
+            self.diff_table.setColumnWidth(0, 115)  # Change
+            self.diff_table.setColumnWidth(1, 230)  # Rule Name
+            self.diff_table.setColumnWidth(2, 160)  # Target
+            self.diff_table.setColumnWidth(3, 110)  # Before Status
+            self.diff_table.setColumnWidth(4, 110)  # After Status
+            self.diff_table.setColumnWidth(5, 140)  # Before Actual
+            self.diff_table.setColumnWidth(6, 140)  # After Actual
+            self.diff_table.setColumnWidth(7, 140)  # Dev
+        else:
+            headers = ["Change", "Rule Name", "Target"]
+            for r in active:
+                headers.append(f"Run #{r.id}")
+            for r in active:
+                headers.append(f"Run #{r.id} Actual")
+            headers.append(f"Run #{self._cmp.run_b.id} Dev")
 
-        self.diff_table.setColumnCount(len(headers))
-        self.diff_table.setHorizontalHeaderLabels(headers)
+            self.diff_table.setColumnCount(len(headers))
+            self.diff_table.setHorizontalHeaderLabels(headers)
 
-        self.diff_table.setColumnWidth(0, 115)  # Change
-        self.diff_table.setColumnWidth(1, 210)  # Rule Name
-        self.diff_table.setColumnWidth(2, 160)  # Target
-        col_idx = 3
-        for _ in active:
-            self.diff_table.setColumnWidth(col_idx, 100)
-            col_idx += 1
-        for _ in active:
+            self.diff_table.setColumnWidth(0, 115)  # Change
+            self.diff_table.setColumnWidth(1, 210)  # Rule Name
+            self.diff_table.setColumnWidth(2, 160)  # Target
+            col_idx = 3
+            for _ in active:
+                self.diff_table.setColumnWidth(col_idx, 100)
+                col_idx += 1
+            for _ in active:
+                self.diff_table.setColumnWidth(col_idx, 125)
+                col_idx += 1
             self.diff_table.setColumnWidth(col_idx, 125)
-            col_idx += 1
-        self.diff_table.setColumnWidth(col_idx, 125)
 
     def _populate_comparison(self, cmp: RunComparisonDTO) -> None:
         # Update KPI labels
@@ -792,6 +848,35 @@ class RunComparisonDialog(QDialog):
                 visible_rows += 1
 
         self.lbl_stats.setText(f"Showing {visible_rows} of {total_rows} rule comparison(s)")
+        self._update_card_styles()
+
+    def _update_card_styles(self) -> None:
+        active = self._current_filter_change
+        reg_b = "#DC2626; border-width: 2px" if active == "REGRESSION" else "#FECACA; border-width: 1px"
+        imp_b = "#16A34A; border-width: 2px" if active == "IMPROVEMENT" else "#BBF7D0; border-width: 1px"
+        unc_b = "#475569; border-width: 2px" if active == "UNCHANGED" else "#CBD5E1; border-width: 1px"
+        mod_b = "#2563EB; border-width: 2px" if active == "MODIFIED" else "#BFDBFE; border-width: 1px"
+
+        self.c_reg.setStyleSheet(
+            f"QFrame#CardReg {{ background-color: #FEF2F2; border: 1px solid {reg_b}; border-radius: 8px; }} "
+            "QFrame#CardReg:hover { background-color: #FEE2E2; border-color: #F87171; } "
+            "QLabel { border: none; background: transparent; }"
+        )
+        self.c_imp.setStyleSheet(
+            f"QFrame#CardImp {{ background-color: #F0FDF4; border: 1px solid {imp_b}; border-radius: 8px; }} "
+            "QFrame#CardImp:hover { background-color: #DCFCE7; border-color: #4ADE80; } "
+            "QLabel { border: none; background: transparent; }"
+        )
+        self.c_unc.setStyleSheet(
+            f"QFrame#CardUnc {{ background-color: #F8FAFC; border: 1px solid {unc_b}; border-radius: 8px; }} "
+            "QFrame#CardUnc:hover { background-color: #F1F5F9; border-color: #94A3B8; } "
+            "QLabel { border: none; background: transparent; }"
+        )
+        self.c_mod.setStyleSheet(
+            f"QFrame#CardMod {{ background-color: #EFF6FF; border: 1px solid {mod_b}; border-radius: 8px; }} "
+            "QFrame#CardMod:hover { background-color: #DBEAFE; border-color: #60A5FA; } "
+            "QLabel { border: none; background: transparent; }"
+        )
 
     def _handle_export_csv(self) -> None:
         active_ids = "_".join(str(r.id) for r in self._cmp.active_runs)
