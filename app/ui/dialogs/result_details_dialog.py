@@ -171,9 +171,8 @@ class ResultDetailsDialog(QDialog):
 
         # Summary box
         summary_frame = QFrame()
-        summary_frame.setToolTip("Summary of what was checked and what was found.")
         summary_frame.setStyleSheet(
-            "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px;"
+            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; }"
         )
         summary_lay = QVBoxLayout(summary_frame)
         summary_lay.setContentsMargins(8, 6, 8, 6)
@@ -195,8 +194,9 @@ class ResultDetailsDialog(QDialog):
 
         # Expected
         c_exp = QFrame()
-        c_exp.setToolTip("The expected threshold or value for this test.")
-        c_exp.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px;")
+        c_exp.setStyleSheet(
+            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; }"
+        )
         lay_exp = QVBoxLayout(c_exp)
         lay_exp.setContentsMargins(6, 6, 6, 6)
         lay_exp.setSpacing(2)
@@ -211,8 +211,9 @@ class ResultDetailsDialog(QDialog):
 
         # Actual
         c_act = QFrame()
-        c_act.setToolTip("The actual value found in your Power BI data.")
-        c_act.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px;")
+        c_act.setStyleSheet(
+            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; }"
+        )
         lay_act = QVBoxLayout(c_act)
         lay_act.setContentsMargins(6, 6, 6, 6)
         lay_act.setSpacing(2)
@@ -227,8 +228,9 @@ class ResultDetailsDialog(QDialog):
 
         # Deviation
         c_dev = QFrame()
-        c_dev.setToolTip("The difference between actual and expected values.")
-        c_dev.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px;")
+        c_dev.setStyleSheet(
+            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; }"
+        )
         lay_dev = QVBoxLayout(c_dev)
         lay_dev.setContentsMargins(6, 6, 6, 6)
         lay_dev.setSpacing(2)
@@ -247,7 +249,6 @@ class ResultDetailsDialog(QDialog):
         timings_label = QLabel(
             f"Evaluated in {self._result.duration_ms} ms  •  Started: {self._result.started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
         )
-        timings_label.setToolTip("How long this check took to run in milliseconds.")
         timings_label.setStyleSheet("font-size: 11px; color: #64748B;")
         layout.addWidget(timings_label)
 
@@ -258,10 +259,9 @@ class ResultDetailsDialog(QDialog):
 
         self.details_box = QTextEdit()
         self.details_box.setReadOnly(True)
-        self.details_box.setToolTip("Full diagnostic query logs, DAX details, and technical messages.")
         self.details_box.setStyleSheet(
-            "font-family: Consolas, 'Courier New', monospace; font-size: 11px; "
-            "background-color: #0F172A; color: #F1F5F9; border-radius: 6px; padding: 10px;"
+            "QTextEdit { font-family: Consolas, 'Courier New', monospace; font-size: 11px; "
+            "background-color: #0F172A; color: #F1F5F9; border-radius: 6px; padding: 10px; }"
         )
         details_text = self._result.detailed_message or self._result.result_summary
         self.details_box.setPlainText(redact_secrets(details_text))
