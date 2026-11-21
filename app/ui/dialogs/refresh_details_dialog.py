@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.core.formatting import format_hours_duration
 from app.core.status import NotificationLevel, RefreshStatus
 from app.services.refresh_service import RefreshRecordDTO, RefreshService, RefreshSummaryDTO
 from app.ui.widgets.notification_banner import NotificationBanner
@@ -410,7 +411,8 @@ class RefreshDetailsDialog(QDialog):
         latest_success = summary.latest_successful
         if latest_success is not None:
             self.lbl_success_time.setText(latest_success.end_time_display)
-            age_str = f"Age: {latest_success.age_hours}h ago" if latest_success.age_hours is not None else "Age: -"
+            age_disp = format_hours_duration(latest_success.age_hours)
+            age_str = f"Age: {age_disp} ago" if latest_success.age_hours is not None else "Age: -"
             self.lbl_success_age.setText(age_str)
             self.lbl_success_duration.setText(f"Duration: {latest_success.duration_display}")
         else:

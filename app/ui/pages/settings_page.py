@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.exceptions import PersistenceError, ValidationConfigError, format_safe_user_error
+from app.core.formatting import format_hours_duration
 from app.core.status import NotificationLevel, RefreshStatus
 from app.integrations.file_import import RegistrationInput
 from app.integrations.powerbi.models import AccessVerificationResult, DatasetMetadata, PowerBIWorkspace
@@ -319,7 +320,7 @@ class SettingsPage(QWidget):
                     if latest_ref.status == RefreshStatus.IN_PROGRESS:
                         ref_status = "In Progress"
                     elif latest_ref.age_hours is not None:
-                        ref_status = f"{status_str} ({latest_ref.age_hours}h ago)"
+                        ref_status = f"{status_str} ({format_hours_duration(latest_ref.age_hours)} ago)"
                     else:
                         ref_status = status_str
 

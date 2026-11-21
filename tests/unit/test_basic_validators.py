@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.core.formatting import format_hours_duration
 from app.core.status import RefreshStatus, ValidationStatus
 from app.integrations.powerbi.dax_client import DaxQueryClient, DaxQueryResult
 from app.services.refresh_service import RefreshRecordDTO, RefreshService
@@ -269,6 +270,52 @@ def test_latest_date_validator_detects_future_dates():
     assert res.status == ValidationStatus.FAIL
     assert "Future date detected" in res.result_summary
     assert "future" in res.deviation
+
+
+def test_format_hours_duration_under_and_over_48h():
+    # Under 48 hours: stays as hours
+    assert format_hours_duration(0.5) == "0.5h"
+    assert format_hours_duration(2.0) == "2.0h"
+    assert format_hours_duration(24.0) == "24.0h"
+    assert format_hours_duration(47.9) == "47.9h"
+
+    # 48 hours and above: converts to days and hours
+    assert format_hours_duration(48.0) == "2d"
+    assert format_hours_duration(48.5) == "2d 0.5h"
+    assert format_hours_duration(49.0) == "2d 1h"
+    assert format_hours_duration(72.0) == "3d"
+    assert format_hours_duration(16160.0) == "673d 8h"
+    assert format_hours_duration(16184.0) == "674d 8h"
+    assert format_hours_duration(None) == "-"
+
+
+def test_latest_date_validator_converts_exceeding_48h_to_days_and_hours():
+    client = MagicMock(spec=DaxQueryClient)
+    # 2026-11-21 07:59:40 UTC
+    ref_time = datetime(2026, 11, 21, 7, 59, 40, tzinfo=timezone.utc)
+    # Order Date: 2025-01-16 00:00:00 UTC (16,183.99 hours old = 674d 8h)
+    latest_date_str = "2025-01-16T00:00:00Z"
+
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows(
+        [{"[TotalRows]": 10000, "[LatestDate]": latest_date_str}], duration_ms=45
+    )
+
+    validator = LatestDateValidator()
+    rule = _make_rule(VALIDATION_TYPE_LATEST_DATE, col="Order_Date", config={"max_age_hours": 24.0})
+
+    res = validator.validate(
+        rule=rule,
+        dax_client=client,
+        workspace_id="ws1",
+        dataset_id="ds1",
+        context={"reference_timestamp": ref_time},
+    )
+
+    assert res.status == ValidationStatus.FAIL
+    assert "674d 8h ago" in res.actual_value
+    assert "+673d 8h over limit" in res.deviation
+    assert "674d 8h old" in res.result_summary
+    assert "674d 8h" in res.detailed_message
 
 
 # =========================================================================

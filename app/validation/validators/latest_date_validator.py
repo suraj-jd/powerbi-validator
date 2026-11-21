@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import logging
 from typing import Any
 
+from app.core.formatting import format_hours_duration
 from app.core.status import ValidationStatus
 from app.database.models import utc_now
 from app.integrations.powerbi.dax_client import (
@@ -153,7 +154,7 @@ class LatestDateValidator(BaseValidator):
                 target_type=rule.target_type,
                 status=ValidationStatus.WARNING,
                 actual_value="0 rows",
-                expected_value=f"<= {max_age_hours}h old",
+                expected_value=f"<= {format_hours_duration(max_age_hours)} old",
                 deviation=None,
                 result_summary="Empty dataset: No rows returned by query.",
                 detailed_message=f"Query executed:\n{query}",
@@ -184,7 +185,7 @@ class LatestDateValidator(BaseValidator):
                 target_type=rule.target_type,
                 status=ValidationStatus.WARNING,
                 actual_value="No date values",
-                expected_value=f"<= {max_age_hours}h old",
+                expected_value=f"<= {format_hours_duration(max_age_hours)} old",
                 deviation=None,
                 result_summary=f"Table is empty or column '{rule.column_name}' contains only blanks.",
                 detailed_message=f"Table: {rule.table_name}\nColumn: {rule.column_name}\nTotal rows: {total_rows}",
@@ -210,12 +211,19 @@ class LatestDateValidator(BaseValidator):
         age_hours = round(age_seconds / 3600.0, 2)
 
         formatted_date = latest_dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-        actual_str = f"{formatted_date} ({age_hours:.1f}h ago)" if age_hours >= 0 else f"{formatted_date} ({abs(age_hours):.1f}h future)"
-        expected_str = f"<= {max_age_hours}h old (since {ref_time.strftime('%Y-%m-%d %H:%M UTC')})"
+        age_disp = format_hours_duration(age_hours)
+        actual_str = (
+            f"{formatted_date} ({age_disp} ago)"
+            if age_hours >= 0
+            else f"{formatted_date} ({age_disp} future)"
+        )
+        max_age_disp = format_hours_duration(max_age_hours)
+        expected_str = f"<= {max_age_disp} old (since {ref_time.strftime('%Y-%m-%d %H:%M UTC')})"
 
         # 1. Check future date violation
         if not allow_future and age_hours < -future_tolerance:
             fut_h = round(abs(age_hours), 2)
+            fut_disp = format_hours_duration(fut_h)
             return CheckEvaluationResult(
                 rule_id=rule.id,
                 rule_name=rule.rule_name,
@@ -224,14 +232,14 @@ class LatestDateValidator(BaseValidator):
                 status=ValidationStatus.FAIL,
                 actual_value=actual_str,
                 expected_value=expected_str,
-                deviation=f"{fut_h:.1f}h in future",
-                result_summary=f"Future date detected: latest date is {fut_h:.1f} hours ahead of current UTC time.",
+                deviation=f"{fut_disp} in future",
+                result_summary=f"Future date detected: latest date is {fut_disp} ahead of current UTC time.",
                 detailed_message=(
                     f"Table: {rule.table_name}\n"
                     f"Column: {rule.column_name}\n"
                     f"Latest Date: {formatted_date}\n"
                     f"Reference UTC Time: {ref_time.strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
-                    f"Future Delta: {fut_h:.1f} hours\n"
+                    f"Future Delta: {fut_disp} ({fut_h:,.1f} hours)\n"
                     f"Allow Future Dates: False"
                 ),
                 started_at=t_start,
@@ -248,6 +256,7 @@ class LatestDateValidator(BaseValidator):
         # 2. Check freshness SLA exceeded
         if age_hours > max_age_hours:
             over_hours = round(age_hours - max_age_hours, 2)
+            over_disp = format_hours_duration(over_hours)
             return CheckEvaluationResult(
                 rule_id=rule.id,
                 rule_name=rule.rule_name,
@@ -256,15 +265,15 @@ class LatestDateValidator(BaseValidator):
                 status=ValidationStatus.FAIL,
                 actual_value=actual_str,
                 expected_value=expected_str,
-                deviation=f"+{over_hours:.1f}h over limit",
-                result_summary=f"Data is stale: latest date is {age_hours:.1f}h old (exceeds {max_age_hours}h limit).",
+                deviation=f"+{over_disp} over limit",
+                result_summary=f"Data is stale: latest date is {age_disp} old (exceeds {max_age_disp} limit).",
                 detailed_message=(
                     f"Table: {rule.table_name}\n"
                     f"Column: {rule.column_name}\n"
                     f"Latest Date: {formatted_date}\n"
-                    f"Age: {age_hours:.1f} hours\n"
-                    f"Allowed Age: {max_age_hours} hours\n"
-                    f"Exceeded by: {over_hours:.1f} hours"
+                    f"Age: {age_disp} ({age_hours:,.1f} hours)\n"
+                    f"Allowed Age: {max_age_disp} ({max_age_hours:,.1f} hours)\n"
+                    f"Exceeded by: {over_disp} ({over_hours:,.1f} hours)"
                 ),
                 started_at=t_start,
                 completed_at=now,
@@ -279,6 +288,7 @@ class LatestDateValidator(BaseValidator):
 
         # 3. Passed
         margin_hours = round(max_age_hours - age_hours, 2)
+        margin_disp = format_hours_duration(margin_hours)
         return CheckEvaluationResult(
             rule_id=rule.id,
             rule_name=rule.rule_name,
@@ -287,13 +297,13 @@ class LatestDateValidator(BaseValidator):
             status=ValidationStatus.PASS,
             actual_value=actual_str,
             expected_value=expected_str,
-            deviation=f"-{margin_hours:.1f}h margin",
+            deviation=f"-{margin_disp} margin",
             result_summary=f"Latest date check passed: {actual_str}.",
             detailed_message=(
                 f"Table: {rule.table_name}\n"
                 f"Column: {rule.column_name}\n"
                 f"Latest Date: {formatted_date}\n"
-                f"Age: {age_hours:.1f} hours (SLA: <= {max_age_hours} hours)"
+                f"Age: {age_disp} (SLA: <= {max_age_disp})"
             ),
             started_at=t_start,
             completed_at=now,

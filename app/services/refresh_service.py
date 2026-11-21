@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from app.core.formatting import format_hours_duration
 from app.core.status import RefreshStatus, ValidationStatus
 from app.database.db import DatabaseManager
 from app.database.models import RefreshRecord, utc_now
@@ -362,7 +363,7 @@ class RefreshService(QObject):
 
         expected_parts = [f"Status = {expected_status}"]
         if max_age_hours is not None:
-            expected_parts.append(f"Age <= {max_age_hours}h")
+            expected_parts.append(f"Age <= {format_hours_duration(float(max_age_hours))}")
         if max_duration_min is not None:
             expected_parts.append(f"Duration <= {max_duration_min}m")
         expected_str = ", ".join(expected_parts)
@@ -383,7 +384,7 @@ class RefreshService(QObject):
         if target_record.duration_ms is not None:
             actual_parts.append(f"Duration: {target_record.duration_display}")
         if target_record.age_hours is not None:
-            actual_parts.append(f"Age: {target_record.age_hours}h ago")
+            actual_parts.append(f"Age: {format_hours_duration(target_record.age_hours)} ago")
         actual_str = ", ".join(actual_parts)
 
         # 1. Check Failure status
@@ -427,12 +428,15 @@ class RefreshService(QObject):
         if max_age_hours is not None and target_record.age_hours is not None:
             if target_record.age_hours > float(max_age_hours):
                 diff = round(target_record.age_hours - float(max_age_hours), 1)
+                diff_disp = format_hours_duration(diff)
+                age_disp = format_hours_duration(target_record.age_hours)
+                limit_disp = format_hours_duration(float(max_age_hours))
                 return RefreshCheckEvaluation(
                     status=ValidationStatus.FAIL,
                     actual_value=actual_str,
                     expected_value=expected_str,
-                    deviation=f"+{diff}h older than threshold",
-                    result_summary=f"Refresh is stale ({target_record.age_hours}h old, exceeding {max_age_hours}h limit).",
+                    deviation=f"+{diff_disp} older than threshold",
+                    result_summary=f"Refresh is stale ({age_disp} old, exceeding {limit_disp} limit).",
                     detailed_message=f"Last completed: {target_record.end_time_display}",
                     refresh_record=target_record,
                 )
@@ -453,12 +457,13 @@ class RefreshService(QObject):
                 )
 
         # All checks passed!
+        age_str = f", {format_hours_duration(target_record.age_hours)} ago" if target_record.age_hours is not None else ""
         return RefreshCheckEvaluation(
             status=ValidationStatus.PASS,
             actual_value=actual_str,
             expected_value=expected_str,
             deviation=None,
-            result_summary=f"Refresh completed successfully ({target_record.duration_display}, {target_record.age_hours}h ago).",
+            result_summary=f"Refresh completed successfully ({target_record.duration_display}{age_str}).",
             detailed_message=f"Refresh ID: {target_record.refresh_id or '-'}\nStart: {target_record.start_time_display}\nEnd: {target_record.end_time_display}",
             refresh_record=target_record,
         )
