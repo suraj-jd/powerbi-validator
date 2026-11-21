@@ -96,6 +96,14 @@ class MainWindow(QMainWindow):
         self._orchestrator_service = orchestrator_service
         self._pending_verify_reg_id: int | None = None
 
+        from app.services.teams_alert_service import TeamsAlertService
+
+        self._teams_alert_service = TeamsAlertService(
+            db=self._db,
+            token_provider=self._auth_service.get_access_token if self._auth_service else None,
+            parent=self,
+        )
+
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.resize(self._config.window_width, self._config.window_height)
         self.setMinimumSize(900, 600)
@@ -161,6 +169,8 @@ class MainWindow(QMainWindow):
             orchestrator_service=self._orchestrator_service,
             rule_service=self._rule_service,
             powerbi_service=self._powerbi_service,
+            teams_alert_service=self._teams_alert_service,
+            auth_service=self._auth_service,
             parent=self,
         )
         self.sheet_settings_page = SheetSettingsPage(

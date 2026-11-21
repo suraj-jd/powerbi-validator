@@ -89,11 +89,15 @@ class ScheduleValidationDialog(QDialog):
         self,
         scheduler_service: ValidationSchedulerService,
         rule_count: int = 0,
+        teams_service: Any | None = None,
+        account: Any | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._scheduler_service = scheduler_service
         self._rule_count = rule_count
+        self._teams_service = teams_service
+        self._account = account
         self._config = scheduler_service.config
 
         # Working list of times (sorted)
@@ -102,7 +106,7 @@ class ScheduleValidationDialog(QDialog):
 
         self.setWindowTitle("Schedule Automated Validations")
         self.setMinimumWidth(720)
-        self.resize(740, 470)
+        self.resize(740, 500)
 
         self._build_ui()
         self._apply_initial_state()
@@ -276,7 +280,32 @@ class ScheduleValidationDialog(QDialog):
 
         layout.addWidget(self.preview_frame)
 
-        # 5. Footer Buttons
+        # 5. Teams Notification Status Bar
+        if self._teams_service is not None:
+            self.teams_frame = QFrame()
+            self.teams_frame.setStyleSheet(
+                "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 6px 12px; }"
+            )
+            tf_lay = QHBoxLayout(self.teams_frame)
+            tf_lay.setContentsMargins(0, 0, 0, 0)
+            tf_lay.setSpacing(10)
+
+            teams_status = self._teams_service.get_status_text()
+            self.lbl_teams_info = QLabel(f"🔔  Microsoft Teams Alerts: {teams_status}")
+            self.lbl_teams_info.setStyleSheet("font-size: 11px; font-weight: 600; color: #334155;")
+            tf_lay.addWidget(self.lbl_teams_info)
+            tf_lay.addStretch(1)
+
+            btn_teams_open = QPushButton("Configure Teams...")
+            btn_teams_open.setObjectName("SecondaryButton")
+            btn_teams_open.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_teams_open.setStyleSheet("font-size: 11px; font-weight: 600; padding: 3px 10px;")
+            btn_teams_open.clicked.connect(self._open_teams_config)
+            tf_lay.addWidget(btn_teams_open)
+
+            layout.addWidget(self.teams_frame)
+
+        # 6. Footer Buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
         btn_row.addStretch(1)
@@ -298,6 +327,21 @@ class ScheduleValidationDialog(QDialog):
         btn_row.addWidget(self.btn_save)
 
         layout.addLayout(btn_row)
+
+    def _open_teams_config(self) -> None:
+        """Open the Teams alert configuration dialog from within the scheduler."""
+        if self._teams_service is None:
+            return
+        from app.ui.dialogs.teams_alert_dialog import TeamsAlertConfigDialog
+
+        dlg = TeamsAlertConfigDialog(
+            teams_service=self._teams_service,
+            account=self._account,
+            parent=self,
+        )
+        if dlg.exec():
+            if hasattr(self, "lbl_teams_info"):
+                self.lbl_teams_info.setText(f"🔔  Microsoft Teams Alerts: {self._teams_service.get_status_text()}")
 
     def _update_sheet_status_banner(self) -> None:
         """Render whether the sheet satisfies the >= 1 row prerequisite."""

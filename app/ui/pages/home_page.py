@@ -95,6 +95,8 @@ class HomePage(QWidget):
         orchestrator_service: OrchestratorService | None = None,
         rule_service: RuleService | None = None,
         powerbi_service: PowerBIService | None = None,
+        teams_alert_service: Any | None = None,
+        auth_service: Any | None = None,
     ) -> None:
         super().__init__(parent)
         self._refresh_service = refresh_service
@@ -102,6 +104,7 @@ class HomePage(QWidget):
         self._orchestrator_service = orchestrator_service
         self._rule_service = rule_service
         self._powerbi_service = powerbi_service
+        self._auth_service = auth_service
         self._validation_worker: ValidationWorker | None = None
         self._current_results: list[ValidationResultDTO] = []
         self._workspaces: list[PowerBIWorkspace] = []
@@ -110,13 +113,23 @@ class HomePage(QWidget):
         self._reports: list[PowerBIReport] = []
 
         from app.services.scheduler_service import ValidationSchedulerService
+        from app.services.teams_alert_service import TeamsAlertService
+
         db = getattr(self._orchestrator_service, "_db", None) if self._orchestrator_service else None
         self._scheduler_service = ValidationSchedulerService(db=db, parent=self)
         self._scheduler_service.schedule_triggered.connect(self._on_schedule_triggered)
         self._scheduler_service.schedule_config_changed.connect(self._update_schedule_badge)
 
+        if teams_alert_service is not None:
+            self._teams_alert_service = teams_alert_service
+        else:
+            token_prov = self._auth_service.get_access_token if self._auth_service else None
+            self._teams_alert_service = TeamsAlertService(db=db, token_provider=token_prov, parent=self)
+        self._teams_alert_service.config_changed.connect(self._update_teams_badge)
+
         self._build_ui()
         self._update_schedule_badge()
+        self._update_teams_badge()
         self._connect_refresh_service()
         self._connect_validation_service()
         self.reload_registered_models()
@@ -747,6 +760,20 @@ class HomePage(QWidget):
 
         card_header.addStretch(1)
 
+        # Microsoft Teams Alerts status badge and configure button
+        self.teams_badge = QLabel()
+        self.teams_badge.setStyleSheet(
+            "font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;"
+        )
+        card_header.addWidget(self.teams_badge)
+
+        self.teams_alerts_button = QPushButton("🔔  Teams Alerts...")
+        self.teams_alerts_button.setObjectName("SecondaryButton")
+        self.teams_alerts_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.teams_alerts_button.setToolTip("Configure automated notifications and report cards sent to Microsoft Teams.")
+        self.teams_alerts_button.clicked.connect(self._open_teams_dialog)
+        card_header.addWidget(self.teams_alerts_button)
+
         # Automated Scheduler status badge and trigger button (Power BI refresh style)
         self.schedule_badge = QLabel()
         self.schedule_badge.setStyleSheet(
@@ -1076,6 +1103,45 @@ class HomePage(QWidget):
             return cnt
         return 0
 
+    def _get_current_account(self) -> Any | None:
+        """Retrieve the active Microsoft user account from the auth service."""
+        if self._auth_service and hasattr(self._auth_service, "state"):
+            return self._auth_service.state.account
+        return None
+
+    def _update_teams_badge(self, config: Any = None) -> None:
+        """Render the Microsoft Teams alert status badge."""
+        if not hasattr(self, "teams_badge"):
+            return
+        cfg = config or self._teams_alert_service.config
+        if cfg.enabled:
+            mode_text = "All" if cfg.notify_on == "all" else ("Critical" if cfg.notify_on == "failure_strict" else "Violations")
+            self.teams_badge.setText(f"🔔 Teams: {mode_text}")
+            self.teams_badge.setStyleSheet(
+                "color: #15803D; background: #DCFCE7; font-size: 11px; font-weight: 600; "
+                "border: 1px solid #BBF7D0; border-radius: 5px; padding: 4px 8px;"
+            )
+            self.teams_badge.setToolTip(f"Microsoft Teams alerts active ({cfg.notify_on} mode). Click 'Teams Alerts...' to configure.")
+        else:
+            self.teams_badge.setText("🔔 Teams: Off")
+            self.teams_badge.setStyleSheet(
+                "color: #64748B; background: #F1F5F9; font-size: 11px; font-weight: 600; "
+                "border: 1px solid #E2E8F0; border-radius: 5px; padding: 4px 8px;"
+            )
+            self.teams_badge.setToolTip("Microsoft Teams alerts disabled. Click 'Teams Alerts...' to configure.")
+
+    def _open_teams_dialog(self) -> None:
+        """Open the Microsoft Teams alert configuration dialog."""
+        from app.ui.dialogs.teams_alert_dialog import TeamsAlertConfigDialog
+
+        dlg = TeamsAlertConfigDialog(
+            teams_service=self._teams_alert_service,
+            account=self._get_current_account(),
+            parent=self,
+        )
+        if dlg.exec():
+            self._update_teams_badge()
+
     def _update_schedule_badge(self, config: Any = None) -> None:
         """Render the schedule status badge next to the Run Validation button."""
         if not hasattr(self, "schedule_badge"):
@@ -1114,6 +1180,8 @@ class HomePage(QWidget):
         dlg = ScheduleValidationDialog(
             scheduler_service=self._scheduler_service,
             rule_count=rule_count,
+            teams_service=self._teams_alert_service,
+            account=self._get_current_account(),
             parent=self,
         )
         if dlg.exec():
@@ -1247,6 +1315,12 @@ class HomePage(QWidget):
             f"{summary.warning_count} warning(s), {summary.error_count} error(s)."
         )
         self.validation_banner.show_message(msg, level=lvl, title=ttl)
+
+        # Dispatch Microsoft Teams alert if configured
+        if self._teams_alert_service and self._teams_alert_service.should_notify(summary):
+            acct = self._get_current_account()
+            logger.info("Dispatching validation alert card to Microsoft Teams.")
+            self._teams_alert_service.send_alert_async(summary, account=acct)
 
     def _on_validation_error(self, err_msg: str) -> None:
         self.run_validation_button.setEnabled(True)
