@@ -325,7 +325,7 @@ class HistoryPage(QWidget):
 
         self.runs_table = QTableWidget()
         self.runs_table.setObjectName("DataTable")
-        self.runs_table.setColumnCount(10)
+        self.runs_table.setColumnCount(9)
         self.runs_table.setHorizontalHeaderLabels([
             "Run ID",
             "Started At",
@@ -336,7 +336,6 @@ class HistoryPage(QWidget):
             "Warnings",
             "Errors",
             "Total Rules",
-            "Version",
         ])
 
         header = self.runs_table.horizontalHeader()
@@ -347,16 +346,15 @@ class HistoryPage(QWidget):
         self.runs_table.verticalHeader().setVisible(False)
 
         # Generous default widths so columns are never squished
-        self.runs_table.setColumnWidth(0, 80)    # Run ID
-        self.runs_table.setColumnWidth(1, 185)   # Started At
-        self.runs_table.setColumnWidth(2, 95)    # Duration
-        self.runs_table.setColumnWidth(3, 130)   # Overall Health
-        self.runs_table.setColumnWidth(4, 75)    # Passed
-        self.runs_table.setColumnWidth(5, 75)    # Failed
-        self.runs_table.setColumnWidth(6, 85)    # Warnings
-        self.runs_table.setColumnWidth(7, 75)    # Errors
-        self.runs_table.setColumnWidth(8, 95)    # Total Rules
-        self.runs_table.setColumnWidth(9, 85)    # Version
+        self.runs_table.setColumnWidth(0, 85)    # Run ID
+        self.runs_table.setColumnWidth(1, 200)   # Started At
+        self.runs_table.setColumnWidth(2, 105)   # Duration
+        self.runs_table.setColumnWidth(3, 145)   # Overall Health
+        self.runs_table.setColumnWidth(4, 80)    # Passed
+        self.runs_table.setColumnWidth(5, 80)    # Failed
+        self.runs_table.setColumnWidth(6, 90)    # Warnings
+        self.runs_table.setColumnWidth(7, 80)    # Errors
+        self.runs_table.setColumnWidth(8, 105)   # Total Rules
 
         self.runs_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.runs_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -548,11 +546,6 @@ class HistoryPage(QWidget):
                 item_t.setData(Qt.ItemDataRole.UserRole, int(run.total_rules))
                 item_t.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.runs_table.setItem(row_idx, 8, item_t)
-
-                # Col 9: Version
-                item_v = QTableWidgetItem(run.app_version or "-")
-                item_v.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.runs_table.setItem(row_idx, 9, item_v)
         finally:
             self.runs_table.setSortingEnabled(True)
 
