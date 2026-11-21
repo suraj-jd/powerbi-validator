@@ -317,9 +317,10 @@ class PowerBIRestClient:
                     "Please try again shortly."
                 ),
             )
+        user_msg = f"Power BI Service request failed (HTTP {status}){suffix}: {detail}" if detail else f"Power BI Service request failed (HTTP {status}){suffix}."
         return PowerBIHttpError(
             f"HTTP {status} error on {path}{suffix}: {detail}",
             status_code=status,
             error_code=error_code,
-            user_message=f"Power BI Service request failed (HTTP {status}){suffix}.",
+            user_message=user_msg,
         )
