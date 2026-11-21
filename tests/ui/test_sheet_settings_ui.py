@@ -117,10 +117,16 @@ def test_sheet_rule_config_dialog_anomaly_check(qtbot) -> None:
     dialog.show()
 
     assert "Baseline & % Change Check" in dialog.windowTitle()
+    assert hasattr(dialog, "anom_agg_combo")
     assert dialog.anom_chk_min.isChecked() is True
     assert dialog.anom_spin_min.value() == 1000.0
     assert dialog.anom_chk_max.isChecked() is True
     assert dialog.anom_spin_max.value() == 50000.0
+
+    # Select Distinct Count aggregation
+    idx_dc = dialog.anom_agg_combo.findData("DISTINCTCOUNT")
+    assert idx_dc >= 0
+    dialog.anom_agg_combo.setCurrentIndex(idx_dc)
 
     # Switch to Previous Run mode and modify min floor
     dialog.anom_spin_min.setValue(2000.0)
@@ -135,6 +141,7 @@ def test_sheet_rule_config_dialog_anomaly_check(qtbot) -> None:
     assert dialog.config["max_baseline"] == 50000.0
     assert dialog.config["comparison_method"] == "previous_run"
     assert dialog.config["allowed_deviation_pct"] == 15.0
+    assert dialog.config["aggregation_func"] == "DISTINCTCOUNT"
 
 
 

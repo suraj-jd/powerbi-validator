@@ -14,6 +14,7 @@ from app.integrations.powerbi.dax_client import (
     build_table_expression,
     escape_column_reference,
     escape_measure_name,
+    escape_table_name,
     extract_rule_filters,
 )
 from app.services.rule_service import TARGET_TYPE_MEASURE, RuleRecord
@@ -44,8 +45,11 @@ class AnomalyValidator(BaseValidator):
         t_start = utc_now()
         cfg = rule.config or {}
 
+        is_measure = rule.target_type == TARGET_TYPE_MEASURE or bool(rule.measure_name and rule.measure_name.strip())
+        diagnostic_note: str | None = None
+
         # 1. Build and execute DAX query for current value
-        if rule.target_type == TARGET_TYPE_MEASURE or rule.measure_name:
+        if is_measure:
             if not rule.measure_name or not rule.measure_name.strip():
                 return CheckEvaluationResult.create_error(
                     rule_id=rule.id,
@@ -68,27 +72,113 @@ class AnomalyValidator(BaseValidator):
                     error_message="Anomaly check on column requires Table Name and Column Name.",
                     started_at=t_start,
                 )
-            agg = str(cfg.get("aggregation_func", "SUM")).strip().upper()
+            raw_agg = cfg.get("aggregation_func") or cfg.get("aggregation")
+            if raw_agg and str(raw_agg).strip():
+                agg = str(raw_agg).strip().upper()
+            else:
+                col_lower = rule.column_name.strip().lower()
+                id_tokens = ("_id", "id", "_key", "key", "_cd", "_code", "code", "_no", "num", "_uuid", "guid")
+                if any(tok in col_lower for tok in id_tokens):
+                    agg = "DISTINCTCOUNT"
+                else:
+                    agg = "SUM"
+
             col_ref = escape_column_reference(rule.column_name, rule.table_name)
             filters = extract_rule_filters(cfg)
-            table_expr = build_table_expression(rule.table_name, filters)
-            target_name = f"{agg}({col_ref})"
-            query = f'EVALUATE ROW("Value", {agg}X({table_expr}, {col_ref}))' if agg in ("SUM", "AVERAGE", "MIN", "MAX") else f'EVALUATE ROW("Value", {agg}({col_ref}))'
+            filters_dax = ", ".join(filters) if filters else ""
+
+            def _build_column_query(function_name: str) -> tuple[str, str]:
+                fn = function_name.upper()
+                if fn in ("DISTINCTCOUNT", "DISTINCT_COUNT"):
+                    tname = f"DISTINCTCOUNT({col_ref})"
+                    qry = (
+                        f'EVALUATE ROW("Value", CALCULATE(DISTINCTCOUNT({col_ref}), {filters_dax}))'
+                        if filters_dax
+                        else f'EVALUATE ROW("Value", DISTINCTCOUNT({col_ref}))'
+                    )
+                elif fn in ("COUNTROWS", "ROWCOUNT"):
+                    tbl_ref = escape_table_name(rule.table_name)
+                    tname = f"COUNTROWS({tbl_ref})"
+                    qry = (
+                        f'EVALUATE ROW("Value", COUNTROWS(CALCULATETABLE({tbl_ref}, {filters_dax})))'
+                        if filters_dax
+                        else f'EVALUATE ROW("Value", COUNTROWS({tbl_ref}))'
+                    )
+                elif fn in ("COUNTA", "COUNT"):
+                    tname = f"COUNTA({col_ref})"
+                    qry = (
+                        f'EVALUATE ROW("Value", CALCULATE(COUNTA({col_ref}), {filters_dax}))'
+                        if filters_dax
+                        else f'EVALUATE ROW("Value", COUNTA({col_ref}))'
+                    )
+                else:
+                    dax_fn = "AVERAGE" if fn in ("AVERAGE", "AVG") else fn
+                    tname = f"{dax_fn}({col_ref})"
+                    qry = (
+                        f'EVALUATE ROW("Value", CALCULATE({dax_fn}({col_ref}), {filters_dax}))'
+                        if filters_dax
+                        else f'EVALUATE ROW("Value", {dax_fn}({col_ref}))'
+                    )
+                return tname, qry
+
+            target_name, query = _build_column_query(agg)
 
         dax_res = dax_client.execute_raw_dax(workspace_id, dataset_id, query)
         now = utc_now()
         duration_ms = dax_res.duration_ms
 
+        # Smart fallback if column contains string / text values and SUM / AVERAGE failed
+        if (
+            not dax_res.is_success
+            and not is_measure
+            and dax_res.error_message
+            and ("cannot work with values of type string" in dax_res.error_message.lower() or "type string" in dax_res.error_message.lower())
+        ):
+            fallback_target, fallback_query = _build_column_query("DISTINCTCOUNT")
+            fallback_res = dax_client.execute_raw_dax(workspace_id, dataset_id, fallback_query)
+            if fallback_res.is_success:
+                logger.info(
+                    "Column %s is string type; automatically evaluated with DISTINCTCOUNT instead of %s",
+                    col_ref, agg
+                )
+                dax_res = fallback_res
+                target_name = fallback_target
+                query = fallback_query
+                duration_ms += fallback_res.duration_ms
+                diagnostic_note = (
+                    f"Note: Column '{rule.column_name}' contains text strings. "
+                    f"The check automatically measured Distinct Count (DISTINCTCOUNT) instead of {agg}. "
+                    "You can customize this aggregation in Rule Settings (⚙️)."
+                )
+
         if not dax_res.is_success:
+            err = dax_res.error_message or "Unknown DAX execution error"
+            if "cannot work with values of type string" in err.lower() or "type string" in err.lower():
+                user_err = (
+                    f"Cannot calculate {agg} on column '{rule.column_name}' because it contains text strings. "
+                    "Please select 'Distinct Count' or 'Count of Rows' in Rule Settings (⚙️), or choose a numeric column."
+                )
+            else:
+                user_err = f"DAX query failed: {err}"
+
             return CheckEvaluationResult.create_error(
                 rule_id=rule.id,
                 rule_name=rule.rule_name,
                 validation_type=rule.validation_type,
                 target_type=rule.target_type,
-                error_message=f"DAX query failed: {dax_res.error_message}",
+                error_message=user_err,
                 started_at=t_start,
                 duration_ms=duration_ms,
             )
+
+        def _finalize(res: CheckEvaluationResult) -> CheckEvaluationResult:
+            if diagnostic_note and res.detailed_message is not None:
+                new_detail = f"{diagnostic_note}\n\n{res.detailed_message}".strip()
+                meta = dict(res.metadata_snapshot) if res.metadata_snapshot else {}
+                meta["diagnostic_note"] = diagnostic_note
+                import dataclasses
+                return dataclasses.replace(res, detailed_message=new_detail, metadata_snapshot=meta)
+            return res
 
         if dax_res.is_blank or dax_res.scalar_value is None:
             return CheckEvaluationResult(

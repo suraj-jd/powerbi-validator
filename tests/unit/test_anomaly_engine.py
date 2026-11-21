@@ -490,3 +490,110 @@ def test_anomaly_validator_graceful_insufficient_history_when_baseline_met():
     assert res.status == ValidationStatus.PASS
     assert "satisfies baseline limits" in res.result_summary.lower()
 
+
+def test_anomaly_validator_column_distinctcount():
+    client = MagicMock(spec=DaxQueryClient)
+    client.execute_raw_dax.return_value = DaxQueryResult.from_raw_rows([{"[Value]": 10000.0}], duration_ms=25)
+
+    validator = AnomalyValidator()
+    rule = RuleRecord(
+        id=40,
+        workspace_registration_id=1,
+        rule_name="Sheet1[Order_ID] - Anomaly",
+        enabled=True,
+        target_type="column",
+        table_name="Sheet1",
+        column_name="Order_ID",
+        measure_name=None,
+        validation_type=VALIDATION_TYPE_ANOMALY,
+        config={
+            "aggregation_func": "DISTINCTCOUNT",
+            "min_baseline": 5000.0,
+            "comparison_method": "threshold_only",
+        },
+        display_order=1,
+    )
+
+    res = validator.validate(rule=rule, dax_client=client, workspace_id="ws1", dataset_id="ds1")
+    assert res.status == ValidationStatus.PASS
+    # Query must evaluate DISTINCTCOUNT
+    called_query = client.execute_raw_dax.call_args[0][2]
+    assert "DISTINCTCOUNT('Sheet1'[Order_ID])" in called_query
+
+
+def test_anomaly_validator_column_string_auto_fallback_from_sum():
+    client = MagicMock(spec=DaxQueryClient)
+    # First call with SUM fails because column contains string/text
+    # Second fallback call with DISTINCTCOUNT succeeds
+    client.execute_raw_dax.side_effect = [
+        DaxQueryResult.from_error(
+            "Query (1, 25) The function SUM cannot work with values of type String.",
+            duration_ms=15,
+        ),
+        DaxQueryResult.from_raw_rows([{"[Value]": 10000.0}], duration_ms=20),
+    ]
+
+    validator = AnomalyValidator()
+    rule = RuleRecord(
+        id=41,
+        workspace_registration_id=1,
+        rule_name="Sheet1[Order_ID] - Fallback",
+        enabled=True,
+        target_type="column",
+        table_name="Sheet1",
+        column_name="Order_ID",
+        measure_name=None,
+        validation_type=VALIDATION_TYPE_ANOMALY,
+        config={
+            "aggregation_func": "SUM",
+            "min_baseline": 5000.0,
+            "comparison_method": "threshold_only",
+        },
+        display_order=1,
+    )
+
+    res = validator.validate(rule=rule, dax_client=client, workspace_id="ws1", dataset_id="ds1")
+    assert res.status == ValidationStatus.PASS
+    assert client.execute_raw_dax.call_count == 2
+    second_query = client.execute_raw_dax.call_args_list[1][0][2]
+    assert "DISTINCTCOUNT('Sheet1'[Order_ID])" in second_query
+    assert "10,000.00" in res.actual_value
+
+
+def test_anomaly_validator_column_string_friendly_error_when_fallback_fails():
+    client = MagicMock(spec=DaxQueryClient)
+    # Both fail
+    client.execute_raw_dax.side_effect = [
+        DaxQueryResult.from_error(
+            "Query (1, 25) The function SUM cannot work with values of type String.",
+            duration_ms=15,
+        ),
+        DaxQueryResult.from_error(
+            "Underlying dataset permission denied.",
+            duration_ms=20,
+        ),
+    ]
+
+    validator = AnomalyValidator()
+    rule = RuleRecord(
+        id=42,
+        workspace_registration_id=1,
+        rule_name="Sheet1[Order_ID] - Error",
+        enabled=True,
+        target_type="column",
+        table_name="Sheet1",
+        column_name="Order_ID",
+        measure_name=None,
+        validation_type=VALIDATION_TYPE_ANOMALY,
+        config={
+            "aggregation_func": "SUM",
+            "comparison_method": "threshold_only",
+        },
+        display_order=1,
+    )
+
+    res = validator.validate(rule=rule, dax_client=client, workspace_id="ws1", dataset_id="ds1")
+    assert res.status == ValidationStatus.ERROR
+    assert "Cannot calculate SUM on column 'Order_ID'" in res.result_summary
+
+

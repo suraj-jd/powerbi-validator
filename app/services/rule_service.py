@@ -258,7 +258,22 @@ def format_rule_conditions_summary(validation_type: str, config: dict[str, Any])
             lookback = config.get("lookback_days", 30)
             method = config.get("comparison_method", "z_score")
             dev = config.get("allowed_deviation_pct", 10.0)
-            return f"lookback {lookback}d, dev <= {dev}% ({method})"
+            agg = config.get("aggregation_func") or config.get("aggregation")
+            agg_prefix = f"{agg}, " if agg else ""
+            if method in ("threshold_only", "baseline_only", "none"):
+                mn = config.get("min_baseline") if config.get("min_baseline") is not None else config.get("min_value")
+                mx = config.get("max_baseline") if config.get("max_baseline") is not None else config.get("max_value")
+                if mn is not None and mx is not None:
+                    return f"{agg_prefix}range [{mn}, {mx}]"
+                if mn is not None:
+                    return f"{agg_prefix}>= {mn}"
+                if mx is not None:
+                    return f"{agg_prefix}<= {mx}"
+                return f"{agg_prefix}thresholds"
+            if method == "percentage":
+                base = config.get("baseline_value", 0.0)
+                return f"{agg_prefix}baseline {base} (±{dev}%)"
+            return f"{agg_prefix}lookback {lookback}d, dev <= {dev}% ({method})"
 
         if validation_type == VALIDATION_TYPE_REFRESH:
             expected = config.get("expected_status", "Completed")

@@ -1136,6 +1136,9 @@ class SheetSettingsPage(QWidget):
             target_display=dto.target_display,
             current_config=dto.config,
             rule_name=dto.rule_name or "",
+            target_type=dto.target_type,
+            column_name=dto.column_name,
+            table_name=dto.table_name,
             parent=self,
         )
         if dialog.exec():

@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.rule_service import (
+    TARGET_TYPE_MEASURE,
     VALIDATION_TYPE_ANOMALY,
     VALIDATION_TYPE_DAX_MEASURE,
     VALIDATION_TYPE_DUPLICATE,
@@ -51,6 +52,9 @@ class SheetRuleConfigDialog(QDialog):
         target_display: str = "",
         current_config: dict[str, Any] | None = None,
         rule_name: str = "",
+        target_type: str | None = None,
+        column_name: str | None = None,
+        table_name: str | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -60,6 +64,9 @@ class SheetRuleConfigDialog(QDialog):
 
         self._validation_type = validation_type
         self._target_display = target_display
+        self._target_type = target_type or ""
+        self._column_name = column_name or ""
+        self._table_name = table_name or ""
         self._config: dict[str, Any] = copy.deepcopy(current_config or {})
         self._initial_rule_name = rule_name
         self._result_config: dict[str, Any] | None = None
@@ -322,6 +329,43 @@ class SheetRuleConfigDialog(QDialog):
             anom_info_card.setWordWrap(True)
             form.addRow(anom_info_card)
 
+            # Column Aggregation (when targeting a column rather than a measure)
+            is_col = (
+                self._target_type != TARGET_TYPE_MEASURE
+                and not self._target_display.startswith("[")
+            )
+            if is_col:
+                self.anom_agg_combo = AnimatedComboBox()
+                agg_items = [
+                    ("Distinct Count (DISTINCTCOUNT)", "DISTINCTCOUNT", "Counts unique values (recommended for IDs, codes, and text columns)."),
+                    ("Count of Rows (COUNTROWS)", "COUNTROWS", "Counts total rows matching filter criteria."),
+                    ("Count of Values (COUNTA)", "COUNTA", "Counts non-blank values in the column."),
+                    ("Sum (SUM)", "SUM", "Total sum of column values (numeric columns only)."),
+                    ("Average (AVERAGE)", "AVERAGE", "Arithmetic mean of column values (numeric columns only)."),
+                    ("Minimum (MIN)", "MIN", "Smallest value in column."),
+                    ("Maximum (MAX)", "MAX", "Largest value in column."),
+                ]
+                for text, val, tip in agg_items:
+                    self.anom_agg_combo.addItem(text, val)
+                    self.anom_agg_combo.setItemData(self.anom_agg_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
+                self.anom_agg_combo.setToolTip("Select how values in this column should be aggregated.")
+                self.anom_agg_combo.currentIndexChanged.connect(
+                    lambda idx: self.anom_agg_combo.setToolTip(self.anom_agg_combo.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Select how values in this column should be aggregated.")
+                )
+
+                saved_agg = str(self._config.get("aggregation_func") or self._config.get("aggregation") or "").strip().upper()
+                if not saved_agg:
+                    col_l = (self._column_name or self._target_display).lower()
+                    if any(t in col_l for t in ("_id", "id", "_key", "key", "_cd", "code", "guid", "uuid", "name", "_no", "num")):
+                        saved_agg = "DISTINCTCOUNT"
+                    else:
+                        saved_agg = "SUM"
+
+                agg_idx = next((i for i in range(self.anom_agg_combo.count()) if self.anom_agg_combo.itemData(i) == saved_agg), 0)
+                self.anom_agg_combo.setCurrentIndex(agg_idx)
+                self.anom_agg_row_lbl = QLabel("Column Aggregation:")
+                form.addRow(self.anom_agg_row_lbl, self.anom_agg_combo)
+
             # 1. Primary Detection Method
             self.anom_method_combo = AnimatedComboBox()
             anom_method_items = [
@@ -551,6 +595,10 @@ class SheetRuleConfigDialog(QDialog):
                         else:
                             msg += "."
 
+                if hasattr(self, "anom_agg_combo"):
+                    agg_desc = self.anom_agg_combo.currentText()
+                    msg = f"<b>Column Aggregation:</b> {agg_desc}<br>" + msg
+
                 self.anom_live_summary.setText(msg)
 
             def _update_method_visibility():
@@ -574,6 +622,8 @@ class SheetRuleConfigDialog(QDialog):
 
                 _update_live_summary()
 
+            if hasattr(self, "anom_agg_combo"):
+                self.anom_agg_combo.currentIndexChanged.connect(lambda _: _update_live_summary())
             self.anom_method_combo.currentIndexChanged.connect(lambda _: _update_method_visibility())
             self.anom_fixed_baseline.valueChanged.connect(lambda _: _update_live_summary())
             self.anom_dev_pct.valueChanged.connect(lambda _: _update_live_summary())
@@ -634,6 +684,11 @@ class SheetRuleConfigDialog(QDialog):
             cfg["allowed_deviation_pct"] = self.dax_dev_pct.value()
 
         elif vtype == VALIDATION_TYPE_ANOMALY:
+            if hasattr(self, "anom_agg_combo"):
+                chosen_agg = self.anom_agg_combo.currentData()
+                cfg["aggregation_func"] = chosen_agg
+                cfg["aggregation"] = chosen_agg
+
             if self.anom_chk_min.isChecked():
                 cfg["min_baseline"] = self.anom_spin_min.value()
                 cfg["min_value"] = self.anom_spin_min.value()
