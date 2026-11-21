@@ -6,7 +6,17 @@ A local-first Windows desktop application for automating Power BI semantic model
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6%20(Qt%206)-41CD52.svg)](https://www.qt.io/)
 [![Database](https://img.shields.io/badge/database-SQLite%20%2B%20Alembic-003B57.svg)](https://www.sqlalchemy.org/)
 [![Version](https://img.shields.io/badge/version-1.0.0-success.svg)](docs/RELEASE_NOTES_v1.0.0.md)
-[![Tests](https://img.shields.io/badge/tests-198%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-224%20passed-brightgreen.svg)](tests/)
+
+---
+
+## 🎬 Software Tour & Video Walkthrough
+
+<video src="docs/videos/powerbi-validator.mp4" controls width="100%"></video>
+
+> 📹 **Watch the end-to-end software tour:** Live walkthrough of Microsoft Entra ID sign-in, metadata discovery, spreadsheet-style test authoring, real-time DAX execution against Power BI, side-by-side run comparisons, and database maintenance.
+> 
+> *(Direct video file link: [docs/videos/powerbi-validator.mp4](docs/videos/powerbi-validator.mp4))*
 
 ---
 
@@ -61,7 +71,7 @@ Explore the application screens and core capabilities below:
 ![Run Comparison](docs/screenshots/04_run_comparison.png)
 
 * **Interactive Run Selectors**: Live dropdowns for **Baseline Run (A)** and **Target Run (B)** with a `⇄ Swap Runs` button for instant re-comparison.
-* **Diff Classification Cards**: Filterable KPI cards for **REGRESSIONS** (worsened checks), **IMPROVEMENTS** (resolved checks), **UNCHANGED**, and **NEW / REMOVED RULES**.
+* **Diff Classification Cards**: Filterable KPI cards for **WORSENED** (regressions), **RESOLVED** (improvements), **UNCHANGED**, and **NEW / REMOVED RULES** with descriptive info tooltips.
 * **Filterable Diff Table**: Universal text search by rule name or target, change type filter, and generous interactive column widths.
 * **Diff Export**: One-click **`📥 Export Diff to CSV`** button for team reviews and audit documentation.
 
@@ -183,7 +193,7 @@ python -m app.main
 
 ## 🧪 Automated Testing
 
-Run the complete automated test suite (168 unit and UI tests):
+Run the complete automated test suite (224 unit and UI tests):
 
 ```powershell
 # Run all tests

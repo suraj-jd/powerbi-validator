@@ -113,10 +113,10 @@ class AboutPage(QWidget):
         self.tabs.setObjectName("AboutTabs")
         self.tabs.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self.tabs.addTab(self._build_guide_tab(), "📖  User Guide & Walkthrough")
-        self.tabs.addTab(self._build_sections_tab(), "🏛️  Sections & Architecture")
+        self.tabs.addTab(self._build_guide_tab(), "📖  User Guide && Walkthrough")
+        self.tabs.addTab(self._build_sections_tab(), "🏛️  Sections && Architecture")
         self.tabs.addTab(self._build_catalog_tab(), "🛡️  Validation Tests Catalog")
-        self.tabs.addTab(self._build_diagnostics_tab(), "⚙️  System & Diagnostics")
+        self.tabs.addTab(self._build_diagnostics_tab(), "⚙️  System && Diagnostics")
 
         outer.addWidget(self.tabs, stretch=1)
 
@@ -409,30 +409,18 @@ class AboutPage(QWidget):
             bullets_layout.addLayout(b_row)
         layout.addLayout(bullets_layout)
 
-        # Tip callout
+        # Tip bullet item
         if tip:
-            tip_frame = QFrame()
-            tip_frame.setObjectName("StepTipFrame")
-            tip_frame.setStyleSheet(
-                "QFrame#StepTipFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
-                "border-left: 3px solid #1668DC; border-radius: 4px; padding: 6px 12px; } "
-                "QLabel { border: none; background: transparent; padding: 0px; }"
-            )
-            tip_layout = QHBoxLayout(tip_frame)
-            tip_layout.setContentsMargins(6, 4, 6, 4)
-            tip_layout.setSpacing(8)
-            tip_tag = QLabel("TIP")
-            tip_tag.setStyleSheet(
-                "font-size: 10px; font-weight: 700; color: #1668DC; "
-                "background-color: #EFF6FF; border: 1px solid #BFDBFE; "
-                "border-radius: 3px; padding: 1px 6px;"
-            )
-            t_lbl = QLabel(tip)
-            t_lbl.setStyleSheet("font-size: 11px; color: #334155; line-height: 1.4;")
-            t_lbl.setWordWrap(True)
-            tip_layout.addWidget(tip_tag, alignment=Qt.AlignmentFlag.AlignTop)
-            tip_layout.addWidget(t_lbl, stretch=1)
-            layout.addWidget(tip_frame)
+            b_row = QHBoxLayout()
+            b_row.setSpacing(6)
+            dot = QLabel("•")
+            dot.setStyleSheet("color: #1668DC; font-weight: 700; font-size: 14px;")
+            b_lbl = QLabel(f"Tip: {tip}")
+            b_lbl.setStyleSheet("font-size: 12px; color: #475569;")
+            b_lbl.setWordWrap(True)
+            b_row.addWidget(dot, alignment=Qt.AlignmentFlag.AlignTop)
+            b_row.addWidget(b_lbl, stretch=1)
+            bullets_layout.addLayout(b_row)
 
         return card
 

@@ -6,6 +6,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 
+# Ensure repository root is on Python sys.path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
@@ -15,6 +20,7 @@ from app.core.status import NotificationLevel, RefreshStatus, ValidationStatus
 from app.database.models import ValidationResult, ValidationRun
 from app.services.compare_service import compare_validation_runs
 from app.services.sheet_service import (
+    VALIDATION_TYPE_ANOMALY,
     VALIDATION_TYPE_DAX_MEASURE,
     VALIDATION_TYPE_DUPLICATE,
     VALIDATION_TYPE_LATEST_DATE,
@@ -30,6 +36,8 @@ from app.ui.dialogs.run_comparison_dialog import RunComparisonDialog
 
 def main() -> None:
     demo_dir = Path("docs/screenshots/demo_data")
+    import shutil
+    shutil.rmtree(demo_dir, ignore_errors=True)
     demo_dir.mkdir(parents=True, exist_ok=True)
 
     ctx = bootstrap_application(data_dir=demo_dir, install_hooks=False, auto_restore_auth=False)
@@ -40,114 +48,139 @@ def main() -> None:
     out_dir = Path("docs/screenshots")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Seed Validation Sheet rules via SheetService
+    ws_name = "My Workspace"
+    ws_id = "me"
+    rep_name = "Zomato Analytics"
+    rep_id = "1bd33d33-45e1-4463-a29a-8980e0d06066"
+    ds_name = "Zomato"
+    ds_id = "ea471a1a-5849-4ba0-b54b-5f624e83c383"
+
+    # 1. Seed Validation Sheet rules with live Power BI testing units
     sheet_svc = SheetService(db)
     sheet_rows = [
         SheetRowDTO(
             sr_no=1,
             enabled=True,
-            workspace_name="Global Enterprise Analytics",
-            workspace_id="a1b2c3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            report_name="Executive Sales Dashboard",
-            report_id="c1c2c3c4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            dataset_name="Sales & Financial Performance",
-            dataset_id="d1d2d3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
             validation_type=VALIDATION_TYPE_NULL,
-            table_name="Fact_SalesOrders",
-            column_name="SalesOrderID",
-            filter_1="'Fact_SalesOrders'[Status] = \"Shipped\"",
+            table_name="Sheet1",
+            column_name="Order_ID",
             config={"null_threshold_count": 0, "null_threshold_pct": 0.0},
-            rule_name="Sales Orders - Primary Key Null Check",
+            rule_name="Sheet1[Order_ID] Null / Blank Check",
         ),
         SheetRowDTO(
             sr_no=2,
             enabled=True,
-            workspace_name="Global Enterprise Analytics",
-            workspace_id="a1b2c3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            report_name="Executive Sales Dashboard",
-            report_id="c1c2c3c4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            dataset_name="Sales & Financial Performance",
-            dataset_id="d1d2d3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
             validation_type=VALIDATION_TYPE_DUPLICATE,
-            table_name="Dim_Customer",
-            column_name="CustomerAlternateKey",
+            table_name="Sheet1",
+            column_name="Order_ID",
             config={"duplicate_threshold_count": 0},
-            rule_name="Customer Dimension - Unique Key Check",
+            rule_name="Sheet1[Order_ID] Duplicate Row Check",
         ),
         SheetRowDTO(
             sr_no=3,
             enabled=True,
-            workspace_name="Global Enterprise Analytics",
-            workspace_id="a1b2c3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            report_name="Executive Sales Dashboard",
-            report_id="c1c2c3c4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            dataset_name="Sales & Financial Performance",
-            dataset_id="d1d2d3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            validation_type=VALIDATION_TYPE_LATEST_DATE,
-            table_name="Fact_SalesOrders",
-            column_name="OrderDate",
-            filter_1="'Fact_SalesOrders'[Year] = 2024",
-            config={"max_age_days": 1, "disallow_future_dates": True},
-            rule_name="Order Date - Freshness SLA (24h)",
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
+            validation_type=VALIDATION_TYPE_ROW_COUNT,
+            table_name="Sheet1",
+            config={"min_row_count": 10000, "max_row_count": 10000},
+            rule_name="Sheet1 Row Count Check (10,000 rows)",
         ),
         SheetRowDTO(
             sr_no=4,
             enabled=True,
-            workspace_name="Global Enterprise Analytics",
-            workspace_id="a1b2c3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            report_name="Executive Sales Dashboard",
-            report_id="c1c2c3c4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            dataset_name="Sales & Financial Performance",
-            dataset_id="d1d2d3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
             validation_type=VALIDATION_TYPE_DAX_MEASURE,
-            measure_name="[Net Profit Margin %]",
-            filter_1="'Dates'[Year] = 2024",
-            filter_2="'Geography'[Region] = \"North America\"",
-            config={"expected_value_str": "0.245", "max_percentage_deviation": 5.0},
-            rule_name="Net Profit Margin - Baseline DAX Check",
+            measure_name="Discount Utilization (%)",
+            config={"expected_value_str": "49.91", "max_percentage_deviation": 10.0},
+            rule_name="[Discount Utilization (%)] DAX Measure Check",
         ),
         SheetRowDTO(
             sr_no=5,
             enabled=True,
-            workspace_name="Global Enterprise Analytics",
-            workspace_id="a1b2c3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            report_name="Executive Sales Dashboard",
-            report_id="c1c2c3c4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            dataset_name="Sales & Financial Performance",
-            dataset_id="d1d2d3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            validation_type=VALIDATION_TYPE_ROW_COUNT,
-            table_name="Fact_ProductInventory",
-            config={"min_row_count": 50000, "max_row_count": 2000000},
-            rule_name="Product Inventory - Min Row Count SLA",
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
+            validation_type=VALIDATION_TYPE_ANOMALY,
+            table_name="Sheet1",
+            column_name="Order_Amount",
+            filter_1="'Sheet1'[Cuisine] = \"Indian\"",
+            config={
+                "aggregation_func": "SUM",
+                "min_baseline": 100000.0,
+                "max_baseline": 10000000.0,
+                "comparison_method": "threshold_only",
+            },
+            rule_name="Sheet1[Order_Amount] Baseline & % Change Check",
         ),
         SheetRowDTO(
             sr_no=6,
             enabled=True,
-            workspace_name="Global Enterprise Analytics",
-            workspace_id="a1b2c3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            report_name="Executive Sales Dashboard",
-            report_id="c1c2c3c4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
-            dataset_name="Sales & Financial Performance",
-            dataset_id="d1d2d3d4-e5f6-4a8b-9c0d-1e2f3a4b5c6d",
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
+            validation_type=VALIDATION_TYPE_LATEST_DATE,
+            table_name="Sheet1",
+            column_name="Order_Date",
+            config={"max_age_days": 730, "disallow_future_dates": False},
+            rule_name="Sheet1[Order_Date] Date Freshness Check",
+        ),
+        SheetRowDTO(
+            sr_no=7,
+            enabled=True,
+            workspace_name=ws_name,
+            workspace_id=ws_id,
+            report_name=rep_name,
+            report_id=rep_id,
+            dataset_name=ds_name,
+            dataset_id=ds_id,
             validation_type=VALIDATION_TYPE_REFRESH,
-            config={"max_age_days": 1},
+            config={"max_age_days": 300},
             rule_name="Power BI Dataset Scheduled Refresh SLA",
         ),
     ]
     saved_rows = sheet_svc.save_all_rows(sheet_rows)
     reg_id = saved_rows[0].workspace_registration_id
 
-    # 2. Seed 3 Historical Runs
+    # 2. Seed 3 Historical Runs reflecting live test outcomes
     now = datetime.now(timezone.utc)
     with db.session_scope() as session:
+        # Run 1 (2 days ago): All Passed
         run1 = ValidationRun(
             workspace_registration_id=reg_id,
             overall_status="PASS",
-            passed_count=6,
+            passed_count=7,
             failed_count=0,
             warning_count=0,
             error_count=0,
-            duration_ms=842,
+            duration_ms=1210,
             app_version="1.0.0",
             started_at=now - timedelta(days=2),
             completed_at=now - timedelta(days=2) + timedelta(seconds=1),
@@ -155,14 +188,15 @@ def main() -> None:
         session.add(run1)
         session.flush()
 
+        # Run 2 (yesterday): Baseline Run (All 7 Passed)
         run2 = ValidationRun(
             workspace_registration_id=reg_id,
             overall_status="PASS",
-            passed_count=5,
+            passed_count=7,
             failed_count=0,
-            warning_count=1,
+            warning_count=0,
             error_count=0,
-            duration_ms=920,
+            duration_ms=1260,
             app_version="1.0.0",
             started_at=now - timedelta(days=1),
             completed_at=now - timedelta(days=1) + timedelta(seconds=1),
@@ -170,31 +204,33 @@ def main() -> None:
         session.add(run2)
         session.flush()
 
+        # Run 3 (latest): Target Run with 6 PASS, 1 WARNING (Refresh SLA Warning)
         run3 = ValidationRun(
             workspace_registration_id=reg_id,
             overall_status="WARNING",
-            passed_count=4,
-            failed_count=1,
+            passed_count=6,
+            failed_count=0,
             warning_count=1,
             error_count=0,
-            duration_ms=1150,
+            duration_ms=1340,
             app_version="1.0.0",
-            started_at=now - timedelta(hours=2),
-            completed_at=now - timedelta(hours=2) + timedelta(seconds=1),
+            started_at=now - timedelta(hours=1),
+            completed_at=now - timedelta(hours=1) + timedelta(seconds=1),
         )
         session.add(run3)
         session.flush()
 
-        # Seed Run 3 Results
-        res_list = [
-            (saved_rows[0].row_id, "PASS", "0 nulls (0.0%)", "<= 0 count", "0.0%", "Passed: 0 null records detected in 'Fact_SalesOrders[SalesOrderID]'."),
-            (saved_rows[1].row_id, "PASS", "0 duplicate keys", "0 duplicates allowed", "0", "Passed: Primary key uniqueness intact across 85,000 customer records."),
-            (saved_rows[2].row_id, "FAIL", "2026-11-17 21:00:00 (Age: 51.2h)", "Max allowed age: 24h", "+27.2h stale", "Failed SLA: Latest transaction date is 51.2 hours old (SLA threshold is 24.0 hours)."),
-            (saved_rows[3].row_id, "WARNING", "0.228 (-6.9% deviation)", "0.245 (+/- 5.0%)", "-6.9%", "Warning: Measure [Net Profit Margin %] evaluated to 22.8% (expected 24.5% +/- 5.0%)."),
-            (saved_rows[4].row_id, "PASS", "318,450 rows", "50,000 - 2,000,000 rows", "Within range", "Passed: Table 'Fact_ProductInventory' contains 318,450 rows."),
-            (saved_rows[5].row_id, "PASS", "Completed (Duration: 2m 14s)", "Completed status within 24h", "0s", "Passed: Latest dataset refresh completed successfully in 2m 14s."),
+        # Seed Run 3 Results (Matches actual live test execution results)
+        res3_list = [
+            (saved_rows[0].row_id, "PASS", "0 blanks / 10,000 rows (0.0%)", "<= 0 blanks (0.0%)", "0.0%", "Null check passed: 0 blanks / 10,000 rows (0.0%)."),
+            (saved_rows[1].row_id, "PASS", "0 duplicates / 10,000 rows (0.0%)", "<= 0 duplicates (0.0%)", "0.0%", "Duplicate check passed: 0 duplicates / 10,000 rows (0.0%) on (Order_ID)."),
+            (saved_rows[2].row_id, "PASS", "10,000 rows", "10,000 rows (baseline)", "0.0%", "Table row count passed: 10,000 rows matches baseline."),
+            (saved_rows[3].row_id, "PASS", "49.91", "49.91 (+/- 10.0%)", "0.0%", "Measure 'Sheet1'[Discount Utilization (%)] passed: 49.91 within target baseline."),
+            (saved_rows[4].row_id, "PASS", "1,505,604.74", ">= 100,000.00 and <= 10,000,000.00", "In range", "Anomaly check passed for SUM('Sheet1'[Order_Amount]): 1,505,604.74 satisfies baseline thresholds."),
+            (saved_rows[5].row_id, "PASS", "2025-01-16 00:00:00 UTC", "<= 730 days old", "Fresh", "Latest date check passed: 2025-01-16 00:00:00 UTC within SLA."),
+            (saved_rows[6].row_id, "WARNING", "No refresh history", "Status = Completed, Age <= 7200h", "Warning", "No refresh history found for this dataset (personal workspace)."),
         ]
-        for rid, st, act, exp, dev, summ in res_list:
+        for rid, st, act, exp, dev, summ in res3_list:
             session.add(
                 ValidationResult(
                     validation_run_id=run3.id,
@@ -209,14 +245,15 @@ def main() -> None:
                 )
             )
 
-        # Seed Run 2 Results
+        # Seed Run 2 Results (All Passed)
         res2_list = [
-            (saved_rows[0].row_id, "PASS", "0 nulls", "<= 0", "0", "Passed"),
-            (saved_rows[1].row_id, "PASS", "0 duplicate keys", "0", "0", "Passed"),
-            (saved_rows[2].row_id, "PASS", "2026-11-19 01:00:00 (Age: 18h)", "Max age: 24h", "0", "Passed"),
-            (saved_rows[3].row_id, "WARNING", "0.231 (-5.7% deviation)", "0.245", "-5.7%", "Warning"),
-            (saved_rows[4].row_id, "PASS", "315,200 rows", "50,000 - 2,000,000", "Within range", "Passed"),
-            (saved_rows[5].row_id, "PASS", "Completed (Duration: 2m 18s)", "Completed", "0", "Passed"),
+            (saved_rows[0].row_id, "PASS", "0 blanks / 10,000 rows", "<= 0 blanks", "0.0%", "Passed"),
+            (saved_rows[1].row_id, "PASS", "0 duplicates", "<= 0 duplicates", "0.0%", "Passed"),
+            (saved_rows[2].row_id, "PASS", "10,000 rows", "10,000 rows", "0.0%", "Passed"),
+            (saved_rows[3].row_id, "PASS", "49.88", "49.91 (+/- 10.0%)", "-0.06%", "Passed"),
+            (saved_rows[4].row_id, "PASS", "1,502,300.10", ">= 100,000.00 and <= 10,000,000.00", "In range", "Passed"),
+            (saved_rows[5].row_id, "PASS", "2025-01-16 00:00:00 UTC", "<= 730 days old", "Fresh", "Passed"),
+            (saved_rows[6].row_id, "PASS", "Completed (Duration: 18s)", "Completed", "0s", "Passed"),
         ]
         for rid, st, act, exp, dev, summ in res2_list:
             session.add(
@@ -233,17 +270,17 @@ def main() -> None:
                 )
             )
 
-    window.resize(1300, 840)
+    window.resize(1340, 860)
 
-    # Set authenticated user profile
+    # Set authenticated user profile matching live session
     window.apply_auth_state(
         AuthStateSnapshot(
             status=AuthStatus.AUTHENTICATED,
             account=AuthAccount(
-                home_account_id="oid.tid",
-                display_name="Enterprise BI Engineer",
-                username="bi.engineer@contoso.com",
-                tenant_id="contoso-corp-tid",
+                home_account_id="suraj-jd-account",
+                display_name="Suraj jd",
+                username="cisam55573@exespay.com",
+                tenant_id="e11878ed-ea6b-4a97-9022-c835a991e474",
             ),
             client_id_configured=True,
         )
@@ -251,17 +288,17 @@ def main() -> None:
 
     # Synchronize Home Page
     home = window.home_page
-    home.auth_banner.set_workspace_access_label("Global Enterprise Analytics - Admin")
+    home.auth_banner.set_workspace_access_label("My Workspace - Contributor")
     home.reload_registered_models()
 
     # Update Home refresh monitoring card
-    home.home_attempt_start.setText("Start: Today, 14:15:00 UTC")
-    home.home_attempt_duration.setText("Duration: 2m 14s")
-    home.home_success_time.setText("Today, 14:17:14 UTC")
-    home.home_success_age.setText("Age: 3.2 hours ago")
-    home.home_success_duration.setText("Duration: 2m 14s")
-    home.home_reliability_rate.setText("98.5%")
-    home.home_reliability_detail.setText("Total: 40 (Passed: 39, Failed: 1)")
+    home.home_attempt_start.setText("Start: Today, 04:12:00 UTC")
+    home.home_attempt_duration.setText("Duration: 15 ms")
+    home.home_success_time.setText("Personal Workspace Model")
+    home.home_success_age.setText("Status: Unscheduled")
+    home.home_success_duration.setText("Duration: N/A")
+    home.home_reliability_rate.setText("100.0%")
+    home.home_reliability_detail.setText("Manual Direct Publish (Cloud Sync Active)")
 
     # Load runs into history page and home dashboard
     window.history_page.refresh_history()
@@ -277,7 +314,7 @@ def main() -> None:
     app.processEvents()
     pm_home = window.grab()
     pm_home.save(str(out_dir / "01_dashboard_home.png"))
-    print("[✓] Saved 01_dashboard_home.png")
+    print("[+] Saved 01_dashboard_home.png")
 
     # 2. Capture Validation Sheet Page
     window.navigate_to("sheet_settings")
@@ -285,7 +322,7 @@ def main() -> None:
     app.processEvents()
     pm_sheet = window.grab()
     pm_sheet.save(str(out_dir / "02_validation_sheet.png"))
-    print("[✓] Saved 02_validation_sheet.png")
+    print("[+] Saved 02_validation_sheet.png")
 
     # 3. Capture History Page
     window.navigate_to("history")
@@ -294,39 +331,40 @@ def main() -> None:
     app.processEvents()
     pm_hist = window.grab()
     pm_hist.save(str(out_dir / "03_history_explorer.png"))
-    print("[✓] Saved 03_history_explorer.png")
+    print("[+] Saved 03_history_explorer.png")
 
-    # 4. Capture Run Comparison Dialog
+    # 4. Capture Run Comparison Dialog (shows Worsened Checks KPI card)
     if len(runs) >= 2:
         cmp_dto = compare_validation_runs(runs[1], runs[0])
         cmp_dialog = RunComparisonDialog(cmp_dto, all_runs=runs)
-        cmp_dialog.resize(1120, 680)
+        cmp_dialog.resize(1160, 700)
         cmp_dialog.show()
         app.processEvents()
         pm_cmp = cmp_dialog.grab()
         pm_cmp.save(str(out_dir / "04_run_comparison.png"))
         cmp_dialog.close()
-        print("[✓] Saved 04_run_comparison.png")
+        print("[+] Saved 04_run_comparison.png")
 
     # 5. Capture Database Maintenance Dialog
     maint_dialog = BackupMaintenanceDialog(db)
-    maint_dialog.resize(760, 640)
+    maint_dialog.resize(780, 660)
     maint_dialog.show()
     app.processEvents()
     pm_maint = maint_dialog.grab()
     pm_maint.save(str(out_dir / "05_database_maintenance.png"))
     maint_dialog.close()
-    print("[✓] Saved 05_database_maintenance.png")
+    print("[+] Saved 05_database_maintenance.png")
 
-    # 6. Capture About Page
+    # 6. Capture About Page (clean professional look)
     window.navigate_to("about")
     app.processEvents()
     pm_about = window.grab()
     pm_about.save(str(out_dir / "06_about_page.png"))
-    print("[✓] Saved 06_about_page.png")
+    print("[+] Saved 06_about_page.png")
 
     window.close()
     db.dispose()
+    print("[+] All showcase screenshots updated successfully.")
 
 
 if __name__ == "__main__":

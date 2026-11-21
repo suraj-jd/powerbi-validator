@@ -205,7 +205,7 @@ class RunComparisonDialog(QDialog):
         self.combo_run_a.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row1.addWidget(self.combo_run_a)
 
-        self.btn_swap = QPushButton("⇄ Swap 1 & 2")
+        self.btn_swap = QPushButton("⇄ Swap 1 && 2")
         self.btn_swap.setObjectName("SecondaryButton")
         self.btn_swap.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_swap.setToolTip("Swap Run 1 (Baseline) and Run 2 (Target).")
@@ -249,7 +249,7 @@ class RunComparisonDialog(QDialog):
         self.combo_run_d.setStyleSheet("padding: 4px 8px; font-size: 12px;")
         row2.addWidget(self.combo_run_d)
 
-        self.btn_clear_optional = QPushButton("✕ Reset (3 & 4)")
+        self.btn_clear_optional = QPushButton("✕ Reset (3 && 4)")
         self.btn_clear_optional.setObjectName("SecondaryButton")
         self.btn_clear_optional.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear_optional.setToolTip("Reset optional Run 3 and Run 4 to None.")
