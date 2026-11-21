@@ -1,4 +1,4 @@
-"""Power BI-style recurring validation schedule dialog."""
+"""Power BI-style recurring validation schedule dialog with a compact, modern layout."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -29,12 +29,11 @@ from app.services.scheduler_service import (
 
 logger = logging.getLogger(__name__)
 
-# Standard 30-minute intervals for Power BI style time picker
 TIME_OPTIONS_30M = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
 
 
 class ScheduleValidationDialog(QDialog):
-    """Dialog configuring recurring automated validation runs inspired by Power BI Scheduled Refresh."""
+    """Refined dialog configuring recurring validation runs inspired by Power BI Scheduled Refresh."""
 
     def __init__(
         self,
@@ -52,8 +51,8 @@ class ScheduleValidationDialog(QDialog):
         self._times.sort()
 
         self.setWindowTitle("Schedule Automated Validations")
-        self.setMinimumWidth(560)
-        self.resize(600, 680)
+        self.setMinimumWidth(720)
+        self.resize(740, 460)
 
         self._build_ui()
         self._apply_initial_state()
@@ -61,146 +60,121 @@ class ScheduleValidationDialog(QDialog):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 22, 24, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
 
-        # Header Title
+        # 1. Header Row (Title on Left, Sheet Status Pill on Right)
+        header_row = QHBoxLayout()
+        header_row.setSpacing(12)
+
         title_box = QVBoxLayout()
-        title_box.setSpacing(3)
+        title_box.setSpacing(2)
         lbl_title = QLabel("Automated Validation Scheduler")
         lbl_title.setStyleSheet("font-size: 17px; font-weight: 700; color: #0F172A;")
         title_box.addWidget(lbl_title)
 
         lbl_sub = QLabel(
-            "Mirroring Power BI Scheduled Refresh: automatically evaluate all rules "
-            "from your Validation Sheet at configured times while the application is active."
+            "Automatically evaluate all enabled checks from your Validation Sheet on a recurring schedule."
         )
         lbl_sub.setWordWrap(True)
-        lbl_sub.setStyleSheet("font-size: 12px; color: #64748B; line-height: 1.4;")
+        lbl_sub.setStyleSheet("font-size: 12px; color: #64748B;")
         title_box.addWidget(lbl_sub)
-        layout.addLayout(title_box)
+        header_row.addLayout(title_box, stretch=1)
 
-        # 1. Validation Sheet Prerequisite Status Pill
+        # Sheet Status Pill (Top-Right)
         self.sheet_status_frame = QFrame()
         self.sheet_status_layout = QHBoxLayout(self.sheet_status_frame)
-        self.sheet_status_layout.setContentsMargins(12, 10, 12, 10)
-        self.sheet_status_layout.setSpacing(8)
+        self.sheet_status_layout.setContentsMargins(8, 5, 10, 5)
+        self.sheet_status_layout.setSpacing(6)
 
         self.lbl_sheet_icon = QLabel()
-        self.lbl_sheet_icon.setFixedSize(18, 18)
         self.sheet_status_layout.addWidget(self.lbl_sheet_icon)
 
         self.lbl_sheet_msg = QLabel()
-        self.lbl_sheet_msg.setWordWrap(True)
-        self.lbl_sheet_msg.setStyleSheet("font-size: 12px; font-weight: 600;")
-        self.sheet_status_layout.addWidget(self.lbl_sheet_msg, stretch=1)
-        layout.addWidget(self.sheet_status_frame)
+        self.sheet_status_layout.addWidget(self.lbl_sheet_msg)
+        header_row.addWidget(self.sheet_status_frame, alignment=Qt.AlignmentFlag.AlignTop)
 
+        layout.addLayout(header_row)
         self._update_sheet_status_banner()
 
-        # 2. Main Master Toggle (Power BI style: "Keep your data up to date")
-        toggle_box = QFrame()
-        toggle_box.setStyleSheet(
-            "QFrame { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
+        # 2. Master Toggle Row (Clean & Compact)
+        toggle_card = QFrame()
+        toggle_card.setStyleSheet(
+            "QFrame { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 7px; padding: 6px 12px; }"
         )
-        t_lay = QVBoxLayout(toggle_box)
+        t_lay = QHBoxLayout(toggle_card)
         t_lay.setContentsMargins(4, 4, 4, 4)
-        t_lay.setSpacing(4)
+        t_lay.setSpacing(10)
 
         self.chk_enabled = QCheckBox("Keep your validations up to date")
-        self.chk_enabled.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
+        self.chk_enabled.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
         self.chk_enabled.toggled.connect(self._on_enabled_toggled)
         t_lay.addWidget(self.chk_enabled)
 
-        lbl_toggle_sub = QLabel(
-            "Run automated validations in the background without requiring manual clicks."
-        )
-        lbl_toggle_sub.setStyleSheet("font-size: 11px; color: #64748B; margin-left: 24px;")
+        lbl_toggle_sub = QLabel("(Executes in the background without requiring manual clicks)")
+        lbl_toggle_sub.setStyleSheet("font-size: 11px; color: #64748B;")
         t_lay.addWidget(lbl_toggle_sub)
-        layout.addWidget(toggle_box)
+        t_lay.addStretch(1)
 
-        # 3. Schedule Settings Container (Disabled when toggle is OFF)
+        layout.addWidget(toggle_card)
+
+        # 3. Schedule Settings Card
         self.settings_card = QFrame()
+        self.settings_card.setObjectName("SettingsCard")
         self.settings_card.setStyleSheet(
             "QFrame#SettingsCard { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; }"
         )
-        self.settings_card.setObjectName("SettingsCard")
         s_lay = QVBoxLayout(self.settings_card)
-        s_lay.setContentsMargins(16, 16, 16, 16)
-        s_lay.setSpacing(14)
+        s_lay.setContentsMargins(16, 14, 16, 14)
+        s_lay.setSpacing(12)
 
-        # Frequency Row
-        freq_row = QHBoxLayout()
-        freq_row.setSpacing(12)
-        lbl_freq = QLabel("Refresh Frequency:")
-        lbl_freq.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155; min-width: 130px;")
-        freq_row.addWidget(lbl_freq)
+        # Control Row: Frequency + Add Time Action (Side by Side)
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(14)
+
+        lbl_freq = QLabel("Frequency:")
+        lbl_freq.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;")
+        ctrl_row.addWidget(lbl_freq)
 
         self.combo_frequency = QComboBox()
         self.combo_frequency.addItems(["Daily (Multiple Times of Day)", "Hourly Interval"])
         self.combo_frequency.currentIndexChanged.connect(self._on_frequency_changed)
-        freq_row.addWidget(self.combo_frequency, stretch=1)
-        s_lay.addLayout(freq_row)
+        ctrl_row.addWidget(self.combo_frequency)
 
-        # Container for Daily Times
-        self.daily_container = QWidget()
-        d_lay = QVBoxLayout(self.daily_container)
-        d_lay.setContentsMargins(0, 0, 0, 0)
-        d_lay.setSpacing(10)
+        # Daily-specific Add Time tools
+        self.add_time_box = QWidget()
+        a_lay = QHBoxLayout(self.add_time_box)
+        a_lay.setContentsMargins(0, 0, 0, 0)
+        a_lay.setSpacing(8)
 
-        lbl_times_head = QLabel("Time Slots (Local Time):")
-        lbl_times_head.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155;")
-        d_lay.addWidget(lbl_times_head)
-
-        lbl_times_desc = QLabel(
-            "Specify multiple times during the day when validation should execute (up to 8 slots):"
-        )
-        lbl_times_desc.setStyleSheet("font-size: 11px; color: #64748B;")
-        d_lay.addWidget(lbl_times_desc)
-
-        # Scroll Area for times list
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setMaximumHeight(150)
-        scroll.setStyleSheet("QScrollArea { border: 1px solid #E2E8F0; border-radius: 6px; background: #F8FAFC; }")
-
-        self.times_list_widget = QWidget()
-        self.times_list_widget.setStyleSheet("background: transparent;")
-        self.times_list_layout = QVBoxLayout(self.times_list_widget)
-        self.times_list_layout.setContentsMargins(8, 8, 8, 8)
-        self.times_list_layout.setSpacing(6)
-        scroll.setWidget(self.times_list_widget)
-        d_lay.addWidget(scroll)
-
-        # Add Time Bar
-        add_bar = QHBoxLayout()
-        add_bar.setSpacing(8)
+        lbl_add = QLabel("Add Time:")
+        lbl_add.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155; margin-left: 10px;")
+        a_lay.addWidget(lbl_add)
 
         self.combo_add_time = QComboBox()
         self.combo_add_time.addItems(TIME_OPTIONS_30M)
         self.combo_add_time.setCurrentText("09:00")
-        add_bar.addWidget(self.combo_add_time, stretch=1)
+        self.combo_add_time.setMinimumWidth(85)
+        a_lay.addWidget(self.combo_add_time)
 
         self.btn_add_time = QPushButton("+ Add Time")
         self.btn_add_time.setObjectName("SecondaryButton")
         self.btn_add_time.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add_time.setStyleSheet(
-            "QPushButton { font-weight: 600; font-size: 12px; padding: 5px 12px; }"
-        )
+        self.btn_add_time.setStyleSheet("font-weight: 600; font-size: 12px; padding: 4px 10px;")
         self.btn_add_time.clicked.connect(self._add_selected_time)
-        add_bar.addWidget(self.btn_add_time)
+        a_lay.addWidget(self.btn_add_time)
 
-        d_lay.addLayout(add_bar)
-        s_lay.addWidget(self.daily_container)
+        ctrl_row.addWidget(self.add_time_box)
+        ctrl_row.addStretch(1)
 
-        # Container for Interval
-        self.interval_container = QWidget()
-        i_lay = QHBoxLayout(self.interval_container)
+        # Interval-specific selector
+        self.interval_box = QWidget()
+        i_lay = QHBoxLayout(self.interval_box)
         i_lay.setContentsMargins(0, 0, 0, 0)
-        i_lay.setSpacing(12)
+        i_lay.setSpacing(8)
 
-        lbl_int = QLabel("Execution Interval:")
-        lbl_int.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155; min-width: 130px;")
+        lbl_int = QLabel("Interval:")
+        lbl_int.setStyleSheet("font-size: 12px; font-weight: 600; color: #334155; margin-left: 10px;")
         i_lay.addWidget(lbl_int)
 
         self.combo_interval = QComboBox()
@@ -211,26 +185,43 @@ class ScheduleValidationDialog(QDialog):
         self.combo_interval.addItem("Every 8 hours", 480)
         self.combo_interval.addItem("Every 12 hours", 720)
         self.combo_interval.currentIndexChanged.connect(lambda _: self._update_preview())
-        i_lay.addWidget(self.combo_interval, stretch=1)
-        s_lay.addWidget(self.interval_container)
+        i_lay.addWidget(self.combo_interval)
 
+        ctrl_row.addWidget(self.interval_box)
+
+        s_lay.addLayout(ctrl_row)
+
+        # Time Chips Area (Daily Mode)
+        self.daily_container = QWidget()
+        d_lay = QVBoxLayout(self.daily_container)
+        d_lay.setContentsMargins(0, 0, 0, 0)
+        d_lay.setSpacing(6)
+
+        self.chips_card = QFrame()
+        self.chips_card.setStyleSheet(
+            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 6px 10px; }"
+        )
+        self.chips_grid = QGridLayout(self.chips_card)
+        self.chips_grid.setContentsMargins(2, 2, 2, 2)
+        self.chips_grid.setSpacing(8)
+        d_lay.addWidget(self.chips_card)
+
+        s_lay.addWidget(self.daily_container)
         layout.addWidget(self.settings_card)
 
-        # 4. Live Schedule Summary & Next Execution Preview
+        # 4. Schedule Preview Banner (Compact Blue-Border Alert)
         self.preview_frame = QFrame()
         self.preview_frame.setStyleSheet(
-            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
+            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+            "border-left: 4px solid #1668DC; border-radius: 6px; padding: 10px 14px; } "
+            "QLabel { background: transparent; border: none; }"
         )
         p_lay = QVBoxLayout(self.preview_frame)
-        p_lay.setContentsMargins(6, 6, 6, 6)
+        p_lay.setContentsMargins(0, 0, 0, 0)
         p_lay.setSpacing(4)
 
-        lbl_p_title = QLabel("SCHEDULE PREVIEW")
-        lbl_p_title.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;")
-        p_lay.addWidget(lbl_p_title)
-
         self.lbl_preview_summary = QLabel()
-        self.lbl_preview_summary.setStyleSheet("font-size: 12px; color: #1E293B; line-height: 1.4;")
+        self.lbl_preview_summary.setStyleSheet("font-size: 12px; color: #1E293B;")
         self.lbl_preview_summary.setWordWrap(True)
         p_lay.addWidget(self.lbl_preview_summary)
 
@@ -240,10 +231,9 @@ class ScheduleValidationDialog(QDialog):
 
         layout.addWidget(self.preview_frame)
 
-        # Footer Buttons
+        # 5. Footer Buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
-
         btn_row.addStretch(1)
 
         self.btn_cancel = QPushButton("Cancel")
@@ -257,7 +247,7 @@ class ScheduleValidationDialog(QDialog):
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.setStyleSheet(
             "background-color: #1668DC; color: #FFFFFF; font-weight: 700; font-size: 13px; "
-            "padding: 8px 18px; border-radius: 6px;"
+            "padding: 7px 20px; border-radius: 6px;"
         )
         self.btn_save.clicked.connect(self._save_schedule)
         btn_row.addWidget(self.btn_save)
@@ -268,26 +258,28 @@ class ScheduleValidationDialog(QDialog):
         """Render whether the sheet satisfies the >= 1 row prerequisite."""
         if self._rule_count > 0:
             self.sheet_status_frame.setStyleSheet(
-                "QFrame { background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; }"
+                "QFrame { background-color: #DCFCE7; border: 1px solid #BBF7D0; border-radius: 6px; padding: 4px 10px; }"
             )
-            self.lbl_sheet_msg.setText(
-                f"Validation Sheet Ready: {self._rule_count} rule(s) configured. "
-                "Automated executions will run across all enabled checks."
-            )
-            self.lbl_sheet_msg.setStyleSheet("font-size: 12px; font-weight: 600; color: #15803D;")
+            self.lbl_sheet_msg.setText(f"{self._rule_count} rule(s) configured")
+            self.lbl_sheet_msg.setStyleSheet("font-size: 11px; font-weight: 600; color: #15803D;")
             self.lbl_sheet_icon.setText("✓")
-            self.lbl_sheet_icon.setStyleSheet("font-size: 14px; font-weight: 700; color: #15803D;")
+            self.lbl_sheet_icon.setStyleSheet("font-size: 12px; font-weight: 700; color: #15803D;")
+            self.sheet_status_frame.setToolTip(
+                f"Validation Sheet Ready: {self._rule_count} active rule(s). "
+                "Automated executions will evaluate all enabled checks."
+            )
         else:
             self.sheet_status_frame.setStyleSheet(
-                "QFrame { background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; }"
+                "QFrame { background-color: #FEE2E2; border: 1px solid #FECACA; border-radius: 6px; padding: 4px 10px; }"
             )
-            self.lbl_sheet_msg.setText(
+            self.lbl_sheet_msg.setText("0 rules configured")
+            self.lbl_sheet_msg.setStyleSheet("font-size: 11px; font-weight: 600; color: #B91C1C;")
+            self.lbl_sheet_icon.setText("⚠")
+            self.lbl_sheet_icon.setStyleSheet("font-size: 12px; font-weight: 700; color: #B91C1C;")
+            self.sheet_status_frame.setToolTip(
                 "Validation Sheet Empty: 0 rules configured. "
                 "You must add at least one validation rule in the 'Validation Sheet' tab before enabling scheduled runs."
             )
-            self.lbl_sheet_msg.setStyleSheet("font-size: 12px; font-weight: 600; color: #B91C1C;")
-            self.lbl_sheet_icon.setText("⚠")
-            self.lbl_sheet_icon.setStyleSheet("font-size: 14px; font-weight: 700; color: #B91C1C;")
 
     def _apply_initial_state(self) -> None:
         """Load stored config into the UI widgets."""
@@ -297,7 +289,6 @@ class ScheduleValidationDialog(QDialog):
         else:
             self.combo_frequency.setCurrentIndex(0)
 
-        # Set interval index if matching
         idx = self.combo_interval.findData(self._config.interval_minutes)
         if idx >= 0:
             self.combo_interval.setCurrentIndex(idx)
@@ -306,7 +297,6 @@ class ScheduleValidationDialog(QDialog):
         self._on_enabled_toggled(self.chk_enabled.isChecked())
         self._on_frequency_changed(self.combo_frequency.currentIndex())
 
-        # If 0 rules in sheet, disable master toggle and save
         if self._rule_count == 0:
             self.chk_enabled.setChecked(False)
             self.chk_enabled.setEnabled(False)
@@ -322,50 +312,61 @@ class ScheduleValidationDialog(QDialog):
         """Toggle between Daily multiple times view and Interval view."""
         is_daily = (idx == 0)
         self.daily_container.setVisible(is_daily)
-        self.interval_container.setVisible(not is_daily)
+        self.add_time_box.setVisible(is_daily)
+        self.interval_box.setVisible(not is_daily)
         self._update_preview()
 
     def _render_times_list(self) -> None:
-        """Refresh the list of time chips in the UI."""
+        """Refresh the interactive time chips in a clean grid."""
         # Clear existing items
-        while self.times_list_layout.count() > 0:
-            item = self.times_list_layout.takeAt(0)
+        while self.chips_grid.count() > 0:
+            item = self.chips_grid.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
         if not self._times:
-            lbl_empty = QLabel("No execution times specified. Click '+ Add Time' below.")
-            lbl_empty.setStyleSheet("font-size: 11px; color: #94A3B8; font-style: italic;")
-            self.times_list_layout.addWidget(lbl_empty)
+            lbl_empty = QLabel("No execution times specified. Pick a time above and click '+ Add Time'.")
+            lbl_empty.setStyleSheet("font-size: 11px; color: #94A3B8; font-style: italic; padding: 4px;")
+            self.chips_grid.addWidget(lbl_empty, 0, 0, 1, 4)
             return
 
-        for t_str in self._times:
-            row = QFrame()
-            row.setStyleSheet(
-                "QFrame { background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 5px; padding: 3px 6px; }"
+        cols_per_row = 4
+        for idx, t_str in enumerate(self._times):
+            row_idx = idx // cols_per_row
+            col_idx = idx % cols_per_row
+
+            chip = QFrame()
+            chip.setStyleSheet(
+                "QFrame { background-color: #FFFFFF; border: 1px solid #CBD5E1; "
+                "border-radius: 14px; padding: 2px 8px; } "
+                "QFrame:hover { border-color: #94A3B8; } "
+                "QLabel { background: transparent; border: none; }"
             )
-            r_lay = QHBoxLayout(row)
-            r_lay.setContentsMargins(4, 2, 4, 2)
-            r_lay.setSpacing(6)
+            ch_lay = QHBoxLayout(chip)
+            ch_lay.setContentsMargins(6, 2, 4, 2)
+            ch_lay.setSpacing(6)
 
             lbl_t = QLabel(f"⏰  {t_str}")
             lbl_t.setStyleSheet("font-size: 12px; font-weight: 600; color: #1E293B;")
-            r_lay.addWidget(lbl_t)
-
-            r_lay.addStretch(1)
+            ch_lay.addWidget(lbl_t)
 
             btn_del = QPushButton("✕")
-            btn_del.setFixedSize(18, 18)
+            btn_del.setFixedSize(14, 14)
             btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_del.setToolTip(f"Remove {t_str}")
             btn_del.setStyleSheet(
-                "QPushButton { border: none; color: #94A3B8; font-size: 11px; font-weight: 700; background: transparent; } "
+                "QPushButton { border: none; color: #94A3B8; font-size: 10px; font-weight: 700; background: transparent; } "
                 "QPushButton:hover { color: #DC2626; }"
             )
             btn_del.clicked.connect(lambda _, t=t_str: self._remove_time(t))
-            r_lay.addWidget(btn_del)
+            ch_lay.addWidget(btn_del)
 
-            self.times_list_layout.addWidget(row)
+            self.chips_grid.addWidget(chip, row_idx, col_idx)
+
+        # Ensure trailing columns expand gracefully
+        current_cols = min(len(self._times), cols_per_row)
+        for c in range(cols_per_row):
+            self.chips_grid.setColumnStretch(c, 1 if c < current_cols else 0)
 
         self.btn_add_time.setEnabled(len(self._times) < 8)
 
