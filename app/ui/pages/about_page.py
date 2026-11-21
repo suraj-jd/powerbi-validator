@@ -412,19 +412,25 @@ class AboutPage(QWidget):
         # Tip callout
         if tip:
             tip_frame = QFrame()
+            tip_frame.setObjectName("StepTipFrame")
             tip_frame.setStyleSheet(
-                "background-color: #F0FDF4; border-left: 3px solid #10B981; "
-                "border-radius: 4px; padding: 6px 10px;"
+                "QFrame#StepTipFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+                "border-left: 3px solid #1668DC; border-radius: 4px; padding: 6px 12px; } "
+                "QLabel { border: none; background: transparent; padding: 0px; }"
             )
             tip_layout = QHBoxLayout(tip_frame)
-            tip_layout.setContentsMargins(4, 2, 4, 2)
-            tip_layout.setSpacing(6)
-            t_icon = QLabel("💡")
-            t_icon.setStyleSheet("font-size: 12px;")
-            t_lbl = QLabel(f"<b>Tip:</b> {tip}")
-            t_lbl.setStyleSheet("font-size: 11px; color: #065F46;")
+            tip_layout.setContentsMargins(6, 4, 6, 4)
+            tip_layout.setSpacing(8)
+            tip_tag = QLabel("TIP")
+            tip_tag.setStyleSheet(
+                "font-size: 10px; font-weight: 700; color: #1668DC; "
+                "background-color: #EFF6FF; border: 1px solid #BFDBFE; "
+                "border-radius: 3px; padding: 1px 6px;"
+            )
+            t_lbl = QLabel(tip)
+            t_lbl.setStyleSheet("font-size: 11px; color: #334155; line-height: 1.4;")
             t_lbl.setWordWrap(True)
-            tip_layout.addWidget(t_icon, alignment=Qt.AlignmentFlag.AlignTop)
+            tip_layout.addWidget(tip_tag, alignment=Qt.AlignmentFlag.AlignTop)
             tip_layout.addWidget(t_lbl, stretch=1)
             layout.addWidget(tip_frame)
 
@@ -986,8 +992,11 @@ class AboutPage(QWidget):
         # Executed Query / Formula Code Frame
         if formula_dax:
             code_frame = QFrame()
+            code_frame.setObjectName("DaxCodeFrame")
             code_frame.setStyleSheet(
-                "background-color: #0F172A; border: 1px solid #1E293B; border-radius: 6px; padding: 10px 14px;"
+                "QFrame#DaxCodeFrame { background-color: #0F172A; border: 1px solid #1E293B; "
+                "border-radius: 6px; padding: 10px 14px; } "
+                "QLabel { border: none; background: transparent; }"
             )
             code_layout = QVBoxLayout(code_frame)
             code_layout.setContentsMargins(0, 0, 0, 0)
@@ -1009,9 +1018,11 @@ class AboutPage(QWidget):
         # Evaluation & Pass/Fail Criteria Box
         if formula_logic:
             eval_frame = QFrame()
+            eval_frame.setObjectName("EvalLogicFrame")
             eval_frame.setStyleSheet(
-                "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 3px solid #1668DC; "
-                "border-radius: 4px; padding: 8px 12px;"
+                "QFrame#EvalLogicFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+                "border-left: 3px solid #1668DC; border-radius: 4px; padding: 8px 12px; } "
+                "QLabel { border: none; background: transparent; }"
             )
             eval_layout = QVBoxLayout(eval_frame)
             eval_layout.setContentsMargins(0, 0, 0, 0)
