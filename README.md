@@ -6,7 +6,7 @@ A local-first Windows desktop application for automating Power BI semantic model
 [![GUI Framework](https://img.shields.io/badge/GUI-PySide6%20(Qt%206)-41CD52.svg)](https://www.qt.io/)
 [![Database](https://img.shields.io/badge/database-SQLite%20%2B%20Alembic-003B57.svg)](https://www.sqlalchemy.org/)
 [![Version](https://img.shields.io/badge/version-1.0.0-success.svg)](docs/RELEASE_NOTES_v1.0.0.md)
-[![Tests](https://img.shields.io/badge/tests-224%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-275%20passed-brightgreen.svg)](tests/)
 
 ---
 
@@ -35,86 +35,71 @@ The **Power BI Validation Tool** automates your entire morning audit routine int
 
 ---
 
-## 📸 Application Tour & Interface Showcase
+## Application screenshots
 
-Explore the application screens and core capabilities below:
+These full-screen captures show the running Windows application with account email hidden. The saved report includes failed and warning outcomes, which remain visible for review.
 
-### 1. 📊 Executive Dashboard & Live Model Health Monitor
-> **Real-time validation dashboard with Microsoft Entra ID authentication, multi-metric KPI summary cards, rule-level execution table, and background dataset refresh tracking.**
+### 1. Overview
 
-![Dashboard & Health Monitor](docs/screenshots/01_dashboard_home.png)
+Run all enabled checks, review the last validation time, and inspect actual versus expected values. Schedule and Teams alerts are beside the run button; optional refresh inspection is under More.
 
-* **Enterprise Entra ID Sign-In**: Zero-trust authentication with tenant selection, account switching, and DPAPI session protection.
-* **Model Health Overview**: Instant KPI metrics displaying overall status (`PASS`, `WARNING`, `FAIL`, `ERROR`), passed count, anomalies, and runtime duration.
-* **Detailed Execution Table**: Interactive results grid with colorful bold status badges, expected vs. actual values, percentage deviations, and single-click diagnostic details.
-* **Power BI Refresh Monitoring**: Background tracking of scheduled refresh history, distinguishing latest attempts from successful completions with duration and reliability rates.
+![Overview](docs/screenshots/01_dashboard_home.png)
 
----
+### 2. Validation Sheet
 
-### 2. 📝 Validation Sheet - Spreadsheet-Style Test Designer
-> **Configure, parameterize, and manage all your validation tests in an intuitive Excel-style spreadsheet interface.**
+Configure checks in a compact grid, save locally, and reveal advanced filters when needed.
 
 ![Validation Sheet](docs/screenshots/02_validation_sheet.png)
 
-* **Familiar Spreadsheet Grid**: Add rows, toggle test enablement, and select workspaces, semantic models, and check types directly from dropdowns.
-* **Supported Validation Check Types**:
-  * 🔍 **Null / Blank Check**: Detects missing or empty primary/foreign keys with count and percentage thresholds.
-  * 🔁 **Duplicate Check**: Enforces uniqueness across single or composite primary key columns.
-  * 📅 **Latest Date Freshness**: Verifies transaction freshness SLAs (e.g. 24h) and detects future date anomalies.
-  * 🧮 **DAX Measure Check**: Evaluates measures directly against Power BI semantic models with baseline deviations.
-  * 📈 **Row Count Check**: Validates table scale against fixed bounds or previous execution baselines.
-  * ⏱️ **Refresh SLA Check**: Asserts Power BI service dataset refresh completion within expected SLA windows.
-* **Ribbon Actions**: One-click actions to `Add Row`, `Delete Row`, `Save Sheet`, `Export Sheet` to CSV/XLSX, `Import Tests`, and `Sync PBI` catalog.
+### 3. Run History
 
----
+A compact toolbar leaves most of the page for saved runs and the selected run's results. Search, filter, compare, and export without leaving the page.
 
-### 3. 📜 Historical Audit Trail & Run Explorer
-> **Comprehensive historical run archive with Excel-style multi-column filtering, universal search, and per-check diagnostic drawer.**
+![Run History](docs/screenshots/03_history_explorer.png)
 
-![History Explorer](docs/screenshots/03_history_explorer.png)
+### 4. Run comparison
 
-* **Execution Runs Log**: Complete chronology of every validation execution with ID, timestamp, duration, overall status, and check pass/fail ratios.
-* **Excel-Style Filters**: Universal text search, status dropdown filters (`Failed Only`, `Passed Only`), and date range pickers.
-* **Result Drawer**: Select any run to instantly inspect all individual rule outcomes in the lower drawer without leaving the page.
-* **Export Actions**: Export runs to styled Excel workbooks (`.xlsx`), raw CSV, or sanitized diagnostic text reports.
+Compare up to four saved runs and inspect changes in outcomes and actual values.
 
----
+![Run comparison](docs/screenshots/04_run_comparison.png)
 
-### 4. ⚖️ Side-by-Side Run Comparison & Regression Diff
-> **Pinpoint regressions, resolved checks, and rule additions between any two validation execution runs.**
+### 5. Backup and maintenance
 
-![Run Comparison](docs/screenshots/04_run_comparison.png)
+Inspect storage statistics, create and verify backups, and access restore or retention tools.
 
-* **Interactive Run Selectors**: Live dropdowns for **Baseline Run (A)** and **Target Run (B)** with a `⇄ Swap Runs` button for instant re-comparison.
-* **Diff Classification Cards**: Filterable KPI cards for **WORSENED** (regressions), **RESOLVED** (improvements), **UNCHANGED**, and **NEW / REMOVED RULES** with descriptive info tooltips.
-* **Filterable Diff Table**: Universal text search by rule name or target, change type filter, and generous interactive column widths.
-* **Diff Export**: One-click **`📥 Export Diff to CSV`** button for team reviews and audit documentation.
+![Backup and maintenance](docs/screenshots/05_database_maintenance.png)
 
----
+### 6. About and Support
 
-### 5. 🗄️ Database Health & Storage Maintenance
-> **Full visibility into local SQLite database metrics with compaction, live backups, integrity checks, and retention pruning.**
+A short quick-start guide, check/result reference, and local support actions replace the development-oriented demonstrations.
 
-![Database Maintenance](docs/screenshots/05_database_maintenance.png)
+![About and Support](docs/screenshots/06_about_page.png)
 
-* **Storage Health Overview**: Live database path, file size in KB/MB, total stored runs, results, rules, and active date range.
-* **Compaction (VACUUM)**: Reclaim unused storage and defragment database pages on demand.
-* **Transaction-Safe Backups**: Online SQLite snapshot creation without stopping active validations or the user interface.
-* **Windows-Safe Restoration**: Safely replaces and validates database files while managing connection pools and WAL logs.
-* **Interactive Retention Pruning**: Live preview of eligible runs older than $N$ days before permanent deletion.
+### 7. Scheduling
 
----
+Choose any minute of the day or a custom repeat interval. The preview shows the next date, local time zone, and why a daily run may be scheduled for tomorrow. Keep the app open for scheduled execution.
 
-### 6. 📘 Integrated Architecture & User Manual (About Page)
-> **Comprehensive application guide, architectural specifications, and real-time environment diagnostics.**
+![Scheduling](docs/screenshots/07_schedule_validation.png)
 
-![About Page](docs/screenshots/06_about_page.png)
+### 8. Teams alerts
 
-* **Architecture & Zero-Trust Cloud Specs**: Details on local-only query evaluation, DPAPI secret encryption, and security policies.
-* **Step-by-Step User Manual**: Interactive guides for setting up Azure Entra ID, creating validation sheets, inspecting DAX queries, and automating tests.
-* **Live System Diagnostics**: Real-time validation of SQLite connection, DPAPI protection, log paths, and Power BI REST connectivity.
+Configure alert delivery and outcomes from the Home toolbar. Account email remains hidden in the dialog.
 
----
+![Teams alerts](docs/screenshots/08_teams_alerts.png)
+
+### 9. Check settings
+
+A side editor keeps the sheet in view on wide windows, with Apply and Cancel always accessible. Smaller windows use a focused dialog.
+
+![Check settings](docs/screenshots/09_check_settings.png)
+
+### 10. Result details
+
+Inspect actual and expected values, the check's validation timestamp, and optional technical diagnostics.
+
+![Result details](docs/screenshots/10_result_details.png)
+
+See [the UI update notes](docs/UI_UPDATE_2026-11-28.md) for behavior and verification details.
 
 ---
 

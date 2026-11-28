@@ -121,7 +121,7 @@ def make_change_pill(change_type: str) -> QLabel:
     else:
         bg = "#F8FAFC"
         color = "#64748B"
-        border = "#E2E8F0"
+        border = "#DDE4ED"
 
     pill.setStyleSheet(
         f"background-color: {bg}; color: {color}; border: 1.5px solid {border}; "
@@ -130,7 +130,9 @@ def make_change_pill(change_type: str) -> QLabel:
     return pill
 
 
-class RunComparisonDialog(QDialog):
+from app.ui.widgets.enterprise import EnterpriseDialog
+
+class RunComparisonDialog(EnterpriseDialog):
     """Side-by-side comparison across 2 to 4 validation runs highlighting regressions and improvements."""
 
     def __init__(
@@ -165,7 +167,7 @@ class RunComparisonDialog(QDialog):
         run_titles = " vs ".join(f"#{r.id}" for r in self._cmp.active_runs)
         self.title_label = QLabel(f"Validation Run Comparison: {run_titles}")
         self.title_label.setObjectName("SectionTitle")
-        self.title_label.setStyleSheet("font-size: 17px; font-weight: 700; color: #0F172A;")
+        self.title_label.setStyleSheet("font-size: 17px; font-weight: 700; color: #16243A;")
         header_block.addWidget(self.title_label)
 
         sub_parts = [
@@ -185,7 +187,7 @@ class RunComparisonDialog(QDialog):
         sel_card = QFrame()
         sel_card.setObjectName("ComparisonSelectorCard")
         sel_card.setStyleSheet(
-            "QFrame#ComparisonSelectorCard { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#ComparisonSelectorCard { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
             "QLabel { border: none; background: transparent; }"
         )
         sel_layout = QVBoxLayout(sel_card)
@@ -391,7 +393,7 @@ class RunComparisonDialog(QDialog):
         self.c_unc.setObjectName("CardUnc")
         self.c_unc.setCursor(Qt.CursorShape.PointingHandCursor)
         self.c_unc.setStyleSheet(
-            "QFrame#CardUnc { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#CardUnc { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
             "QFrame#CardUnc:hover { background-color: #F8FAFC; border-color: #CBD5E1; } "
             "QLabel { border: none; background: transparent; }"
         )
@@ -892,9 +894,9 @@ class RunComparisonDialog(QDialog):
 
         try:
             dest = export_comparison_to_csv(self._cmp, filename)
-            self.banner.show_message(
+            self.banner.show_export_success(
                 f"Comparison report exported successfully to '{dest.name}'.",
-                level=NotificationLevel.SUCCESS,
+                dest,
                 title="Export Complete",
             )
         except Exception as exc:

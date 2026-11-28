@@ -45,7 +45,9 @@ _PREVIEW_COLUMNS: list[ColumnSpec] = [
 ]
 
 
-class ImportRegistrationsDialog(QDialog):
+from app.ui.widgets.enterprise import EnterpriseDialog
+
+class ImportRegistrationsDialog(EnterpriseDialog):
     """Guides users through CSV/XLSX preview, error review, and confirmed import."""
 
     def __init__(

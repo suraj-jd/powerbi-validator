@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import threading
 from typing import Any, Sequence
@@ -86,6 +86,18 @@ class ValidationResultDTO:
     duration_ms: int
     started_at: datetime
     completed_at: datetime
+
+    @property
+    def validated_at(self) -> datetime:
+        """Completion time in UTC, including older SQLite timestamps without tzinfo."""
+        timestamp = self.completed_at or self.started_at
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        return timestamp.astimezone(timezone.utc)
+
+    @property
+    def validated_at_display(self) -> str:
+        return self.validated_at.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 @dataclass(frozen=True, slots=True)

@@ -28,10 +28,12 @@ from app.ui.widgets.notification_banner import NotificationBanner
 if TYPE_CHECKING:
     from app.services.dax_service import DaxQueryService
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 
-class DaxInspectorDialog(QDialog):
+class DaxInspectorDialog(EnterpriseDialog):
     """Interactive modal allowing users to execute DAX measure queries and inspect results."""
 
     def __init__(
@@ -137,7 +139,7 @@ class DaxInspectorDialog(QDialog):
         self.btn_run = QPushButton("▶  Execute DAX Measure")
         self.btn_run.setObjectName("PrimaryButton")
         self.btn_run.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 8px 18px; border-radius: 6px;"
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 8px 18px; border-radius: 6px;"
         )
         self.btn_run.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_run.clicked.connect(self._handle_run_query)
@@ -155,7 +157,7 @@ class DaxInspectorDialog(QDialog):
 
         res_header = QHBoxLayout()
         res_title = QLabel("Query Evaluation Output")
-        res_title.setStyleSheet("color: #0F172A; font-size: 13px; font-weight: 600;")
+        res_title.setStyleSheet("color: #16243A; font-size: 13px; font-weight: 600;")
         res_header.addWidget(res_title)
         res_header.addStretch(1)
 
@@ -169,7 +171,7 @@ class DaxInspectorDialog(QDialog):
         val_box.setSpacing(12)
 
         self.lbl_value_result = QLabel("-")
-        self.lbl_value_result.setStyleSheet("color: #0F172A; font-size: 22px; font-weight: 700;")
+        self.lbl_value_result.setStyleSheet("color: #16243A; font-size: 22px; font-weight: 700;")
         val_box.addWidget(self.lbl_value_result)
 
         self.lbl_type_pill = QLabel(" Ready ")
@@ -190,7 +192,7 @@ class DaxInspectorDialog(QDialog):
         self.text_query.setReadOnly(True)
         self.text_query.setMaximumHeight(65)
         self.text_query.setStyleSheet(
-            "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; "
+            "background-color: #F8FAFC; border: 1px solid #DDE4ED; border-radius: 4px; "
             "font-family: Consolas, monospace; font-size: 11px; color: #334155;"
         )
         res_layout.addWidget(self.text_query)

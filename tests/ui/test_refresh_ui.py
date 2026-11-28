@@ -185,10 +185,7 @@ def test_home_page_refresh_card_integration(
     qtbot.addWidget(page)
     page.show()
 
-    # Verify Stage badge
-    badge = page.findChild(object, "StageBadge")
-    assert badge is not None
-    assert "Stage" in badge.text()
+    assert page.overview_header.title.text() == "Report health"
 
     # Enter registered Workspace and Dataset ID
     page.workspace_id_input.setText(WS_ID)

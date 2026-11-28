@@ -39,10 +39,13 @@ from app.services.rule_service import (
 from app.services.sheet_service import FRIENDLY_TEST_NAMES
 from app.ui.widgets.animated_combo import AnimatedComboBox
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+from app.ui.theme import make_nav_icon
+
 logger = logging.getLogger(__name__)
 
 
-class SheetRuleConfigDialog(QDialog):
+class SheetRuleConfigDialog(EnterpriseDialog):
     """Clean, friendly popup dialog triggered by the ⚙️ gear icon on a sheet row."""
 
     def __init__(
@@ -95,7 +98,8 @@ class SheetRuleConfigDialog(QDialog):
         header_row = QHBoxLayout()
         header_row.setSpacing(8)
 
-        icon_lbl = QLabel("⚙️")
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(make_nav_icon("settings", "#2563EB", 20).pixmap(20, 20))
         icon_lbl.setStyleSheet("font-size: 20px;")
         header_row.addWidget(icon_lbl)
 
@@ -118,7 +122,7 @@ class SheetRuleConfigDialog(QDialog):
         card = QFrame()
         card.setObjectName("DialogCard")
         card.setStyleSheet(
-            "#DialogCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+            "#DialogCard { background-color: #F8FAFC; border: 1px solid #DDE4ED; "
             "border-radius: 8px; padding: 16px; }"
         )
         card_layout = QVBoxLayout(card)
@@ -156,7 +160,7 @@ class SheetRuleConfigDialog(QDialog):
         self.apply_button = QPushButton("✔  Apply Settings")
         self.apply_button.setObjectName("PrimaryButton")
         self.apply_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 8px 18px; border-radius: 6px;"
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 8px 18px; border-radius: 6px;"
         )
         self.apply_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.apply_button.setToolTip("Apply and save these settings for the validation check.")

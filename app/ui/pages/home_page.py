@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -13,6 +14,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QFrame,
+    QFileDialog,
+    QMenu,
+    QInputDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -47,6 +51,7 @@ from app.ui.dialogs.result_details_dialog import (
     update_validation_status_pill,
 )
 from app.ui.widgets.animated_combo import AnimatedComboBox
+from app.ui.widgets.enterprise import PageHeader, MetricCard, ResultsTable, action_button
 from app.ui.widgets.auth_banner import AuthBanner
 from app.ui.widgets.notification_banner import NotificationBanner
 from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
@@ -210,12 +215,19 @@ class HomePage(QWidget):
 
         self.model_selector_combo.blockSignals(False)
         self._on_model_selector_changed(self.model_selector_combo.currentIndex())
+        count = self._get_enabled_sheet_rules_count()
+        self.overview_header.subtitle.setText(f"{count} enabled checks across your configured reports")
 
     def _on_model_selector_changed(self, index: int) -> None:
         if index < 0:
             return
         reg = self.model_selector_combo.itemData(index)
         if reg is not None and hasattr(reg, "workspace_id"):
+            if hasattr(self, "resource_access_label"):
+                current_context = (reg.workspace_id, reg.dataset_id)
+                if current_context != getattr(self, "_inspected_context", None):
+                    self._inspected_context = current_context
+                    self.resource_access_label.setText("Report permissions have not been checked. Choose Verify Access for this report.")
             self.workspace_id_input.setText(reg.workspace_id)
             self.dataset_id_input.setText(reg.dataset_id)
             self.report_id_input.setText(reg.report_id or "")
@@ -234,8 +246,8 @@ class HomePage(QWidget):
         container = QWidget(scroll_area)
         container.setObjectName("PageContainer")
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(28, 20, 28, 24)
-        layout.setSpacing(18)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(12)
 
         # Stage 3 Authentication Banner
         self.auth_banner = AuthBanner(container)
@@ -252,29 +264,9 @@ class HomePage(QWidget):
         self.verification_details_label.hide()
         layout.addWidget(self.verification_details_label)
 
-        # Header row
-        header_row = QHBoxLayout()
-        header_row.setSpacing(12)
-
-        title_block = QVBoxLayout()
-        title_block.setSpacing(4)
-
-        title_label = QLabel("Power BI Report Health Monitor")
-        title_label.setObjectName("PageTitle")
-        title_block.addWidget(title_label)
-
-        subtitle_label = QLabel("Validate. Detect. Ensure Data Integrity.")
-        subtitle_label.setObjectName("PageSubtitle")
-        title_block.addWidget(subtitle_label)
-
-        header_row.addLayout(title_block, stretch=1)
-
-        badge = QLabel("Stage 13: Health Dashboard Active", container)
-        badge.setObjectName("StageBadge")
-        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
-
-        layout.addLayout(header_row)
+        header = PageHeader("Report health", "All configured reports · Validate your enabled checks and review what needs attention.")
+        self.overview_header = header
+        layout.addWidget(header)
 
         # Internal/backward-compatible widgets (kept hidden to support APIs and test fixtures)
         self.workspace_id_input = QLineEdit(container)
@@ -302,13 +294,16 @@ class HomePage(QWidget):
 
         # Stage 13 Validation Results & Model Health Dashboard Card
         self.validation_card = self._create_validation_dashboard_card(container)
-        layout.addWidget(self.validation_card)
+        layout.addWidget(self.validation_card, 1)
 
         # Stage 8 Dataset Refresh Health & Monitoring Card (hidden to keep Home focused strictly on today's validation)
         self.refresh_card = self._create_refresh_monitoring_card(container)
         self.refresh_card.hide()
+        self.model_selector_combo.hide()
+        self.refresh_models_button.hide()
+        self.resource_access_label = QLabel("Report permissions have not been checked.")
+        self.resource_access_label.hide()
 
-        layout.addStretch(1)
 
         scroll_area.setWidget(container)
         outer_layout.addWidget(scroll_area)
@@ -359,6 +354,8 @@ class HomePage(QWidget):
             title = "Access Not Verified"
 
         self.verification_banner.show_message(result.summary, level=level, title=title)
+        if (result.workspace_id, result.dataset_id) == getattr(self, "_inspected_context", None):
+            self.resource_access_label.setText("Report access verified" if result.is_verified else "Report access could not be verified. Review the details above.")
 
         ws_label = result.workspace.name if result.workspace else result.workspace_id
         ds_label = result.dataset.name if result.dataset else result.dataset_id
@@ -419,27 +416,31 @@ class HomePage(QWidget):
         layout.setSpacing(12)
 
         card_header = QHBoxLayout()
-        section_title = QLabel("Power BI Dataset Refresh Monitoring")
+        section_title = QLabel("Power BI refresh history")
+        section_title.setWordWrap(True)
         section_title.setObjectName("SectionTitle")
         card_header.addWidget(section_title, stretch=1)
 
-        self.fetch_refresh_button = QPushButton("↻  Fetch Live Refresh History")
+        self.fetch_refresh_button = action_button("Fetch refresh history", "refresh")
         self.fetch_refresh_button.setObjectName("SecondaryButton")
         self.fetch_refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.fetch_refresh_button.setToolTip("Retrieve the latest refresh history from Power BI for this dataset.")
         self.fetch_refresh_button.clicked.connect(self._handle_fetch_refresh)
-        card_header.addWidget(self.fetch_refresh_button)
+        refresh_actions = QHBoxLayout()
+        refresh_actions.addWidget(self.fetch_refresh_button)
 
-        self.view_refresh_details_button = QPushButton("View Full History & Diagnostics...")
+        self.view_refresh_details_button = action_button("View refresh details", "history")
         self.view_refresh_details_button.setObjectName("PrimaryButton")
         self.view_refresh_details_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 7px 14px; border-radius: 6px;"
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 7px 14px; border-radius: 6px;"
         )
         self.view_refresh_details_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.view_refresh_details_button.setToolTip("Open detailed refresh history logs and diagnostics.")
         self.view_refresh_details_button.clicked.connect(self._handle_view_refresh_details)
-        card_header.addWidget(self.view_refresh_details_button)
+        refresh_actions.addWidget(self.view_refresh_details_button)
+        refresh_actions.addStretch(1)
         layout.addLayout(card_header)
+        layout.addLayout(refresh_actions)
 
         desc = QLabel(
             "Inspect execution history, track refresh durations, and distinguish the latest attempt "
@@ -460,7 +461,7 @@ class HomePage(QWidget):
         card_attempt = QFrame()
         card_attempt.setObjectName("Card")
         card_attempt.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
             "QLabel { border: none; background: transparent; }"
         )
         lay_att = QVBoxLayout(card_attempt)
@@ -482,7 +483,7 @@ class HomePage(QWidget):
         self.home_attempt_start.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_att.addWidget(self.home_attempt_start)
         self.home_attempt_duration = QLabel("Duration: -")
-        self.home_attempt_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
+        self.home_attempt_duration.setStyleSheet("color: #16243A; font-size: 12px; font-weight: 600;")
         lay_att.addWidget(self.home_attempt_duration)
         kpi_row.addWidget(card_attempt)
 
@@ -490,7 +491,7 @@ class HomePage(QWidget):
         card_success = QFrame()
         card_success.setObjectName("Card")
         card_success.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
             "QLabel { border: none; background: transparent; }"
         )
         lay_suc = QVBoxLayout(card_success)
@@ -507,7 +508,7 @@ class HomePage(QWidget):
         self.home_success_age.setStyleSheet("color: #64748B; font-size: 11px;")
         lay_suc.addWidget(self.home_success_age)
         self.home_success_duration = QLabel("Duration: -")
-        self.home_success_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
+        self.home_success_duration.setStyleSheet("color: #16243A; font-size: 12px; font-weight: 600;")
         lay_suc.addWidget(self.home_success_duration)
         kpi_row.addWidget(card_success)
 
@@ -515,7 +516,7 @@ class HomePage(QWidget):
         card_rel = QFrame()
         card_rel.setObjectName("Card")
         card_rel.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
             "QLabel { border: none; background: transparent; }"
         )
         lay_rel = QVBoxLayout(card_rel)
@@ -526,7 +527,7 @@ class HomePage(QWidget):
         lay_rel.addWidget(lbl_rel_title)
 
         self.home_reliability_rate = QLabel("No Data")
-        self.home_reliability_rate.setStyleSheet("color: #1668DC; font-size: 15px; font-weight: 700;")
+        self.home_reliability_rate.setStyleSheet("color: #2563EB; font-size: 15px; font-weight: 700;")
         lay_rel.addWidget(self.home_reliability_rate)
         self.home_reliability_detail = QLabel("Recorded Runs: 0")
         self.home_reliability_detail.setStyleSheet("color: #64748B; font-size: 11px;")
@@ -737,303 +738,154 @@ class HomePage(QWidget):
         card = QFrame(container)
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(22, 20, 22, 20)
-        layout.setSpacing(12)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
 
-        # Header with Run Validation button
-        card_header = QHBoxLayout()
-        card_header.setSpacing(10)
-        section_title = QLabel("Validation Report & Health Dashboard")
-        section_title.setObjectName("SectionTitle")
-        card_header.addWidget(section_title)
-
-        # Retain hidden controls for backward-compatible API and tests
-        self.model_selector_combo = AnimatedComboBox(card)
-        self.model_selector_combo.setObjectName("FilterCombo")
-        self.model_selector_combo.currentIndexChanged.connect(self._on_model_selector_changed)
-        self.model_selector_combo.hide()
-
-        self.refresh_models_button = QPushButton("↻", card)
-        self.refresh_models_button.setObjectName("SecondaryButton")
-        self.refresh_models_button.clicked.connect(self._handle_refresh_models_clicked)
-        self.refresh_models_button.hide()
-
-        card_header.addStretch(1)
-
-        # Microsoft Teams Alerts status badge and configure button
-        self.teams_badge = QLabel()
-        self.teams_badge.setStyleSheet(
-            "font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;"
-        )
-        card_header.addWidget(self.teams_badge)
-
-        self.teams_alerts_button = QPushButton("🔔  Teams Alerts...")
-        self.teams_alerts_button.setObjectName("SecondaryButton")
-        self.teams_alerts_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.teams_alerts_button.setToolTip("Configure automated notifications and report cards sent to Microsoft Teams.")
-        self.teams_alerts_button.clicked.connect(self._open_teams_dialog)
-        card_header.addWidget(self.teams_alerts_button)
-
-        # Automated Scheduler status badge and trigger button (Power BI refresh style)
-        self.schedule_badge = QLabel()
-        self.schedule_badge.setStyleSheet(
-            "font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;"
-        )
-        card_header.addWidget(self.schedule_badge)
-
-        self.schedule_validation_button = QPushButton("⏱  Schedule...")
-        self.schedule_validation_button.setObjectName("SecondaryButton")
-        self.schedule_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.schedule_validation_button.setToolTip("Configure automated recurring validation runs (Power BI refresh style).")
-        self.schedule_validation_button.clicked.connect(self._open_schedule_dialog)
-        card_header.addWidget(self.schedule_validation_button)
-
-        self.cancel_validation_button = QPushButton("✕ Cancel")
-        self.cancel_validation_button.setObjectName("SecondaryButton")
-        self.cancel_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cancel_validation_button.setToolTip("Stop the current validation run.")
+        actions = QHBoxLayout()
+        scope = QLabel("All configured reports · All enabled checks")
+        scope.setObjectName("SectionTitle")
+        scope.setWordWrap(True)
+        scope.hide()
+        self.cancel_validation_button = action_button("Cancel run", "close")
         self.cancel_validation_button.clicked.connect(self._cancel_validation)
         self.cancel_validation_button.hide()
-        card_header.addWidget(self.cancel_validation_button)
-
-        self.run_validation_button = QPushButton("▶  Run Validation")
-        self.run_validation_button.setObjectName("PrimaryButton")
-        self.run_validation_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 700; font-size: 13px; "
-            "padding: 8px 18px; border-radius: 6px;"
-        )
-        self.run_validation_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.run_validation_button.setToolTip("Execute all enabled validation checks against your Power BI models.")
+        self.overview_header.actions.addWidget(self.cancel_validation_button)
+        self.run_validation_button = action_button("Run all enabled checks", "run", primary=True)
+        self.run_validation_button.setToolTip("Execute every enabled Validation Sheet check across all configured reports.")
         self.run_validation_button.clicked.connect(self._run_validation)
-        card_header.addWidget(self.run_validation_button)
-        layout.addLayout(card_header)
+        self.overview_header.actions.addWidget(self.run_validation_button)
 
-        desc = QLabel(
-            "Execute all configured validation checks from the Validation Sheet across your Power BI datasets "
-            "and generate a consolidated health report."
-        )
-        desc.setObjectName("PageSubtitle")
-        desc.setWordWrap(True)
-        layout.addWidget(desc)
+        self.home_overall_timing = QLabel("No validation runs recorded yet")
+        self.home_overall_timing.setObjectName("RunContext")
+        self.home_overall_timing.setWordWrap(True)
+        layout.addWidget(self.home_overall_timing)
+        summary = QHBoxLayout()
+        self.home_overall_pill = make_validation_status_pill("NOT RUN")
+        summary.addWidget(self.home_overall_pill)
+        self.attention_summary = QLabel("Run validation to see which checks need attention.")
+        self.attention_summary.setWordWrap(True)
+        summary.addWidget(self.attention_summary, 1)
+        layout.addLayout(summary)
 
-        # Progress bar & running status label
-        self.validation_progress_label = QLabel("Initializing validation...")
-        self.validation_progress_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #1668DC;")
-        self.validation_progress_label.hide()
-        layout.addWidget(self.validation_progress_label)
+        kpis = QHBoxLayout()
+        for outcome, attribute in [("PASS", "home_passed_count"), ("FAIL", "home_failed_count"),
+                                   ("WARNING", "home_warning_count"), ("ERROR", "home_error_count")]:
+            metric = MetricCard(outcome)
+            setattr(self, attribute, metric.value)
+            kpis.addWidget(metric, 1)
+        layout.addLayout(kpis)
 
+        self.validation_progress_label = QLabel("Preparing checks…")
         self.validation_progress_bar = QProgressBar()
         self.validation_progress_bar.setRange(0, 100)
-        self.validation_progress_bar.setValue(0)
-        self.validation_progress_bar.setStyleSheet(
-            "QProgressBar { border: 1px solid #CBD5E1; border-radius: 4px; text-align: center; height: 16px; font-size: 10px; font-weight: 600; background: #F1F5F9; }"
-            "QProgressBar::chunk { background-color: #1668DC; border-radius: 3px; }"
-        )
+        self.validation_progress_label.hide()
         self.validation_progress_bar.hide()
+        layout.addWidget(self.validation_progress_label)
         layout.addWidget(self.validation_progress_bar)
-
         self.validation_banner = NotificationBanner(card)
         layout.addWidget(self.validation_banner)
 
-        # 5 Summary KPI Cards Row
-        kpi_row = QHBoxLayout()
-        kpi_row.setSpacing(10)
-
-        # 1. Overall Status
-        card_ov = QFrame()
-        card_ov.setObjectName("Card")
-        card_ov.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
-            "QLabel { border: none; background: transparent; }"
-        )
-        lay_ov = QVBoxLayout(card_ov)
-        lay_ov.setContentsMargins(14, 12, 14, 12)
-        lay_ov.setSpacing(6)
-        lbl_ov_t = QLabel("OVERALL HEALTH")
-        lbl_ov_t.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
-        lay_ov.addWidget(lbl_ov_t)
-
-        self.home_overall_pill_container = QWidget()
-        ov_p_lay = QHBoxLayout(self.home_overall_pill_container)
-        ov_p_lay.setContentsMargins(0, 0, 0, 0)
-        self.home_overall_pill = make_validation_status_pill("NOT RUN")
-        ov_p_lay.addWidget(self.home_overall_pill)
-        ov_p_lay.addStretch(1)
-        lay_ov.addWidget(self.home_overall_pill_container)
-
-        self.home_overall_timing = QLabel("Last Run: -")
-        self.home_overall_timing.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        lay_ov.addWidget(self.home_overall_timing)
-        kpi_row.addWidget(card_ov, stretch=1)
-
-        # 2. Passed
-        card_pass = QFrame()
-        card_pass.setObjectName("Card")
-        card_pass.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
-            "QLabel { border: none; background: transparent; }"
-        )
-        lay_p = QVBoxLayout(card_pass)
-        lay_p.setContentsMargins(14, 12, 14, 12)
-        lay_p.setSpacing(6)
-        lbl_p_t = QLabel("PASSED CHECKS")
-        lbl_p_t.setStyleSheet("color: #15803D; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
-        lay_p.addWidget(lbl_p_t)
-        self.home_passed_count = QLabel("0")
-        self.home_passed_count.setStyleSheet("color: #15803D; font-size: 24px; font-weight: 700;")
-        lay_p.addWidget(self.home_passed_count)
-        lbl_p_sub = QLabel("Within expected SLA")
-        lbl_p_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        lay_p.addWidget(lbl_p_sub)
-        kpi_row.addWidget(card_pass, stretch=1)
-
-        # 3. Failed
-        card_fail = QFrame()
-        card_fail.setObjectName("Card")
-        card_fail.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
-            "QLabel { border: none; background: transparent; }"
-        )
-        lay_f = QVBoxLayout(card_fail)
-        lay_f.setContentsMargins(14, 12, 14, 12)
-        lay_f.setSpacing(6)
-        lbl_f_t = QLabel("FAILED CHECKS")
-        lbl_f_t.setStyleSheet("color: #B91C1C; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
-        lay_f.addWidget(lbl_f_t)
-        self.home_failed_count = QLabel("0")
-        self.home_failed_count.setStyleSheet("color: #B91C1C; font-size: 24px; font-weight: 700;")
-        lay_f.addWidget(self.home_failed_count)
-        lbl_f_sub = QLabel("Violations detected")
-        lbl_f_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        lay_f.addWidget(lbl_f_sub)
-        kpi_row.addWidget(card_fail, stretch=1)
-
-        # 4. Warnings
-        card_warn = QFrame()
-        card_warn.setObjectName("Card")
-        card_warn.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
-            "QLabel { border: none; background: transparent; }"
-        )
-        lay_w = QVBoxLayout(card_warn)
-        lay_w.setContentsMargins(14, 12, 14, 12)
-        lay_w.setSpacing(6)
-        lbl_w_t = QLabel("WARNINGS / ANOMALIES")
-        lbl_w_t.setStyleSheet("color: #B45309; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
-        lay_w.addWidget(lbl_w_t)
-        self.home_warning_count = QLabel("0")
-        self.home_warning_count.setStyleSheet("color: #B45309; font-size: 24px; font-weight: 700;")
-        lay_w.addWidget(self.home_warning_count)
-        lbl_w_sub = QLabel("Deviations or empty")
-        lbl_w_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        lay_w.addWidget(lbl_w_sub)
-        kpi_row.addWidget(card_warn, stretch=1)
-
-        # 5. Errors
-        card_err = QFrame()
-        card_err.setObjectName("Card")
-        card_err.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
-            "QLabel { border: none; background: transparent; }"
-        )
-        lay_e = QVBoxLayout(card_err)
-        lay_e.setContentsMargins(14, 12, 14, 12)
-        lay_e.setSpacing(6)
-        lbl_e_t = QLabel("EXECUTION ERRORS")
-        lbl_e_t.setStyleSheet("color: #7E22CE; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;")
-        lay_e.addWidget(lbl_e_t)
-        self.home_error_count = QLabel("0")
-        self.home_error_count.setStyleSheet("color: #7E22CE; font-size: 24px; font-weight: 700;")
-        lay_e.addWidget(self.home_error_count)
-        lbl_e_sub = QLabel("Query or engine errors")
-        lbl_e_sub.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        lay_e.addWidget(lbl_e_sub)
-        kpi_row.addWidget(card_err, stretch=1)
-
-        layout.addLayout(kpi_row)
-
-        # Search & Filter row
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(10)
-
+        tools = QHBoxLayout()
+        title = QLabel("Validation results")
+        title.setObjectName("SectionTitle")
+        tools.addWidget(title)
         self.results_search_input = QLineEdit()
-        self.results_search_input.setObjectName("SearchInput")
-        self.results_search_input.setPlaceholderText("Filter checks by rule name, target, or outcome...")
-        self.results_search_input.setToolTip("Type to filter results by rule name, target, or outcome.")
-        self.results_search_input.textChanged.connect(lambda _: self._apply_results_filter())
-        filter_row.addWidget(self.results_search_input, stretch=1)
+        self.results_search_input.setPlaceholderText("Search checks, targets, or outcomes…")
+        self.results_search_input.setClearButtonEnabled(True)
+        self.results_search_input.textChanged.connect(self._apply_results_filter)
+        tools.addWidget(self.results_search_input, 1)
+        self.results_status_filter = QComboBox()
+        self.results_status_filter.addItems(["All outcomes", "Failed", "Warnings", "Execution errors", "Passed"])
+        self.results_status_filter.currentIndexChanged.connect(self._apply_results_filter)
+        tools.addWidget(self.results_status_filter)
+        self.export_results_button = action_button("Export run", "export")
+        menu = QMenu(self.export_results_button)
+        menu.addAction("Latest displayed run as CSV", lambda: self._export_displayed_run("csv"))
+        menu.addAction("Latest displayed run as Excel", lambda: self._export_displayed_run("xlsx"))
+        self.export_results_button.setMenu(menu)
+        self.export_results_button.setEnabled(False)
+        tools.addWidget(self.export_results_button)
+        layout.addLayout(tools)
 
-        self.results_status_filter = AnimatedComboBox()
-        self.results_status_filter.setObjectName("FilterCombo")
-        results_status_items = [
-            ("All Check Outcomes", "Show all test outcomes."),
-            ("Failed Only", "Show only tests that failed."),
-            ("Warnings Only", "Show tests with warnings or anomalies."),
-            ("Errors Only", "Show tests that stopped because of query or connection errors."),
-            ("Passed Only", "Show only tests that passed successfully."),
-        ]
-        for text, tip in results_status_items:
-            self.results_status_filter.addItem(text)
-            self.results_status_filter.setItemData(self.results_status_filter.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
-        self.results_status_filter.setToolTip("Filter results table by validation outcome status.")
-        self.results_status_filter.currentIndexChanged.connect(
-            lambda idx: self.results_status_filter.setToolTip(self.results_status_filter.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "Filter results table by validation outcome status.")
-        )
-        self.results_status_filter.currentIndexChanged.connect(lambda _: self._apply_results_filter())
-        filter_row.addWidget(self.results_status_filter)
-        layout.addLayout(filter_row)
-
-        # Detailed Results Table
-        self.results_table = QTableWidget()
-        self.results_table.setObjectName("DataTable")
-        self.results_table.setColumnCount(9)
-        self.results_table.setHorizontalHeaderLabels([
-            "Status",
-            "Rule Name",
-            "Target",
-            "Check Type",
-            "Actual Value",
-            "Expected Value",
-            "Deviation",
-            "Duration",
-            "Action",
-        ])
-        header = self.results_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        header.setMinimumSectionSize(70)
-
-        self.results_table.setColumnWidth(0, 110)  # Status (bold colorful text)
-        self.results_table.setColumnWidth(1, 230)  # Rule Name
-        self.results_table.setColumnWidth(2, 160)  # Target
-        self.results_table.setColumnWidth(3, 130)  # Check Type
-        self.results_table.setColumnWidth(4, 120)  # Actual Value
-        self.results_table.setColumnWidth(5, 120)  # Expected Value
-        self.results_table.setColumnWidth(6, 100)  # Deviation
-        self.results_table.setColumnWidth(7, 90)   # Duration
-        self.results_table.setColumnWidth(8, 90)   # Action
-
-        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.results_table.setAlternatingRowColors(True)
-        self.results_table.verticalHeader().setVisible(False)
-        self.results_table.verticalHeader().setDefaultSectionSize(34)
-        self.results_table.setMinimumHeight(240)
-        apply_smooth_scrolling(self.results_table)
+        self.results_table = ResultsTable()
         self.results_table.cellDoubleClicked.connect(self._handle_table_double_clicked)
         self.results_table.cellClicked.connect(self._handle_table_clicked)
+        self.results_table.model().layoutChanged.connect(lambda *_: self._apply_results_filter())
         self.results_table.hide()
         layout.addWidget(self.results_table)
-
-        self.empty_results_label = QLabel(
-            "No validation runs recorded yet. Click 'Run Validation' above to execute checks from your Validation Sheet."
-        )
-        self.empty_results_label.setStyleSheet(
-            "color: #64748B; font-size: 13px; font-style: italic; padding: 24px 0; qproperty-alignment: AlignCenter;"
-        )
+        self.empty_results_label = QLabel("No validation runs yet. Add checks in Validation Sheet, then run validation.")
+        self.empty_results_label.setWordWrap(True)
+        self.empty_results_label.setObjectName("MutedText")
         layout.addWidget(self.empty_results_label)
+        self.results_count_label = QLabel("")
+        self.results_count_label.setObjectName("MutedText")
+        layout.addWidget(self.results_count_label)
 
+        self.schedule_badge = QLabel()
+        self.schedule_badge.setObjectName("MutedText")
+        self.schedule_badge.setWordWrap(True)
+        layout.insertWidget(1, self.schedule_badge)
+        self.schedule_validation_button = action_button("Schedule", "schedule")
+        self.schedule_validation_button.setToolTip("Choose when all enabled validation checks run automatically.")
+        self.schedule_validation_button.clicked.connect(self._open_schedule_dialog)
+        self.overview_header.actions.insertWidget(0, self.schedule_validation_button)
+        self.teams_alerts_button = action_button("Teams alerts", "alerts")
+        self.teams_alerts_button.setToolTip("Configure Microsoft Teams validation alerts.")
+        self.teams_alerts_button.clicked.connect(self._open_teams_dialog)
+        self.overview_header.actions.insertWidget(1, self.teams_alerts_button)
+        self.teams_badge = QLabel()
+        self.teams_badge.hide()
+        more = action_button("More")
+        more_menu = QMenu(more)
+        more_menu.addAction("Power BI refresh history…", self._open_refresh_history)
+        more_menu.addAction("Sync reports", self._handle_refresh_models_clicked)
+        more.setMenu(more_menu)
+        tools.addWidget(more)
+
+        self.model_selector_combo = AnimatedComboBox(card)
+        self.model_selector_combo.currentIndexChanged.connect(self._on_model_selector_changed)
+        self.refresh_models_button = action_button("Sync reports", "refresh")
+        self.refresh_models_button.clicked.connect(self._handle_refresh_models_clicked)
+        self.model_selector_combo.hide()
+        self.refresh_models_button.hide()
         return card
+
+    def _open_refresh_history(self) -> None:
+        """Optional source-refresh inspection, kept out of validation results."""
+        registrations = self._registry_service.list_registrations(active_only=True) if self._registry_service else []
+        if not registrations or self._refresh_service is None:
+            self.validation_banner.show_message("Add a report in Validation Sheet before inspecting its Power BI refresh history.", level=NotificationLevel.INFO)
+            return
+        registration = registrations[0]
+        if len(registrations) > 1:
+            names = [f"{r.workspace_name} / {r.report_name}" for r in registrations]
+            selected, accepted = QInputDialog.getItem(self, "Power BI refresh history", "Report / model", names, 0, False)
+            if not accepted:
+                return
+            registration = registrations[names.index(selected)]
+        dialog = RefreshDetailsDialog(workspace_registration_id=registration.id,
+            workspace_id=registration.workspace_id, dataset_id=registration.dataset_id,
+            registration_display_name=f"{registration.workspace_name} / {registration.report_name}",
+            refresh_service=self._refresh_service, parent=self)
+        dialog.exec()
+
+    def _export_displayed_run(self, extension: str) -> None:
+        summary = getattr(self, "_displayed_summary", None)
+        if summary is None:
+            return
+        from app.services.export_service import export_run_to_csv, export_run_to_xlsx
+        destination, _ = QFileDialog.getSaveFileName(self, "Export displayed validation results",
+            f"validation-results.{extension}", "CSV (*.csv)" if extension == "csv" else "Excel (*.xlsx)")
+        if destination:
+            try:
+                dest = (export_run_to_csv if extension == "csv" else export_run_to_xlsx)(summary, destination)
+                self.validation_banner.show_export_success(
+                    f"Validation results exported to '{dest.name}'.",
+                    dest,
+                    title="Export Complete",
+                )
+            except Exception as exc:
+                self.validation_banner.show_message(str(exc), level=NotificationLevel.ERROR, title="Export failed")
 
     def _connect_validation_service(self) -> None:
         self.dataset_id_input.textChanged.connect(lambda _: self._update_validation_ui())
@@ -1065,7 +917,10 @@ class HomePage(QWidget):
     def _reset_validation_ui(self) -> None:
         update_validation_status_pill(self.home_overall_pill, "NOT RUN")
 
-        self.home_overall_timing.setText("Last Run: -")
+        self.home_overall_timing.setText("No validation runs recorded yet")
+        self.attention_summary.setText("Run validation to see which checks need attention.")
+        self.export_results_button.setEnabled(False)
+        self._displayed_summary = None
         self.home_passed_count.setText("0")
         self.home_failed_count.setText("0")
         self.home_warning_count.setText("0")
@@ -1126,7 +981,7 @@ class HomePage(QWidget):
             self.teams_badge.setText("🔔 Teams: Off")
             self.teams_badge.setStyleSheet(
                 "color: #64748B; background: #F1F5F9; font-size: 11px; font-weight: 600; "
-                "border: 1px solid #E2E8F0; border-radius: 5px; padding: 4px 8px;"
+                "border: 1px solid #DDE4ED; border-radius: 5px; padding: 4px 8px;"
             )
             self.teams_badge.setToolTip("Microsoft Teams alerts disabled. Click 'Teams Alerts...' to configure.")
 
@@ -1143,25 +998,11 @@ class HomePage(QWidget):
             self._update_teams_badge()
 
     def _update_schedule_badge(self, config: Any = None) -> None:
-        """Render the schedule status badge next to the Run Validation button."""
         if not hasattr(self, "schedule_badge"):
             return
         cfg = config or self._scheduler_service.config
-        if not cfg.enabled:
-            self.schedule_badge.setText("○ Schedule Off")
-            self.schedule_badge.setStyleSheet(
-                "color: #64748B; background: #F1F5F9; font-size: 11px; font-weight: 600; "
-                "border: 1px solid #E2E8F0; border-radius: 5px; padding: 4px 8px;"
-            )
-            self.schedule_badge.setToolTip("Automated validation scheduling is turned off.")
-        else:
-            status_text = self._scheduler_service.get_status_text()
-            self.schedule_badge.setText(f"● {status_text}")
-            self.schedule_badge.setStyleSheet(
-                "color: #15803D; background: #DCFCE7; font-size: 11px; font-weight: 600; "
-                "border: 1px solid #BBF7D0; border-radius: 5px; padding: 4px 8px;"
-            )
-            self.schedule_badge.setToolTip(f"Automated Schedule Active: {status_text}")
+        self.schedule_badge.setText(f"Next scheduled run: {self._scheduler_service.get_status_text()} · Local time" if cfg.enabled else "Schedule Off")
+        self.schedule_badge.setStyleSheet("font-size: 12px; color: #64748B; background: transparent; border: none;")
 
     def _open_schedule_dialog(self) -> None:
         """Open the Power BI-style recurring schedule configuration dialog."""
@@ -1314,7 +1155,7 @@ class HomePage(QWidget):
             f"{summary.passed_count} passed, {summary.failed_count} failed, "
             f"{summary.warning_count} warning(s), {summary.error_count} error(s)."
         )
-        self.validation_banner.show_message(msg, level=lvl, title=ttl)
+        self.validation_banner.clear_message()
 
         # Dispatch Microsoft Teams alert if configured
         if self._teams_alert_service and self._teams_alert_service.should_notify(summary):
@@ -1336,7 +1177,26 @@ class HomePage(QWidget):
     def _display_run_summary(self, summary: Any) -> None:
         update_validation_status_pill(self.home_overall_pill, summary.overall_status)
 
-        self.home_overall_timing.setText(f"Run: {summary.duration_display} ({summary.started_at_display})")
+        self._displayed_summary = summary
+        self.export_results_button.setEnabled(True)
+        run_ids = {result.validation_run_id for result in summary.results}
+        identity = f"Run #{summary.id}" if len(run_ids) <= 1 else f"Combined results · {len(run_ids)} saved model runs"
+        latest = max((r.validated_at_display for r in summary.results), default=summary.started_at_display)
+        context = ""
+        if self._registry_service is not None and len(run_ids) <= 1:
+            registrations = self._registry_service.list_registrations(active_only=False)
+            registration = next((r for r in registrations if r.id == summary.workspace_registration_id), None)
+            if registration is not None:
+                context = f" · {registration.workspace_name} / {registration.report_name}"
+        self.home_overall_timing.setText(f"{identity}{context} · Validated {latest} · Duration {summary.duration_display}")
+        concerns = []
+        if summary.failed_count:
+            concerns.append(f"{summary.failed_count} failed")
+        if summary.warning_count:
+            concerns.append(f"{summary.warning_count} warnings")
+        if summary.error_count:
+            concerns.append(f"{summary.error_count} execution errors")
+        self.attention_summary.setText(" · ".join(concerns) if concerns else "All evaluated checks passed.")
         self.home_passed_count.setText(str(summary.passed_count))
         self.home_failed_count.setText(str(summary.failed_count))
         self.home_warning_count.setText(str(summary.warning_count))
@@ -1346,68 +1206,26 @@ class HomePage(QWidget):
 
     def _populate_results_table(self, results: list[Any]) -> None:
         self._current_results = list(results)
-        if not results:
-            self.results_table.setRowCount(0)
-            self.results_table.hide()
-            self.empty_results_label.show()
-            return
-
-        self.empty_results_label.hide()
-        self.results_table.show()
-        self.results_table.setRowCount(len(results))
-
-        for row_idx, res in enumerate(results):
-            # 0: Status (Native bold colorful text, no shrinked widget)
-            item_status = make_status_table_item(res.status)
-            item_status.setData(Qt.ItemDataRole.UserRole, res.id)
-            self.results_table.setItem(row_idx, 0, item_status)
-
-            # 1: Rule Name
-            item_name = QTableWidgetItem(res.rule_name)
-            item_name.setToolTip(res.result_summary)
-            self.results_table.setItem(row_idx, 1, item_name)
-
-            # 2: Target
-            self.results_table.setItem(row_idx, 2, QTableWidgetItem(res.target_display))
-
-            # 3: Check Type
-            self.results_table.setItem(row_idx, 3, QTableWidgetItem(res.validation_type))
-
-            # 4: Actual Value
-            self.results_table.setItem(row_idx, 4, QTableWidgetItem(res.actual_value or "-"))
-
-            # 5: Expected Value
-            self.results_table.setItem(row_idx, 5, QTableWidgetItem(res.expected_value or "-"))
-
-            # 6: Deviation
-            self.results_table.setItem(row_idx, 6, QTableWidgetItem(res.deviation or "None"))
-
-            # 7: Duration
-            self.results_table.setItem(row_idx, 7, QTableWidgetItem(f"{res.duration_ms} ms"))
-
-            # 8: Action link item (crisp bold text, no floating widget glitch)
-            item_act = QTableWidgetItem("Details ➔")
-            item_act.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            font_act = item_act.font()
-            font_act.setBold(True)
-            item_act.setFont(font_act)
-            item_act.setForeground(QColor("#1668DC"))
-            self.results_table.setItem(row_idx, 8, item_act)
-
+        self.results_table.set_results(results)
+        self.results_table.setVisible(bool(results))
+        self.empty_results_label.setVisible(not results)
         self._apply_results_filter()
 
     def _handle_table_clicked(self, row: int, col: int) -> None:
-        if col == 8:  # Clicked on Details column
+        if col == 9:  # Clicked on Details column
             self._handle_table_double_clicked(row, col)
 
     def _apply_results_filter(self) -> None:
+        if not hasattr(self, "results_count_label"):
+            return
         query = self.results_search_input.text().strip().lower()
         filter_mode = self.results_status_filter.currentIndex()
+        visible_count = 0
 
         for row_idx in range(self.results_table.rowCount()):
-            if row_idx >= len(self._current_results):
+            res = self.results_table.result_at(row_idx)
+            if res is None:
                 continue
-            res = self._current_results[row_idx]
 
             # Status filter
             st_val = res.status.value.upper()
@@ -1427,11 +1245,19 @@ class HomePage(QWidget):
                 text_blob = f"{res.rule_name} {res.target_display} {res.validation_type} {res.result_summary} {res.actual_value} {res.deviation}".lower()
                 query_match = query in text_blob
 
-            self.results_table.setRowHidden(row_idx, not (status_match and query_match))
+            matches = status_match and query_match
+            self.results_table.setRowHidden(row_idx, not matches)
+            visible_count += int(matches)
+        total = self.results_table.rowCount()
+        self.results_count_label.setText(f"Showing {visible_count} of {total} checks")
+        if total:
+            self.empty_results_label.setText("No matching results. Clear search or change the outcome filter.")
+            self.empty_results_label.setVisible(visible_count == 0)
 
     def _handle_table_double_clicked(self, row: int, _col: int) -> None:
-        if 0 <= row < len(self._current_results):
-            self._open_result_details(self._current_results[row])
+        result = self.results_table.result_at(row)
+        if result is not None:
+            self._open_result_details(result)
 
     def _open_result_details(self, result: Any) -> None:
         dialog = ResultDetailsDialog(result, parent=self)

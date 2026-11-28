@@ -5,8 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from PySide6.QtCore import QPoint, QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -23,59 +22,12 @@ from PySide6.QtWidgets import (
 from app.auth.msal_auth import AuthAccount
 from app.services.teams_alert_service import TeamsAlertConfig, TeamsAlertService
 
+from app.ui.widgets.enterprise import EnterpriseDialog, ToggleSwitch
+
 logger = logging.getLogger(__name__)
 
 
-class TeamsToggleSwitch(QCheckBox):
-    """Custom graphical ON/OFF toggle switch with green/red indicator pill."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(58, 28)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-    def hitButton(self, pos: QPoint) -> bool:
-        """Allow clicking anywhere on the full 58x28 switch capsule."""
-        return self.rect().contains(pos)
-
-    def paintEvent(self, event) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        checked = self.isChecked()
-        enabled = self.isEnabled()
-
-        if not enabled:
-            bg_color = QColor("#CBD5E1")
-        elif checked:
-            bg_color = QColor("#16A34A")  # Vibrant Green when ON
-        else:
-            bg_color = QColor("#DC2626")  # Vibrant Red when OFF
-
-        # Outer capsule
-        p.setBrush(QBrush(bg_color))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.drawRoundedRect(0, 0, 58, 28, 14, 14)
-
-        # ON / OFF Label
-        p.setPen(QPen(QColor("#FFFFFF")))
-        font = QFont("Segoe UI", 8, QFont.Weight.Bold)
-        p.setFont(font)
-        if checked:
-            p.drawText(QRectF(8, 0, 26, 28), Qt.AlignmentFlag.AlignCenter, "ON")
-            knob_x = 58 - 25
-        else:
-            p.drawText(QRectF(24, 0, 28, 28), Qt.AlignmentFlag.AlignCenter, "OFF")
-            knob_x = 3
-
-        # Circular sliding knob
-        p.setBrush(QBrush(QColor("#FFFFFF")))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.drawEllipse(knob_x, 3, 22, 22)
-        p.end()
-
-
-class TeamsAlertConfigDialog(QDialog):
+class TeamsAlertConfigDialog(EnterpriseDialog):
     """Configuration dialog for Microsoft Teams validation alert notifications."""
 
     def __init__(
@@ -110,7 +62,7 @@ class TeamsAlertConfigDialog(QDialog):
         title_box = QVBoxLayout()
         title_box.setSpacing(2)
         lbl_title = QLabel("Microsoft Teams Validation Alerts")
-        lbl_title.setStyleSheet("font-size: 17px; font-weight: 700; color: #0F172A;")
+        lbl_title.setStyleSheet("font-size: 17px; font-weight: 700; color: #16243A;")
         title_box.addWidget(lbl_title)
 
         lbl_sub = QLabel(
@@ -141,19 +93,19 @@ class TeamsAlertConfigDialog(QDialog):
         self.toggle_card = QFrame()
         self.toggle_card.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_card.setStyleSheet(
-            "QFrame { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 7px; padding: 6px 12px; } "
+            "QFrame { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 7px; padding: 6px 12px; } "
             "QFrame:hover { border-color: #CBD5E1; }"
         )
         t_lay = QHBoxLayout(self.toggle_card)
         t_lay.setContentsMargins(2, 2, 2, 2)
         t_lay.setSpacing(12)
 
-        self.chk_enabled = TeamsToggleSwitch()
+        self.chk_enabled = ToggleSwitch()
         self.chk_enabled.toggled.connect(self._on_enabled_toggled)
         t_lay.addWidget(self.chk_enabled)
 
         lbl_toggle_title = QLabel("Keep Teams validation alerts active")
-        lbl_toggle_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        lbl_toggle_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #16243A;")
         lbl_toggle_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         t_lay.addWidget(lbl_toggle_title)
 
@@ -202,14 +154,14 @@ class TeamsAlertConfigDialog(QDialog):
         self.edit_webhook_url.setPlaceholderText("https://...webhook.office.com/... or https://...logic.azure.com/...")
         self.edit_webhook_url.setStyleSheet(
             "QLineEdit { border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 10px; font-size: 12px; } "
-            "QLineEdit:focus { border-color: #1668DC; }"
+            "QLineEdit:focus { border-color: #2563EB; }"
         )
         w_lay.addWidget(self.edit_webhook_url)
 
         # Helpful instructions box
         self.guide_box = QFrame()
         self.guide_box.setStyleSheet(
-            "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; } "
+            "QFrame { background-color: #F8FAFC; border: 1px solid #DDE4ED; border-radius: 6px; padding: 8px 12px; } "
             "QLabel { background: transparent; border: none; font-size: 11px; color: #475569; }"
         )
         g_lay = QVBoxLayout(self.guide_box)
@@ -307,7 +259,7 @@ class TeamsAlertConfigDialog(QDialog):
         self.btn_save.setObjectName("PrimaryButton")
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 700; font-size: 13px; "
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 700; font-size: 13px; "
             "padding: 7px 20px; border-radius: 6px;"
         )
         self.btn_save.clicked.connect(self._save_settings)
@@ -379,23 +331,23 @@ class TeamsAlertConfigDialog(QDialog):
 
         if enabled:
             self.settings_card.setStyleSheet(
-                "QFrame#SettingsCard { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+                "QFrame#SettingsCard { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
                 "QLabel { color: #334155; font-size: 12px; font-weight: 600; }"
             )
             self.guide_box.setStyleSheet(
-                "QFrame { background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; } "
+                "QFrame { background-color: #F8FAFC; border: 1px solid #DDE4ED; border-radius: 6px; padding: 8px 12px; } "
                 "QLabel { background: transparent; border: none; font-size: 11px; color: #475569; }"
             )
         else:
             self.settings_card.setStyleSheet(
                 "QFrame#SettingsCard { background-color: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 8px; } "
                 "QLabel { color: #94A3B8; font-size: 12px; font-weight: 600; } "
-                "QLineEdit { background-color: #E2E8F0; color: #94A3B8; border-color: #CBD5E1; } "
-                "QComboBox { background-color: #E2E8F0; color: #94A3B8; border-color: #CBD5E1; } "
-                "QPushButton { background-color: #E2E8F0; color: #94A3B8; border-color: #CBD5E1; }"
+                "QLineEdit { background-color: #DDE4ED; color: #94A3B8; border-color: #CBD5E1; } "
+                "QComboBox { background-color: #DDE4ED; color: #94A3B8; border-color: #CBD5E1; } "
+                "QPushButton { background-color: #DDE4ED; color: #94A3B8; border-color: #CBD5E1; }"
             )
             self.guide_box.setStyleSheet(
-                "QFrame { background-color: #E2E8F0; border: 1px solid #CBD5E1; border-radius: 6px; padding: 8px 12px; } "
+                "QFrame { background-color: #DDE4ED; border: 1px solid #CBD5E1; border-radius: 6px; padding: 8px 12px; } "
                 "QLabel { background: transparent; border: none; font-size: 11px; color: #94A3B8; }"
             )
 

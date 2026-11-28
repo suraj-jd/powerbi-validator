@@ -27,10 +27,12 @@ from app.ui.widgets.searchable_combo import SearchableComboBox
 if TYPE_CHECKING:
     from app.services.powerbi_service import PowerBIService
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 
-class QuickAddWorkspacesDialog(QDialog):
+class QuickAddWorkspacesDialog(EnterpriseDialog):
     """Batch-register datasets from a connected Power BI workspace in one click."""
 
     def __init__(
@@ -78,7 +80,7 @@ class QuickAddWorkspacesDialog(QDialog):
         ws_row.setSpacing(10)
 
         ws_label = QLabel("Power BI Workspace:")
-        ws_label.setStyleSheet("color: #0F172A; font-weight: 600; font-size: 12px;")
+        ws_label.setStyleSheet("color: #16243A; font-weight: 600; font-size: 12px;")
         ws_row.addWidget(ws_label)
 
         self.workspace_combo = SearchableComboBox()

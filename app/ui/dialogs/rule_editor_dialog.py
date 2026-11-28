@@ -46,10 +46,12 @@ from app.services.rule_service import (
 from app.ui.dialogs.advanced_settings_dialog import AdvancedSettingsDialog
 from app.ui.widgets.searchable_combo import SearchableComboBox
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 
-class RuleEditorDialog(QDialog):
+class RuleEditorDialog(EnterpriseDialog):
     """Create or edit one validation rule row with dynamic target fields and advanced modal."""
 
     def __init__(
@@ -98,7 +100,7 @@ class RuleEditorDialog(QDialog):
         card = QFrame()
         card.setObjectName("DialogCard")
         card.setStyleSheet(
-            "#DialogCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+            "#DialogCard { background-color: #F8FAFC; border: 1px solid #DDE4ED; "
             "border-radius: 8px; padding: 16px; }"
         )
         card_layout = QVBoxLayout(card)

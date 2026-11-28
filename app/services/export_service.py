@@ -54,6 +54,7 @@ def export_run_to_csv(summary: ValidationRunSummaryDTO, destination: Path | str)
             "Duration (ms)",
             "Summary",
             "Detailed Message",
+            "Validated At (UTC)",
         ]
         writer.writerow(headers)
 
@@ -72,6 +73,7 @@ def export_run_to_csv(summary: ValidationRunSummaryDTO, destination: Path | str)
                 res.duration_ms,
                 res.result_summary,
                 redact_secrets(res.detailed_message or ""),
+                res.validated_at_display,
             ])
 
     logger.info("Exported validation run #%s to CSV: %s", summary.id, dest_path)
@@ -153,6 +155,7 @@ def export_run_to_xlsx(summary: ValidationRunSummaryDTO, destination: Path | str
         "Deviation",
         "Duration (ms)",
         "Summary",
+        "Validated At (UTC)",
     ]
 
     for col_idx, h in enumerate(headers, start=1):
@@ -171,7 +174,7 @@ def export_run_to_xlsx(summary: ValidationRunSummaryDTO, destination: Path | str
         c_st.alignment = Alignment(horizontal="center", vertical="center")
         c_st.border = thin_border
 
-        # Col 2-9
+        # Col 2-10
         values = [
             res.rule_name,
             res.target_display,
@@ -181,6 +184,7 @@ def export_run_to_xlsx(summary: ValidationRunSummaryDTO, destination: Path | str
             res.deviation or "None",
             res.duration_ms,
             res.result_summary,
+            res.validated_at_display,
         ]
         for c_offset, v in enumerate(values, start=2):
             cell = ws_results.cell(row=curr_row, column=c_offset, value=v)

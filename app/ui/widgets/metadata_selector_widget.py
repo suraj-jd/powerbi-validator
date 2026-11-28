@@ -55,7 +55,7 @@ class MetadataSelectorWidget(QFrame):
         header_row.setSpacing(12)
 
         title = QLabel("Semantic Model Object Discovery")
-        title.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
+        title.setStyleSheet("font-size: 14px; font-weight: 700; color: #16243A;")
         header_row.addWidget(title)
 
         header_row.addStretch(1)
@@ -70,7 +70,7 @@ class MetadataSelectorWidget(QFrame):
         self._discover_button = QPushButton("🔍 Discover Metadata")
         self._discover_button.setObjectName("DiscoverMetadataButton")
         self._discover_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; font-size: 12px; "
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; font-size: 12px; "
             "padding: 7px 16px; border-radius: 6px;"
         )
         self._discover_button.setCursor(Qt.CursorShape.PointingHandCursor)

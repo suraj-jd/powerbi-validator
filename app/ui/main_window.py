@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QPushButton,
     QStackedWidget,
     QStatusBar,
@@ -36,6 +37,7 @@ from app.ui.pages.home_page import HomePage
 from app.ui.pages.sheet_settings_page import SheetSettingsPage
 from app.ui.theme import make_nav_icon
 from app.ui.widgets.notification_banner import NotificationBanner
+from app.ui.widgets.enterprise import action_button, polish_button, mask_email_text
 
 if TYPE_CHECKING:
     from app.database.db import DatabaseManager
@@ -95,6 +97,8 @@ class MainWindow(QMainWindow):
         self._dax_service = dax_service
         self._orchestrator_service = orchestrator_service
         self._pending_verify_reg_id: int | None = None
+        self._account_email_text = "Microsoft Entra ID"
+        self.setProperty("hideAccountEmail", True)
 
         from app.services.teams_alert_service import TeamsAlertService
 
@@ -145,6 +149,7 @@ class MainWindow(QMainWindow):
         workspace_col = QVBoxLayout()
         workspace_col.setContentsMargins(0, 0, 0, 0)
         workspace_col.setSpacing(0)
+        workspace_col.addWidget(self._build_context_bar())
 
         banner_wrapper = QWidget(central)
         banner_layout = QVBoxLayout(banner_wrapper)
@@ -196,15 +201,63 @@ class MainWindow(QMainWindow):
             parent=self,
         )
 
-        self._register_page("home", "Home", self.home_page)
+        self.about_page.page_requested.connect(self.navigate_to)
+        self.about_page.diagnostics_requested.connect(self.history_page._handle_export_logs)
+        self.about_page.backup_requested.connect(self.history_page._handle_backup_maintenance)
+        self._register_page("home", "Overview", self.home_page)
         self._register_page("sheet_settings", "Validation Sheet", self.sheet_settings_page)
-        self._register_page("history", "History", self.history_page)
-        self._register_page("about", "About", self.about_page)
+        self._register_page("history", "Run History", self.history_page)
+        self._register_page("about", "About & Support", self.about_page)
+        for button in self.findChildren(QPushButton):
+            polish_button(button)
 
         self.setCentralWidget(central)
 
         status_bar = QStatusBar(self)
         self.setStatusBar(status_bar)
+
+    def _build_context_bar(self) -> QFrame:
+        bar = QFrame()
+        bar.setObjectName("ContextBar")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(24, 8, 24, 8)
+        self.context_title = QLabel("All configured reports")
+        self.context_title.setObjectName("ContextTitle")
+        self.context_title.setToolTip("Validation evaluates all enabled checks in the Validation Sheet.")
+        layout.addWidget(self.context_title, 1)
+        self.connection_status = QLabel("Not signed in")
+        self.connection_status.setObjectName("ConnectionStatus")
+        self.connection_status.setWordWrap(True)
+        self.connection_status.setMaximumWidth(360)
+        layout.addWidget(self.connection_status)
+        self.account_button = QPushButton("Account")
+        self.account_button.setObjectName("AccountButton")
+        self.account_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.account_button.setAccessibleName("Account menu")
+        self.account_button.setToolTip("Account, connection settings, and privacy")
+        menu = QMenu(self.account_button)
+        self.hide_email_action = menu.addAction("Hide account email")
+        self.hide_email_action.setCheckable(True)
+        self.hide_email_action.setChecked(True)
+        self.hide_email_action.toggled.connect(self._refresh_account_email)
+        menu.addSeparator()
+        self.sign_in_action = menu.addAction("Sign in", self._handle_sign_in_requested)
+        self.switch_account_action = menu.addAction("Switch account", self._handle_switch_account_requested)
+        menu.addAction("Connection settings", self._open_entra_config_dialog)
+        self.sign_out_action = menu.addAction("Sign out", self._handle_sign_out_requested)
+        menu.addSeparator()
+        menu.addAction("Exit application", self.close)
+        self.account_button.setMenu(menu)
+        layout.addWidget(self.account_button)
+        return bar
+
+    def _refresh_account_email(self, hidden: bool) -> None:
+        self.setProperty("hideAccountEmail", hidden)
+        if hasattr(self, "_sidebar_user_email"):
+            self._sidebar_user_email.setText("Email hidden" if hidden else self._account_email_text)
+        if hidden and hasattr(self, "home_page"):
+            for label in self.home_page.auth_banner.findChildren(QLabel):
+                label.setText(mask_email_text(label.text()))
 
     def _show_banner_wrapper(self, *_args: object) -> None:
         self._banner_wrapper.setVisible(True)
@@ -421,16 +474,28 @@ class MainWindow(QMainWindow):
     def apply_auth_state(self, state: AuthStateSnapshot) -> None:
         """Synchronize the sidebar profile panel and Home auth banner with auth state."""
         self.home_page.auth_banner.apply_state(state)
+        signed_in = state.status == AuthStatus.AUTHENTICATED and state.account is not None
+        self.home_page.auth_banner.setVisible(not signed_in)
+        self.sign_in_action.setEnabled(not signed_in)
+        self.switch_account_action.setEnabled(signed_in)
+        self.sign_out_action.setEnabled(signed_in)
+        self.connection_status.setText("Signed in" if signed_in else "Not signed in")
+        self.connection_status.setToolTip("Microsoft account authenticated. Verify report permissions in Power BI refresh monitoring." if signed_in else state.status_message)
+        self.connection_status.setProperty("connected", signed_in)
+        self.connection_status.style().unpolish(self.connection_status)
+        self.connection_status.style().polish(self.connection_status)
+        self.account_button.setText(state.account.initials if signed_in else "Account")
 
         if state.status == AuthStatus.AUTHENTICATED and state.account is not None:
             acct = state.account
             self._avatar_label.setText(acct.initials)
             self._avatar_label.setStyleSheet(
-                "background-color: #1668DC; color: #FFFFFF; border-radius: 17px; "
+                "background-color: #2563EB; color: #FFFFFF; border-radius: 17px; "
                 "font-weight: 700; font-size: 12px;"
             )
             self._sidebar_user_name.setText(acct.display_name)
-            self._sidebar_user_email.setText(acct.username or "Signed in")
+            self._account_email_text = acct.username or "Signed in"
+            self._refresh_account_email(self.hide_email_action.isChecked())
             self._sign_out_button.setVisible(True)
             self._auto_load_powerbi_catalog()
         else:
@@ -442,9 +507,8 @@ class MainWindow(QMainWindow):
             self._sidebar_user_name.setText(
                 "Session expired" if state.status == AuthStatus.EXPIRED else "Not signed in"
             )
-            self._sidebar_user_email.setText(
-                state.account.username if state.account else "Microsoft Entra ID"
-            )
+            self._account_email_text = state.account.username if state.account else "Microsoft Entra ID"
+            self._refresh_account_email(self.hide_email_action.isChecked())
             self._sign_out_button.setVisible(False)
 
     def _open_entra_config_dialog(self, *, save_button_text: str = "Save Settings") -> bool:
@@ -500,10 +564,10 @@ class MainWindow(QMainWindow):
         self._pages[key] = widget
         self._stack.addWidget(widget)
 
-        button = QPushButton(f"  {label}")
+        button = QPushButton(f"  {label.replace(chr(38), chr(38) * 2)}")
         button.setObjectName("NavButton")
         button.setCheckable(True)
-        button.setIcon(make_nav_icon(key, color="#E2E8F0"))
+        button.setIcon(make_nav_icon(key, color="#DDE4ED"))
         button.setIconSize(QSize(18, 18))
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         nav_tooltips = {
@@ -557,7 +621,7 @@ class MainWindow(QMainWindow):
         elif page_key == "home" and hasattr(self.home_page, "reload_registered_models"):
             self.home_page.reload_registered_models()
 
-        page_label = self._nav_buttons[page_key].text().strip()
+        page_label = self._nav_buttons[page_key].text().replace("&&", "&").strip()
         self.statusBar().showMessage(f"Ready  |  View: {page_label}")
         logger.debug("Navigated to page: %s", page_key)
 

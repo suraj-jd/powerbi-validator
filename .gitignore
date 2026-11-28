@@ -43,6 +43,8 @@ msal_token_cache*
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
 *.log
 logs/
 
@@ -54,3 +56,11 @@ logs/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Private local QA data, recordings, and machine-specific shortcuts
+/QA_*
+/qa_*
+*.lnk
+/Plan/*.mp4
+/docs/ui-implementation-*/
+/docs/ui-proposal-*/verification/

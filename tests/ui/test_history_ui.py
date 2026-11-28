@@ -71,8 +71,8 @@ def test_history_page_renders_runs_and_drawer(qtbot):
     qtbot.addWidget(page)
     page.show()
 
-    assert page.btn_refresh.text() == "↻  Refresh History"
-    assert page.btn_compare.text() == "⚖  Compare Runs..."
+    assert page.btn_refresh.accessibleName() == "Refresh history"
+    assert page.btn_compare.text() == "Compare runs"
 
     # Inject mock runs
     run1 = _make_dummy_run(1, ValidationStatus.PASS)
@@ -90,6 +90,11 @@ def test_history_page_renders_runs_and_drawer(qtbot):
     assert not page.results_table.isHidden()
     assert page.results_table.rowCount() == 1
     assert page.results_table.item(0, 1).text() == "Sales Null Check"
+    assert page.results_table.horizontalHeaderItem(2).text() == "Validated At (UTC)"
+    assert page.results_table.item(0, 2).text() == "2026-11-19 12:00:00 UTC"
+    page._open_result_details = MagicMock()
+    page._handle_result_clicked(0, 9)
+    page._open_result_details.assert_called_once_with(run2.results[0])
 
     # Verify status items render bold colorful text without cell widgets
     assert page.runs_table.item(0, 3).text() == "FAIL"
@@ -193,10 +198,10 @@ def test_backup_maintenance_dialog_ui(qtbot, tmp_path):
     assert dialog.spin_retention.value() == 90
 
     # Verify Save Backup button has bold "Save" text with floppy disk icon
-    save_btns = [btn for btn in dialog.findChildren(QPushButton) if "💾" in btn.text()]
+    save_btns = [btn for btn in dialog.findChildren(QPushButton) if "Create backup" in btn.text()]
     assert len(save_btns) == 1
-    assert "Save" in save_btns[0].text()
-    assert "font-weight: 700" in save_btns[0].styleSheet()
+    assert "backup" in save_btns[0].text()
+    assert not save_btns[0].icon().isNull()
 
     db.dispose()
 

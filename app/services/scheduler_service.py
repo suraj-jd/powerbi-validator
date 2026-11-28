@@ -54,7 +54,7 @@ class ScheduleConfig:
                 except Exception:
                     pass
             times = data.get("times")
-            if not isinstance(times, list) or not times:
+            if not isinstance(times, list):
                 times = list(DEFAULT_DAILY_TIMES)
             return cls(
                 enabled=bool(data.get("enabled", False)),
@@ -76,7 +76,7 @@ def compute_next_run(config: ScheduleConfig, current_dt: datetime | None = None)
     now = current_dt or datetime.now()
 
     if config.mode == "interval":
-        mins = max(15, config.interval_minutes)
+        mins = max(1, config.interval_minutes)
         if config.last_run_at is None:
             # If never run, run at next clean interval boundary or now + mins
             return now + timedelta(minutes=mins)

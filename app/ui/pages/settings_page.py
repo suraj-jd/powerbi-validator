@@ -156,7 +156,7 @@ class SettingsPage(QWidget):
         self.quick_add_button = QPushButton("✨ Quick Add from Power BI")
         self.quick_add_button.setObjectName("PrimaryButton")
         self.quick_add_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 7px 16px; border-radius: 6px;"
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 7px 16px; border-radius: 6px;"
         )
         self.quick_add_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.quick_add_button.clicked.connect(self._handle_quick_add_clicked)
@@ -252,7 +252,7 @@ class SettingsPage(QWidget):
         target_select_row = QHBoxLayout()
         target_select_row.setSpacing(10)
         target_label = QLabel("Select Target Model:")
-        target_label.setStyleSheet("color: #0F172A; font-weight: 600; font-size: 13px;")
+        target_label.setStyleSheet("color: #16243A; font-weight: 600; font-size: 13px;")
         target_select_row.addWidget(target_label)
 
         self.dataset_selector_combo = SearchableComboBox()

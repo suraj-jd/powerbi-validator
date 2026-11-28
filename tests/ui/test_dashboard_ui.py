@@ -80,7 +80,7 @@ def test_home_page_initial_validation_state(qtbot):
     qtbot.addWidget(page)
     page.show()
 
-    assert page.run_validation_button.text() == "▶  Run Validation"
+    assert page.run_validation_button.text() == "Run all enabled checks"
     assert not page.cancel_validation_button.isVisible()
     assert not page.validation_progress_bar.isVisible()
 
@@ -137,6 +137,11 @@ def test_home_page_run_validation_updates_dashboard(qtbot):
     assert page.results_table.rowCount() == 2
     assert page.results_table.item(0, 1).text() == "Sales Amount Not Blank"
     assert page.results_table.item(1, 1).text() == "Order ID Unique Key"
+    assert page.results_table.horizontalHeaderItem(2).text() == "Validated At (UTC)"
+    assert page.results_table.item(0, 2).text() == "2026-11-19 14:00:00 UTC"
+    page._open_result_details = MagicMock()
+    page._handle_table_clicked(0, 9)
+    page._open_result_details.assert_called_once_with(summary.results[0])
 
 
 def test_home_page_run_sheet_validation_without_model_selection(qtbot):

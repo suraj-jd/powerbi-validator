@@ -81,6 +81,24 @@ def test_compute_next_run_interval():
     assert nxt == datetime(2026, 11, 21, 12, 0, 0)
 
 
+def test_arbitrary_minutes_survive_reload_and_daily_rollover():
+    cfg = ScheduleConfig.from_json(ScheduleConfig(enabled=True, times=["09:17", "23:59", "00:01"]).to_json())
+    assert compute_next_run(cfg, datetime(2026, 11, 28, 9, 16, 59)) == datetime(2026, 11, 28, 9, 17)
+    assert compute_next_run(cfg, datetime(2026, 11, 28, 23, 59, 1)) == datetime(2026, 11, 29, 0, 1)
+
+
+@pytest.mark.parametrize("minutes", [1, 7, 37, 10080])
+def test_custom_interval_is_not_rounded_to_preset(minutes):
+    now = datetime(2026, 11, 28, 10, 0)
+    cfg = ScheduleConfig(enabled=True, mode="interval", interval_minutes=minutes, last_run_at=now)
+    assert compute_next_run(cfg, now) == now + timedelta(minutes=minutes)
+
+
+def test_empty_daily_schedule_is_preserved_when_reloaded():
+    cfg = ScheduleConfig.from_json(ScheduleConfig(enabled=False, times=[]).to_json())
+    assert cfg.times == []
+
+
 def test_format_next_run_display():
     now = datetime(2026, 11, 21, 10, 0, 0)
     t_today = datetime(2026, 11, 21, 13, 30, 0)

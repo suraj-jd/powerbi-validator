@@ -28,6 +28,8 @@ from app.core.status import NotificationLevel, RefreshStatus
 from app.services.refresh_service import RefreshRecordDTO, RefreshService, RefreshSummaryDTO
 from app.ui.widgets.notification_banner import NotificationBanner
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,7 +148,7 @@ def make_refresh_status_table_item(status: RefreshStatus | str) -> QTableWidgetI
     return item
 
 
-class RefreshDetailsDialog(QDialog):
+class RefreshDetailsDialog(EnterpriseDialog):
     """Interactive modal showing full dataset refresh history, KPI summaries, and diagnostics."""
 
     def __init__(
@@ -205,7 +207,7 @@ class RefreshDetailsDialog(QDialog):
         self.fetch_button = QPushButton("↻  Fetch Live Power BI History")
         self.fetch_button.setObjectName("PrimaryButton")
         self.fetch_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 8px 16px; border-radius: 6px;"
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 8px 16px; border-radius: 6px;"
         )
         self.fetch_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.fetch_button.clicked.connect(self._handle_fetch_live)
@@ -235,7 +237,7 @@ class RefreshDetailsDialog(QDialog):
         self.lbl_attempt_start.setStyleSheet("color: #475569; font-size: 11px;")
         self.card_latest_attempt.layout().addWidget(self.lbl_attempt_start)
         self.lbl_attempt_duration = QLabel("Duration: -")
-        self.lbl_attempt_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
+        self.lbl_attempt_duration.setStyleSheet("color: #16243A; font-size: 12px; font-weight: 600;")
         self.card_latest_attempt.layout().addWidget(self.lbl_attempt_duration)
         kpi_row.addWidget(self.card_latest_attempt)
 
@@ -248,14 +250,14 @@ class RefreshDetailsDialog(QDialog):
         self.lbl_success_age.setStyleSheet("color: #475569; font-size: 11px;")
         self.card_latest_success.layout().addWidget(self.lbl_success_age)
         self.lbl_success_duration = QLabel("Duration: -")
-        self.lbl_success_duration.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
+        self.lbl_success_duration.setStyleSheet("color: #16243A; font-size: 12px; font-weight: 600;")
         self.card_latest_success.layout().addWidget(self.lbl_success_duration)
         kpi_row.addWidget(self.card_latest_success)
 
         # Card 3: Reliability
         self.card_reliability = self._create_kpi_card("REFRESH RELIABILITY")
         self.lbl_rate = QLabel("-")
-        self.lbl_rate.setStyleSheet("color: #1668DC; font-size: 15px; font-weight: 700;")
+        self.lbl_rate.setStyleSheet("color: #2563EB; font-size: 15px; font-weight: 700;")
         self.card_reliability.layout().addWidget(self.lbl_rate)
         self.lbl_rate_detail = QLabel("Recorded Runs: 0")
         self.lbl_rate_detail.setStyleSheet("color: #475569; font-size: 11px;")
@@ -276,7 +278,7 @@ class RefreshDetailsDialog(QDialog):
 
         tbl_header = QHBoxLayout()
         tbl_title = QLabel("Execution History (Persisted Locally)")
-        tbl_title.setStyleSheet("color: #0F172A; font-size: 13px; font-weight: 600;")
+        tbl_title.setStyleSheet("color: #16243A; font-size: 13px; font-weight: 600;")
         tbl_header.addWidget(tbl_title)
         tbl_header.addStretch(1)
 
@@ -313,7 +315,7 @@ class RefreshDetailsDialog(QDialog):
         # 4. Diagnostics / Error Drawer
         self.drawer_frame = QFrame()
         self.drawer_frame.setStyleSheet(
-            "background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 6px;"
+            "background-color: #F8FAFC; border: 1px solid #DDE4ED; border-radius: 6px; padding: 6px;"
         )
         drawer_layout = QVBoxLayout(self.drawer_frame)
         drawer_layout.setContentsMargins(10, 8, 10, 8)
@@ -352,7 +354,7 @@ class RefreshDetailsDialog(QDialog):
         card = QFrame()
         card.setObjectName("Card")
         card.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; } "
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; } "
             "QLabel { border: none; background: transparent; }"
         )
         layout = QVBoxLayout(card)

@@ -43,6 +43,8 @@ from app.services.rule_service import (
 from app.services.sheet_service import FRIENDLY_TEST_NAMES, SheetRowDTO, SheetService
 from app.ui.widgets.animated_combo import AnimatedComboBox
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_COLUMNS_INFO = [
@@ -59,7 +61,7 @@ SUPPORTED_COLUMNS_INFO = [
 ]
 
 
-class ImportSheetDialog(QDialog):
+class ImportSheetDialog(EnterpriseDialog):
     """Modal dialog displaying supported spreadsheet format, sample downloads, and test selector."""
 
     def __init__(
@@ -79,6 +81,8 @@ class ImportSheetDialog(QDialog):
         self._selected_file: Path | None = None
         self._parsed_rows: list[SheetRowDTO] = []
         self._replace_mode: bool = False
+        self._preview_file_stamp = None
+        self._preview_rows = []
 
         self._init_ui()
 
@@ -118,8 +122,9 @@ class ImportSheetDialog(QDialog):
 
         demo_header = QHBoxLayout()
         demo_header.setSpacing(8)
-        lbl_demo = QLabel("📋 Demo Sheet Format (Supported Columns)")
-        lbl_demo.setStyleSheet("font-size: 12px; font-weight: 700; color: #0F172A;")
+        lbl_demo = QLabel("Example file format")
+        self.preview_title = lbl_demo
+        lbl_demo.setStyleSheet("font-size: 12px; font-weight: 700; color: #16243A;")
         demo_header.addWidget(lbl_demo, stretch=1)
 
         btn_demo_xlsx = QPushButton("📥 Download Demo (.xlsx)")
@@ -175,7 +180,7 @@ class ImportSheetDialog(QDialog):
         self.demo_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.demo_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.demo_table.setStyleSheet(
-            "QTableWidget { gridline-color: #E2E8F0; font-size: 11px; background: #FFFFFF; "
+            "QTableWidget { gridline-color: #DDE4ED; font-size: 11px; background: #FFFFFF; "
             "border: 1px solid #CBD5E1; border-radius: 4px; } "
             "QHeaderView::section { background: #F8FAFC; color: #334155; font-weight: 700; "
             "border: none; border-bottom: 1px solid #CBD5E1; padding: 4px; font-size: 11px; }"
@@ -204,7 +209,7 @@ class ImportSheetDialog(QDialog):
         file_layout.setSpacing(8)
 
         file_lbl = QLabel("Select File to Import:")
-        file_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #0F172A;")
+        file_lbl.setStyleSheet("font-size: 12px; font-weight: 700; color: #16243A;")
         file_layout.addWidget(file_lbl)
 
         file_row = QHBoxLayout()
@@ -213,7 +218,7 @@ class ImportSheetDialog(QDialog):
         self.btn_browse = QPushButton("📁  Choose File (.xlsx, .csv)...")
         self.btn_browse.setObjectName("PrimaryButton")
         self.btn_browse.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 700; font-size: 12px; "
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 700; font-size: 12px; "
             "padding: 8px 16px; border-radius: 6px;"
         )
         self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -293,13 +298,40 @@ class ImportSheetDialog(QDialog):
         self.file_path_input.setText(str(p))
         self.import_button.setEnabled(True)
 
+        self._load_import_preview()
+
+    def _load_import_preview(self) -> bool:
+        self.import_button.setEnabled(False)
+        self._preview_rows = []
         try:
-            records = self._read_file_records(p)
-            self.status_label.setText(f"✓ Selected '{p.name}' ({len(records)} row(s) found). Ready to import.")
-            self.status_label.setStyleSheet("color: #059669; font-size: 11px; font-weight: 600;")
-        except Exception:
-            self.status_label.setText(f"Selected: {p.name} (Ready to import)")
-            self.status_label.setStyleSheet("color: #1668DC; font-size: 11px; font-weight: 600;")
+            records = self._read_file_records(self._selected_file)
+            for row in records:
+                parsed = self._parse_dict(row, self.test_selector_combo.currentData())
+                if parsed is not None:
+                    self._preview_rows.append(parsed)
+            skipped = len(records) - len(self._preview_rows)
+            self.preview_title.setText(f"File preview · {len(self._preview_rows)} valid checks · {skipped} skipped rows")
+            self.demo_table.setRowCount(min(len(self._preview_rows), 100))
+            self.demo_table.setFixedHeight(200)
+            for index, row in enumerate(self._preview_rows[:100]):
+                values = [str(index + 1), row.workspace_name, row.workspace_id, row.report_name,
+                          row.dataset_id, row.validation_type_display, row.table_name or "—",
+                          row.column_name or row.measure_name or "—"]
+                for col, value in enumerate(values):
+                    self.demo_table.setItem(index, col, QTableWidgetItem(value))
+            self._preview_file_stamp = (self._selected_file, self._selected_file.stat().st_mtime_ns)
+            self.status_label.setText(
+                f"Append {len(self._preview_rows)} checks to the current sheet. {skipped} rows missing required IDs will be skipped. "
+                "Review the preview, then import. The existing checks are retained."
+                if self._preview_rows else "No valid checks found. Required Workspace ID and Dataset ID values are missing, or the file is empty."
+            )
+            self.status_label.setWordWrap(True)
+            self.import_button.setText(f"Append {len(self._preview_rows)} checks")
+            self.import_button.setEnabled(bool(self._preview_rows))
+            return bool(self._preview_rows)
+        except Exception as exc:
+            self.status_label.setText(f"Could not read the file: {exc}")
+            return False
 
     def _download_sample_template(self, is_xlsx: bool, destination: Path | str | None = None) -> Path | None:
         if destination is not None:
@@ -425,31 +457,14 @@ class ImportSheetDialog(QDialog):
         if not self._selected_file or not self._selected_file.exists():
             self.status_label.setText("Please select a valid file first.")
             return
-
-        forced_test = self.test_selector_combo.currentData()
-        self._replace_mode = self.radio_replace.isChecked()
-
-        try:
-            raw_dicts = self._read_file_records(self._selected_file)
-            if not raw_dicts:
-                self.status_label.setText("No data rows found in the selected file.")
-                return
-
-            parsed: list[SheetRowDTO] = []
-            for item in raw_dicts:
-                dto = self._parse_dict(item, forced_test)
-                if dto:
-                    parsed.append(dto)
-
-            if not parsed:
-                self.status_label.setText("Could not map any rows. Ensure 'Workspace ID' and 'Dataset ID' columns exist.")
-                return
-
-            self._parsed_rows = parsed
+        stamp = (self._selected_file, self._selected_file.stat().st_mtime_ns)
+        if stamp != self._preview_file_stamp:
+            self._load_import_preview()
+            return
+        if self._preview_rows:
+            self._replace_mode = False
+            self._parsed_rows = list(self._preview_rows)
             self.accept()
-        except Exception as exc:
-            logger.exception("Failed to parse import file: %s", exc)
-            self.status_label.setText(f"Error parsing file: {exc}")
 
     def _read_file_records(self, path: Path) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []

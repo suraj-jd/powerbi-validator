@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 # Supported Power BI slicer / filter operators
@@ -261,7 +263,7 @@ def parse_dax_filter_expression(expr: str) -> dict[str, str] | None:
     return None
 
 
-class FilterBuilderDialog(QDialog):
+class FilterBuilderDialog(EnterpriseDialog):
     """Compact, professional popup dialog for creating or editing a Power BI / DAX filter condition.
     
     Uses a neat 2x2 grid (Table | Column, Condition | Value) with live DAX preview
@@ -315,14 +317,14 @@ class FilterBuilderDialog(QDialog):
         # 1. Sleek Compact Header
         h_layout = QHBoxLayout()
         lbl_title = QLabel(f"Filter {self._filter_index} Condition Builder")
-        lbl_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        lbl_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #16243A;")
         h_layout.addWidget(lbl_title)
 
         h_layout.addStretch()
 
         badge = QLabel("DAX CALCULATE")
         badge.setStyleSheet(
-            "font-size: 10px; font-weight: 600; color: #1668DC; background: #EFF6FF; "
+            "font-size: 10px; font-weight: 600; color: #2563EB; background: #EFF6FF; "
             "border: 1px solid #BFDBFE; border-radius: 3px; padding: 2px 6px;"
         )
         h_layout.addWidget(badge)
@@ -344,8 +346,8 @@ class FilterBuilderDialog(QDialog):
         self.combo_table.setToolTip("Choose or type the table name to apply this filter to.")
         self.combo_table.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
-            "QComboBox:focus { border-color: #1668DC; }"
+            "padding: 4px 7px; font-size: 11px; color: #16243A; } "
+            "QComboBox:focus { border-color: #2563EB; }"
         )
         self.combo_table.currentTextChanged.connect(self._on_table_changed)
 
@@ -357,8 +359,8 @@ class FilterBuilderDialog(QDialog):
         self.combo_column.setToolTip("Choose or type the column name to filter.")
         self.combo_column.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
-            "QComboBox:focus { border-color: #1668DC; }"
+            "padding: 4px 7px; font-size: 11px; color: #16243A; } "
+            "QComboBox:focus { border-color: #2563EB; }"
         )
         self.combo_column.currentTextChanged.connect(lambda _: self._update_preview())
 
@@ -378,8 +380,8 @@ class FilterBuilderDialog(QDialog):
                 self.combo_operator.setItemData(self.combo_operator.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
         self.combo_operator.setStyleSheet(
             "QComboBox { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
-            "QComboBox:focus { border-color: #1668DC; }"
+            "padding: 4px 7px; font-size: 11px; color: #16243A; } "
+            "QComboBox:focus { border-color: #2563EB; }"
         )
         self.combo_operator.setToolTip(OPERATOR_TOOLTIPS.get(OPERATOR_EQUALS, ""))
         self.combo_operator.currentIndexChanged.connect(self._on_operator_changed)
@@ -391,8 +393,8 @@ class FilterBuilderDialog(QDialog):
         self.input_value.setToolTip("Enter the filter value (for example: Completed or 2024).")
         self.input_value.setStyleSheet(
             "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 4px 7px; font-size: 11px; color: #0F172A; } "
-            "QLineEdit:focus { border-color: #1668DC; } "
+            "padding: 4px 7px; font-size: 11px; color: #16243A; } "
+            "QLineEdit:focus { border-color: #2563EB; } "
             "QLineEdit:disabled { background: #F1F5F9; color: #94A3B8; }"
         )
         self.input_value.textChanged.connect(lambda _: self._update_preview())
@@ -424,8 +426,8 @@ class FilterBuilderDialog(QDialog):
         self.input_custom_dax.setToolTip("Type a custom Power BI filter formula (for example: 'Dates'[Year] = 2024).")
         self.input_custom_dax.setStyleSheet(
             "QLineEdit { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; "
-            "padding: 4px 7px; font-size: 11px; font-family: Consolas, monospace; color: #0F172A; } "
-            "QLineEdit:focus { border-color: #1668DC; }"
+            "padding: 4px 7px; font-size: 11px; font-family: Consolas, monospace; color: #16243A; } "
+            "QLineEdit:focus { border-color: #2563EB; }"
         )
         self.input_custom_dax.setVisible(False)
         self.input_custom_dax.textChanged.connect(lambda _: self._update_preview())
@@ -437,7 +439,7 @@ class FilterBuilderDialog(QDialog):
         preview_card = QFrame()
         preview_card.setToolTip("Preview of the generated DAX filter formula.")
         preview_card.setStyleSheet(
-            "QFrame { background: #0F172A; border-radius: 5px; padding: 6px 10px; }"
+            "QFrame { background: #16243A; border-radius: 5px; padding: 6px 10px; }"
         )
         p_layout = QHBoxLayout(preview_card)
         p_layout.setContentsMargins(4, 2, 4, 2)
@@ -490,7 +492,7 @@ class FilterBuilderDialog(QDialog):
         self.btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_apply.setToolTip("Save and use this filter.")
         self.btn_apply.setStyleSheet(
-            "QPushButton { background: #1668DC; color: #FFFFFF; border: 1px solid #1668DC; "
+            "QPushButton { background: #2563EB; color: #FFFFFF; border: 1px solid #2563EB; "
             "border-radius: 4px; padding: 5px 16px; font-size: 11px; font-weight: 700; } "
             "QPushButton:hover { background: #1D4ED8; border-color: #1D4ED8; } "
             "QPushButton:disabled { background: #93C5FD; border-color: #93C5FD; color: #EFF6FF; }"

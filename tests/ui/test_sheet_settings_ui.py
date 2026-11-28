@@ -151,25 +151,26 @@ def test_sheet_settings_page_initial_ui(qtbot, db: DatabaseManager, sample_regis
     page.show()
 
     # Ribbon buttons
-    assert "Add Row" in page.btn_add_row.text()
+    assert "Add check" in page.btn_add_row.text()
     assert "Delete" in page.btn_delete_row.text()
-    assert "Save Sheet" in page.btn_save_sheet.text()
-    assert "Sync PBI" in page.btn_sync_pbi.text()
-    assert "Import..." in page.btn_import.text()
-    assert "Export..." in page.btn_export.text()
+    assert "Save sheet" in page.btn_save_sheet.text()
+    assert "Sync from Power BI" in page.btn_sync_pbi.text()
+    assert "Import checks" in page.btn_import.text()
+    assert "Export sheet" in page.btn_export.text()
 
     # Table columns
-    assert page.sheet_table.columnCount() == 13
+    assert page.sheet_table.columnCount() == 14
     assert page.sheet_table.horizontalHeaderItem(0).text() == "Sr."
-    assert page.sheet_table.horizontalHeaderItem(2).text() == "Workspace"
-    assert page.sheet_table.horizontalHeaderItem(4).text() == "Test to Do"
-    assert page.sheet_table.horizontalHeaderItem(6).text() == "Column or Measure"
-    assert "Filter 1" in page.sheet_table.horizontalHeaderItem(7).text()
-    assert "Filter 2" in page.sheet_table.horizontalHeaderItem(8).text()
-    assert "Filter 3" in page.sheet_table.horizontalHeaderItem(9).text()
-    assert "Filter 4" in page.sheet_table.horizontalHeaderItem(10).text()
-    assert page.sheet_table.horizontalHeaderItem(11).text() == "Test Rule & Settings ⚙️"
-    assert page.sheet_table.horizontalHeaderItem(12).text() == "Action"
+    assert page.sheet_table.horizontalHeaderItem(2).text() == "Check Name"
+    assert page.sheet_table.horizontalHeaderItem(3).text() == "Workspace"
+    assert page.sheet_table.horizontalHeaderItem(5).text() == "Check type"
+    assert page.sheet_table.horizontalHeaderItem(7).text() == "Column or Measure"
+    assert "Filter 1" in page.sheet_table.horizontalHeaderItem(8).text()
+    assert "Filter 2" in page.sheet_table.horizontalHeaderItem(9).text()
+    assert "Filter 3" in page.sheet_table.horizontalHeaderItem(10).text()
+    assert "Filter 4" in page.sheet_table.horizontalHeaderItem(11).text()
+    assert page.sheet_table.horizontalHeaderItem(12).text() == "Condition & settings"
+    assert page.sheet_table.horizontalHeaderItem(13).text() == "Action"
 
 
 def test_sheet_settings_page_add_and_save_flow(qtbot, db: DatabaseManager, sample_registration: int) -> None:
@@ -182,11 +183,14 @@ def test_sheet_settings_page_add_and_save_flow(qtbot, db: DatabaseManager, sampl
     assert page.sheet_table.rowCount() == 1
 
     # 2. Configure row widgets
-    tbl_input = page.sheet_table.cellWidget(0, 5)
-    col_input = page.sheet_table.cellWidget(0, 6)
+    name_input = page.sheet_table.cellWidget(0, 2)
+    tbl_input = page.sheet_table.cellWidget(0, 6)
+    col_input = page.sheet_table.cellWidget(0, 7)
+    assert isinstance(name_input, QLineEdit)
     assert isinstance(tbl_input, (QLineEdit, QComboBox))
     assert isinstance(col_input, (QLineEdit, QComboBox))
 
+    name_input.setText("Daily Orders Null Guard")
     tbl_input.setText("Orders")
     col_input.setText("OrderID")
 
@@ -199,6 +203,7 @@ def test_sheet_settings_page_add_and_save_flow(qtbot, db: DatabaseManager, sampl
     sheet_service = SheetService(db=db)
     rows = sheet_service.load_sheet_rows()
     assert len(rows) == 1
+    assert rows[0].rule_name == "Daily Orders Null Guard"
     assert rows[0].table_name == "Orders"
     assert rows[0].column_name == "OrderID"
     assert rows[0].validation_type == VALIDATION_TYPE_NULL
@@ -224,8 +229,8 @@ def test_sheet_settings_page_row_deletion(qtbot, db: DatabaseManager, sample_reg
 
     assert page.sheet_table.rowCount() == 1
 
-    # Click row delete button in column 12
-    btn_del = page.sheet_table.cellWidget(0, 12)
+    # Click row delete button in column 13
+    btn_del = page.sheet_table.cellWidget(0, 13)
     assert isinstance(btn_del, QPushButton)
     qtbot.mouseClick(btn_del, Qt.MouseButton.LeftButton)
 
@@ -365,8 +370,8 @@ def test_sheet_settings_page_populates_live_workspaces_and_cascades_datasets(qtb
     qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
     assert page.sheet_table.rowCount() == 1
 
-    ws_combo = page.sheet_table.cellWidget(0, 2)
-    ds_combo = page.sheet_table.cellWidget(0, 3)
+    ws_combo = page.sheet_table.cellWidget(0, 3)
+    ds_combo = page.sheet_table.cellWidget(0, 4)
     assert isinstance(ws_combo, QComboBox)
     assert isinstance(ds_combo, QComboBox)
 
@@ -403,7 +408,7 @@ def test_import_sheet_dialog_demo_table_and_file_selection(qtbot, tmp_path: Path
 
     # Initially import button is disabled
     assert not dialog.import_button.isEnabled()
-    assert dialog.btn_browse.text() == "📁  Choose File (.xlsx, .csv)..."
+    assert dialog.btn_browse.text() == "Choose File (.xlsx, .csv)..."
 
     # Simulate selecting a valid CSV file
     csv_file = tmp_path / "valid_rules.csv"
@@ -424,7 +429,7 @@ def test_sheet_settings_page_auto_save(qtbot, db: DatabaseManager, sample_regist
 
     # Verify auto-save timer and status label
     assert hasattr(page, "lbl_auto_save")
-    assert "Auto-save active (1 min)" in page.lbl_auto_save.text()
+    assert "Autosave every minute" in page.lbl_auto_save.text()
     assert hasattr(page, "_auto_save_timer")
     assert page._auto_save_timer.isActive()
     assert page._auto_save_timer.interval() == 60_000
@@ -436,8 +441,8 @@ def test_sheet_settings_page_auto_save(qtbot, db: DatabaseManager, sample_regist
     assert "Unsaved changes" in page.lbl_auto_save.text()
 
     # Fill in required fields
-    tbl_input = page.sheet_table.cellWidget(0, 5)
-    col_input = page.sheet_table.cellWidget(0, 6)
+    tbl_input = page.sheet_table.cellWidget(0, 6)
+    col_input = page.sheet_table.cellWidget(0, 7)
     tbl_input.setText("Orders")
     col_input.setText("OrderID")
 
@@ -503,9 +508,9 @@ def test_sheet_settings_cascading_metadata_dropdowns(qtbot, db: DatabaseManager)
     qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
     assert page.sheet_table.rowCount() == 1
 
-    tbl_combo = page.sheet_table.cellWidget(0, 5)
-    col_combo = page.sheet_table.cellWidget(0, 6)
-    test_combo = page.sheet_table.cellWidget(0, 4)
+    tbl_combo = page.sheet_table.cellWidget(0, 6)
+    col_combo = page.sheet_table.cellWidget(0, 7)
+    test_combo = page.sheet_table.cellWidget(0, 5)
 
     # Tables should be populated from metadata
     assert tbl_combo.count() == 2
@@ -540,18 +545,18 @@ def test_sheet_settings_filters_flow(qtbot, db: DatabaseManager, sample_registra
     qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
     assert page.sheet_table.rowCount() == 1
 
-    f1 = page.sheet_table.cellWidget(0, 7)
-    f2 = page.sheet_table.cellWidget(0, 8)
-    f3 = page.sheet_table.cellWidget(0, 9)
-    f4 = page.sheet_table.cellWidget(0, 10)
+    f1 = page.sheet_table.cellWidget(0, 8)
+    f2 = page.sheet_table.cellWidget(0, 9)
+    f3 = page.sheet_table.cellWidget(0, 10)
+    f4 = page.sheet_table.cellWidget(0, 11)
 
     assert isinstance(f1, QLineEdit)
     assert isinstance(f2, QLineEdit)
     assert isinstance(f3, QLineEdit)
     assert isinstance(f4, QLineEdit)
 
-    tbl_input = page.sheet_table.cellWidget(0, 5)
-    col_input = page.sheet_table.cellWidget(0, 6)
+    tbl_input = page.sheet_table.cellWidget(0, 6)
+    col_input = page.sheet_table.cellWidget(0, 7)
     tbl_input.setText("Orders")
     col_input.setText("OrderID")
 
@@ -582,13 +587,13 @@ def test_sheet_filters_optional_and_backend_unmanipulated(qtbot, db: DatabaseMan
 
     # 1. Add row with NO filters (all optional left blank)
     qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
-    tbl_input = page.sheet_table.cellWidget(0, 5)
-    col_input = page.sheet_table.cellWidget(0, 6)
+    tbl_input = page.sheet_table.cellWidget(0, 6)
+    col_input = page.sheet_table.cellWidget(0, 7)
     tbl_input.setText("Orders")
     col_input.setText("Revenue")
 
     # Leave Filter 1..4 completely empty
-    f1 = page.sheet_table.cellWidget(0, 7)
+    f1 = page.sheet_table.cellWidget(0, 8)
     assert f1.text() == ""
     assert "Optional" in f1.placeholderText()
 

@@ -33,7 +33,9 @@ from app.ui.dialogs.confirm_dialog import ConfirmDialog
 from app.ui.widgets.notification_banner import NotificationBanner
 
 
-class BackupMaintenanceDialog(QDialog):
+from app.ui.widgets.enterprise import EnterpriseDialog
+
+class BackupMaintenanceDialog(EnterpriseDialog):
     """Database management dialog providing backup, integrity check, restore, and history pruning."""
 
     def __init__(
@@ -68,7 +70,7 @@ class BackupMaintenanceDialog(QDialog):
         title_block.setSpacing(4)
         title = QLabel("Database Backup & Storage Maintenance")
         title.setObjectName("SectionTitle")
-        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #0F172A;")
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #16243A;")
         title_block.addWidget(title)
 
         desc = QLabel(
@@ -89,7 +91,7 @@ class BackupMaintenanceDialog(QDialog):
         self.card_stats = QFrame()
         self.card_stats.setObjectName("Card")
         self.card_stats.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 8px; padding: 14px; }"
+            "QFrame#Card { background-color: #FFFFFF; border: 1.5px solid #DDE4ED; border-radius: 8px; padding: 14px; }"
         )
         lay_s = QVBoxLayout(self.card_stats)
         lay_s.setContentsMargins(14, 12, 14, 12)
@@ -97,7 +99,7 @@ class BackupMaintenanceDialog(QDialog):
 
         head_s = QHBoxLayout()
         lbl_s_title = QLabel("Database Health & Storage Status")
-        lbl_s_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        lbl_s_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #16243A;")
         head_s.addWidget(lbl_s_title)
         head_s.addStretch(1)
 
@@ -139,14 +141,14 @@ class BackupMaintenanceDialog(QDialog):
         box_backup = QFrame()
         box_backup.setObjectName("Card")
         box_backup.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; padding: 12px; }"
         )
         lay_b = QVBoxLayout(box_backup)
         lay_b.setContentsMargins(14, 12, 14, 12)
         lay_b.setSpacing(8)
 
         lbl_b_t = QLabel("1. Create Database Backup Snapshot")
-        lbl_b_t.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        lbl_b_t.setStyleSheet("font-size: 13px; font-weight: 700; color: #16243A;")
         lay_b.addWidget(lbl_b_t)
 
         lbl_b_d = QLabel(
@@ -157,11 +159,11 @@ class BackupMaintenanceDialog(QDialog):
         lbl_b_d.setWordWrap(True)
         lay_b.addWidget(lbl_b_d)
 
-        btn_backup = QPushButton("💾  Save")
+        btn_backup = QPushButton("Create backup")
         btn_backup.setObjectName("PrimaryButton")
         btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_backup.setStyleSheet(
-            "QPushButton#PrimaryButton { background-color: #1668DC; color: #FFFFFF; font-weight: 700; "
+            "QPushButton#PrimaryButton { background-color: #2563EB; color: #FFFFFF; font-weight: 700; "
             "font-size: 13px; border: none; border-radius: 6px; padding: 8px 22px; } "
             "QPushButton#PrimaryButton:hover { background-color: #1357BA; }"
         )
@@ -174,14 +176,14 @@ class BackupMaintenanceDialog(QDialog):
         box_restore = QFrame()
         box_restore.setObjectName("Card")
         box_restore.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; padding: 12px; }"
         )
         lay_r = QVBoxLayout(box_restore)
         lay_r.setContentsMargins(14, 12, 14, 12)
         lay_r.setSpacing(8)
 
         lbl_r_t = QLabel("2. Verify & Restore Backup")
-        lbl_r_t.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        lbl_r_t.setStyleSheet("font-size: 13px; font-weight: 700; color: #16243A;")
         lay_r.addWidget(lbl_r_t)
 
         lbl_r_d = QLabel(
@@ -217,14 +219,14 @@ class BackupMaintenanceDialog(QDialog):
         box_prune = QFrame()
         box_prune.setObjectName("Card")
         box_prune.setStyleSheet(
-            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }"
+            "QFrame#Card { background-color: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 8px; padding: 12px; }"
         )
         lay_p = QVBoxLayout(box_prune)
         lay_p.setContentsMargins(14, 12, 14, 12)
         lay_p.setSpacing(8)
 
         lbl_p_t = QLabel("3. History Retention & Pruning")
-        lbl_p_t.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        lbl_p_t.setStyleSheet("font-size: 13px; font-weight: 700; color: #16243A;")
         lay_p.addWidget(lbl_p_t)
 
         lbl_p_d = QLabel(

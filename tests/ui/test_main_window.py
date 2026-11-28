@@ -19,14 +19,14 @@ def test_main_window_initial_state(qtbot) -> None:
     assert not window.windowIcon().isNull()
     assert window.current_page_key == "home"
     assert window._nav_buttons["home"].isChecked()
-    assert "Home" in window.statusBar().currentMessage()
+    assert "Overview" in window.statusBar().currentMessage()
 
 
 @pytest.mark.parametrize("page_key,expected_label", [
     ("sheet_settings", "Validation Sheet"),
     ("history", "History"),
     ("about", "About"),
-    ("home", "Home"),
+    ("home", "Overview"),
 ])
 def test_sidebar_navigation_switches_pages(qtbot, page_key: str, expected_label: str) -> None:
     """Clicking each sidebar navigation button switches to the corresponding page."""

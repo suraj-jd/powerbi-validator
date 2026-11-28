@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
 )
 
 
-class ConfirmDialog(QDialog):
+from app.ui.widgets.enterprise import EnterpriseDialog
+
+class ConfirmDialog(EnterpriseDialog):
     """Consistent confirmation modal for standard and destructive user actions."""
 
     def __init__(

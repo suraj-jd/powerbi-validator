@@ -102,32 +102,15 @@ def test_confirm_dialog_accept_and_reject(qtbot) -> None:
     assert dialog2.result() == ConfirmDialog.DialogCode.Accepted
 
 
-def test_about_page_shared_component_demo(qtbot, tmp_path: Path) -> None:
+def test_about_page_help_and_storage(qtbot, tmp_path: Path) -> None:
     page = AboutPage(logs_dir=tmp_path / "logs", db_path=tmp_path / "data" / "validation_tool.db")
     qtbot.addWidget(page)
     page.show()
-
-    assert page.demo_table.visible_row_count() == 5
-    assert not page.demo_banner.isVisible()
-
-    qtbot.mouseClick(page.demo_notify_btn, Qt.MouseButton.LeftButton)
-    assert page.demo_banner.isVisible()
-    assert page.demo_banner.current_level == NotificationLevel.INFO
-
-    # Verify tabs and structure
-    assert page.tabs.count() == 4
-    tab_titles = [page.tabs.tabText(i) for i in range(page.tabs.count())]
-    assert any("User Guide" in t for t in tab_titles)
-    assert any("Sections" in t for t in tab_titles)
-    assert any("Validation Tests" in t for t in tab_titles)
-    assert any("Diagnostics" in t for t in tab_titles)
+    assert page.tabs.count() == 3
+    assert [page.tabs.tabText(i) for i in range(3)] == ["Quick start", "Check reference", "Support"]
     assert page.open_logs_button is not None
     assert page.open_db_button is not None
-
-    # Verify Tab 3 contains validation formulas catalog
-    catalog_widget = page.tabs.widget(2)
-    assert catalog_widget is not None
-    assert page.findChild(QLabel, "PageTitle") is not None or page.findChild(QLabel) is not None
+    assert not hasattr(page, "demo_table")
 
 
 def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_path: Path) -> None:
@@ -153,3 +136,42 @@ def test_bootstrap_application_initializes_config_logs_and_window(qtbot, tmp_pat
         ctx.powerbi_service.shutdown()
         ctx.auth_service.shutdown()
         ctx.db.dispose()
+
+
+def test_notification_banner_export_actions(qtbot, tmp_path: Path, monkeypatch) -> None:
+    from PySide6.QtWidgets import QPushButton
+
+    from app.ui.widgets.notification_banner import NotificationBanner
+
+    export_file = tmp_path / "results.xlsx"
+    export_file.write_text("demo", encoding="utf-8")
+
+    opened_files: list[str] = []
+    opened_locations: list[str] = []
+    monkeypatch.setattr(
+        "app.ui.widgets.notification_banner.open_exported_file",
+        lambda p: opened_files.append(str(p)),
+    )
+    monkeypatch.setattr(
+        "app.ui.widgets.notification_banner.open_file_location",
+        lambda p: opened_locations.append(str(p)),
+    )
+
+    banner = NotificationBanner()
+    qtbot.addWidget(banner)
+    banner.show()
+
+    banner.show_export_success("Exported to results.xlsx", export_file)
+    action_buttons = [
+        b for b in banner.findChildren(QPushButton) if b.objectName() == "BannerActionButton"
+    ]
+    assert [b.text() for b in action_buttons] == ["Open File", "Open File Location"]
+
+    qtbot.mouseClick(action_buttons[0], Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(action_buttons[1], Qt.MouseButton.LeftButton)
+    assert opened_files == [str(export_file.resolve())]
+    assert opened_locations == [str(export_file.resolve())]
+
+    # Subsequent regular message clears export actions
+    banner.show_message("Regular info", level=NotificationLevel.INFO)
+    assert banner._actions_layout.count() == 0

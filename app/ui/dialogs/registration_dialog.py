@@ -28,10 +28,12 @@ from app.ui.widgets.searchable_combo import SearchableComboBox
 if TYPE_CHECKING:
     from app.services.powerbi_service import PowerBIService
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 
-class RegistrationDialog(QDialog):
+class RegistrationDialog(EnterpriseDialog):
     """Add or edit one Workspace / Report / Semantic Model registration."""
 
     record_saved = Signal(object)  # RegistrationInput
@@ -88,7 +90,7 @@ class RegistrationDialog(QDialog):
         card = QFrame()
         card.setObjectName("DialogCard")
         card.setStyleSheet(
-            "#DialogCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+            "#DialogCard { background-color: #F8FAFC; border: 1px solid #DDE4ED; "
             "border-radius: 8px; padding: 14px; }"
         )
         card_layout = QVBoxLayout(card)
@@ -97,7 +99,7 @@ class RegistrationDialog(QDialog):
 
         card_header = QHBoxLayout()
         card_title = QLabel("Power BI Asset Selection")
-        card_title.setStyleSheet("color: #0F172A; font-weight: 700; font-size: 13px;")
+        card_title.setStyleSheet("color: #16243A; font-weight: 700; font-size: 13px;")
         card_header.addWidget(card_title)
         card_header.addStretch(1)
         card_layout.addLayout(card_header)
@@ -140,7 +142,7 @@ class RegistrationDialog(QDialog):
             else "▸ Advanced: View / Edit Technical Details (GUIDs and Names)"
         )
         self.details_toggle_button.setStyleSheet(
-            "QPushButton { background: transparent; border: none; color: #1668DC; "
+            "QPushButton { background: transparent; border: none; color: #2563EB; "
             "font-size: 12px; font-weight: 600; text-align: left; padding: 4px 0px; } "
             "QPushButton:hover { color: #1357BA; text-decoration: underline; }"
         )

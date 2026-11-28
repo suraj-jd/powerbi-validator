@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -62,6 +63,7 @@ from app.services.sheet_service import (
     TEST_NAME_TO_TYPE,
     TEST_TYPE_TOOLTIPS,
     format_rule_conditions_summary,
+    generate_rule_name,
 )
 from app.ui.dialogs.sheet_rule_config_dialog import SheetRuleConfigDialog
 from app.ui.theme import CHEVRON_ACTIVE_PATH, CHEVRON_DOWN_PATH
@@ -69,6 +71,8 @@ from app.ui.widgets.animated_combo import AnimatedComboBox, EditableCellCombo
 from app.ui.widgets.filter_cell_widget import FilterCellWidget
 from app.ui.widgets.notification_banner import NotificationBanner
 from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
+from app.ui.widgets.enterprise import PageHeader, action_button
+from app.ui.theme import make_nav_icon
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +122,8 @@ class SheetSettingsPage(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        self.reload_sheet()
+        if not self._is_dirty and self.check_editor_panel.isHidden():
+            self.reload_sheet()
 
     def closeEvent(self, event) -> None:
         if hasattr(self, "_auto_save_timer") and self._auto_save_timer.isActive():
@@ -141,7 +146,7 @@ class SheetSettingsPage(QWidget):
         self._is_dirty = False
         if hasattr(self, "lbl_auto_save"):
             now_str = datetime.now().strftime("%H:%M:%S")
-            text = msg or f"✓ Saved at {now_str}"
+            text = msg or f"Saved locally at {now_str}"
             self.lbl_auto_save.setStyleSheet("font-size: 11px; font-weight: 600; color: #059669; margin-left: 8px;")
             self.lbl_auto_save.setText(text)
 
@@ -154,35 +159,8 @@ class SheetSettingsPage(QWidget):
         main_layout.setContentsMargins(24, 16, 24, 16)
         main_layout.setSpacing(12)
 
-        # Header Title row
-        header_row = QHBoxLayout()
-        header_row.setSpacing(12)
+        main_layout.addWidget(PageHeader("Validation Sheet", "Define what healthy data means. Changes are saved locally; autosave runs every minute."))
 
-        title_block = QVBoxLayout()
-        title_block.setSpacing(2)
-
-        title_lbl = QLabel("Validation Sheet (Excel-Style Rule Manager)")
-        title_lbl.setObjectName("PageTitle")
-        title_block.addWidget(title_lbl)
-
-        sub_lbl = QLabel(
-            "Configure and maintain Power BI validation checks in a clean, spreadsheet view. "
-            "Select workspaces and reports from dropdowns. No technical IDs needed."
-        )
-        sub_lbl.setObjectName("PageSubtitle")
-        title_block.addWidget(sub_lbl)
-        header_row.addLayout(title_block, stretch=1)
-
-        badge = QLabel("Interactive Sheet Mode")
-        badge.setObjectName("StageBadge")
-        badge.setStyleSheet(
-            "background-color: #E0E7FF; color: #3730A3; font-weight: 700; "
-            "padding: 5px 12px; border-radius: 12px; font-size: 11px;"
-        )
-        header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
-        main_layout.addLayout(header_row)
-
-        # Top Menu Ribbon
         ribbon_frame = self._build_menu_ribbon()
         main_layout.addWidget(ribbon_frame)
 
@@ -192,7 +170,17 @@ class SheetSettingsPage(QWidget):
 
         # Spreadsheet Table
         self.sheet_table = self._build_sheet_table()
-        main_layout.addWidget(self.sheet_table, stretch=1)
+        self.sheet_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.sheet_splitter.addWidget(self.sheet_table)
+        self.check_editor_panel = QFrame()
+        self.check_editor_panel.setObjectName("Card")
+        self.check_editor_layout = QVBoxLayout(self.check_editor_panel)
+        self.check_editor_layout.setContentsMargins(0, 0, 0, 0)
+        self.sheet_splitter.addWidget(self.check_editor_panel)
+        self.check_editor_panel.hide()
+        self.sheet_splitter.setStretchFactor(0, 1)
+        self.sheet_splitter.setStretchFactor(1, 0)
+        main_layout.addWidget(self.sheet_splitter, stretch=1)
 
         # Bottom Summary & Status Bar
         status_bar = self._build_status_bar()
@@ -200,125 +188,83 @@ class SheetSettingsPage(QWidget):
 
     def _build_menu_ribbon(self) -> QFrame:
         ribbon = QFrame(self)
-        ribbon.setObjectName("RibbonBar")
-        ribbon.setStyleSheet(
-            "#RibbonBar { background-color: #FFFFFF; border: 1px solid #CBD5E1; "
-            "border-radius: 8px; padding: 4px 8px; }"
-        )
-        ribbon_layout = QHBoxLayout(ribbon)
-        ribbon_layout.setContentsMargins(6, 4, 6, 4)
-        ribbon_layout.setSpacing(6)
-
-        # Group 1: Sheet Actions
-        self.btn_add_row = QPushButton("➕ Add Row")
-        self.btn_add_row.setObjectName("PrimaryButton")
-        self.btn_add_row.setToolTip("Add a new validation check row to this sheet.")
-        self.btn_add_row.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 5px 10px; border-radius: 5px; font-size: 12px;"
-        )
-        self.btn_add_row.setCursor(Qt.CursorShape.PointingHandCursor)
+        ribbon.setObjectName("Card")
+        layout = QHBoxLayout(ribbon)
+        layout.setContentsMargins(10, 8, 10, 8)
+        first = layout
+        self.btn_add_row = action_button("Add check", "add", primary=True)
         self.btn_add_row.clicked.connect(self._handle_add_row)
-        ribbon_layout.addWidget(self.btn_add_row)
-
-        self.btn_delete_row = QPushButton("🗑️ Delete")
-        self.btn_delete_row.setObjectName("SecondaryButton")
-        self.btn_delete_row.setToolTip("Delete the selected validation rows from this sheet.")
-        self.btn_delete_row.setStyleSheet(
-            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
-        )
-        self.btn_delete_row.setCursor(Qt.CursorShape.PointingHandCursor)
+        first.addWidget(self.btn_add_row)
+        self.btn_delete_row = action_button("Delete selected", "delete", danger=True)
         self.btn_delete_row.clicked.connect(self._handle_delete_selected_row)
-        ribbon_layout.addWidget(self.btn_delete_row)
-
-        self.btn_save_sheet = QPushButton("💾 Save Sheet")
-        self.btn_save_sheet.setObjectName("PrimaryButton")
-        self.btn_save_sheet.setToolTip("Save all validation rules to the database.")
-        self.btn_save_sheet.setStyleSheet(
-            "background-color: #10B981; color: #FFFFFF; font-weight: 700; padding: 5px 12px; border-radius: 5px; font-size: 12px;"
-        )
-        self.btn_save_sheet.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete_row.hide()
+        self.btn_save_sheet = action_button("Save sheet", "save")
         self.btn_save_sheet.clicked.connect(self._handle_save_sheet)
-        ribbon_layout.addWidget(self.btn_save_sheet)
-
-        self._add_ribbon_separator(ribbon_layout)
-
-        # Group 2: Power BI Sync
-        self.btn_sync_pbi = QPushButton("🔄 Sync PBI")
-        self.btn_sync_pbi.setObjectName("SecondaryButton")
-        self.btn_sync_pbi.setToolTip("Sync accessible workspaces, datasets, and tables from Power BI.")
-        self.btn_sync_pbi.setStyleSheet(
-            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
-        )
-        self.btn_sync_pbi.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_sync_pbi.clicked.connect(self._handle_sync_powerbi)
-        ribbon_layout.addWidget(self.btn_sync_pbi)
-
-        self._add_ribbon_separator(ribbon_layout)
-
-        # Group 3: File Transfer
-        self.btn_import = QPushButton("📥 Import...")
-        self.btn_import.setObjectName("SecondaryButton")
-        self.btn_import.setToolTip("Import validation rules from an Excel (.xlsx) or CSV file.")
-        self.btn_import.setStyleSheet(
-            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
-        )
-        self.btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_import.clicked.connect(self._handle_import_sheet)
-        ribbon_layout.addWidget(self.btn_import)
-
-        self.btn_export = QPushButton("📤 Export...")
-        self.btn_export.setObjectName("SecondaryButton")
-        self.btn_export.setToolTip("Export the current validation sheet rules to an Excel (.xlsx) file.")
-        self.btn_export.setStyleSheet(
-            "padding: 5px 10px; font-size: 12px; border-radius: 5px;"
-        )
-        self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export.clicked.connect(self._handle_export_sheet)
-        ribbon_layout.addWidget(self.btn_export)
-
-        ribbon_layout.addStretch(1)
-
-        # Group 4: Quick Search
+        first.addWidget(self.btn_save_sheet)
         self.search_filter = QLineEdit()
-        self.search_filter.setObjectName("RibbonSearch")
-        self.search_filter.setPlaceholderText("🔍 Filter...")
-        self.search_filter.setToolTip("Filter visible sheet rows by table name, column, measure, or test type.")
-        self.search_filter.setMinimumWidth(80)
-        self.search_filter.setMaximumWidth(150)
-        self.search_filter.setStyleSheet(
-            "QLineEdit#RibbonSearch { background: #F8FAFC; border: 1px solid #CBD5E1; "
-            "border-radius: 4px; padding: 4px 8px; font-size: 11px; } "
-            "QLineEdit#RibbonSearch:focus { border-color: #1668DC; background: #FFFFFF; }"
-        )
+        self.search_filter.setPlaceholderText("Search checks or targets…")
+        self.search_filter.setClearButtonEnabled(True)
         self.search_filter.textChanged.connect(self._apply_filter)
-        ribbon_layout.addWidget(self.search_filter)
-
+        first.addWidget(self.search_filter, 1)
+        self.btn_sync_pbi = action_button("Sync from Power BI", "refresh")
+        self.btn_sync_pbi.clicked.connect(self._handle_sync_powerbi)
+        self.btn_sync_pbi.hide()
+        self.btn_import = action_button("Import checks", "import")
+        self.btn_import.clicked.connect(self._handle_import_sheet)
+        self.btn_import.hide()
+        self.btn_export = action_button("Export sheet", "export")
+        self.btn_export.clicked.connect(self._handle_export_sheet)
+        self.btn_export.hide()
+        self.advanced_fields_button = action_button("Show filters", "settings")
+        self.advanced_fields_button.setCheckable(True)
+        self.advanced_fields_button.toggled.connect(self._toggle_filter_columns)
+        first.addWidget(self.advanced_fields_button)
+        from PySide6.QtWidgets import QMenu, QSizePolicy
+        self.search_filter.setMinimumWidth(80)
+        self.search_filter.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.sheet_more_button = action_button("More")
+        menu = QMenu(self.sheet_more_button)
+        actions = []
+        for button in (self.btn_sync_pbi, self.btn_import, self.btn_export, self.btn_delete_row):
+            if button is self.btn_delete_row:
+                menu.addSeparator()
+            action = menu.addAction(button.icon(), button.text(), button.click)
+            actions.append((action, button))
+        menu.aboutToShow.connect(lambda: [action.setEnabled(button.isEnabled()) for action, button in actions])
+        self.sheet_more_button.setMenu(menu)
+        first.addWidget(self.sheet_more_button)
         return ribbon
+
+    def _toggle_filter_columns(self, visible: bool) -> None:
+        for column in range(8, 12):
+            self.sheet_table.setColumnHidden(column, not visible)
+        self.advanced_fields_button.setText("Hide filters" if visible else "Show filters")
 
     def _add_ribbon_separator(self, layout: QHBoxLayout) -> None:
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setFrameShadow(QFrame.Shadow.Sunken)
-        sep.setStyleSheet("color: #E2E8F0; margin: 2px 2px; max-width: 1px;")
+        sep.setStyleSheet("color: #DDE4ED; margin: 2px 2px; max-width: 1px;")
         layout.addWidget(sep)
 
     def _build_sheet_table(self) -> QTableWidget:
         table = QTableWidget()
         table.setObjectName("SheetTable")
-        table.setColumnCount(13)
+        table.setColumnCount(14)
         table.setHorizontalHeaderLabels([
             "Sr.",
             "Enabled",
+            "Check Name",
             "Workspace",
             "Report / Dataset",
-            "Test to Do",
+            "Check type",
             "Table Name",
             "Column or Measure",
             "Filter 1 (Opt)",
             "Filter 2 (Opt)",
             "Filter 3 (Opt)",
             "Filter 4 (Opt)",
-            "Test Rule & Settings ⚙️",
+            "Condition & settings",
             "Action",
         ])
 
@@ -327,36 +273,39 @@ class SheetSettingsPage(QWidget):
         header.setStretchLastSection(False)
         header.resizeSection(0, 38)   # Sr.
         header.resizeSection(1, 55)   # Enabled
-        header.resizeSection(2, 140)  # Workspace
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        header.resizeSection(3, 170)  # Report / Dataset
-        header.resizeSection(4, 150)  # Test to Do
-        header.resizeSection(5, 120)  # Table Name
-        header.resizeSection(6, 130)  # Column or Measure
-        header.resizeSection(7, 130)  # Filter 1
-        header.resizeSection(8, 130)  # Filter 2
-        header.resizeSection(9, 130)  # Filter 3
-        header.resizeSection(10, 130) # Filter 4
-        header.resizeSection(11, 180) # Settings
-        header.resizeSection(12, 45)  # Action
+        header.resizeSection(2, 180)  # Check Name
+        header.resizeSection(3, 140)  # Workspace
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(4, 170)  # Report / Dataset
+        header.resizeSection(5, 150)  # Check type
+        header.resizeSection(6, 120)  # Table Name
+        header.resizeSection(7, 130)  # Column or Measure
+        header.resizeSection(8, 130)  # Filter 1
+        header.resizeSection(9, 130)  # Filter 2
+        header.resizeSection(10, 130) # Filter 3
+        header.resizeSection(11, 130) # Filter 4
+        header.resizeSection(12, 180) # Condition & settings
+        header.resizeSection(13, 45)  # Action
 
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.setShowGrid(True)
+        for col in range(8, 12):
+            table.setColumnHidden(col, True)
+        table.setShowGrid(False)
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
-        table.verticalHeader().setDefaultSectionSize(32)
+        table.verticalHeader().setDefaultSectionSize(44)
         apply_smooth_scrolling(table)
         table.setStyleSheet(
             "QTableWidget#SheetTable { "
             "  background-color: #FFFFFF; "
             "  alternate-background-color: #F8FAFC; "
-            "  gridline-color: #E2E8F0; "
+            "  gridline-color: #DDE4ED; "
             "  border: 1px solid #CBD5E1; "
             "  border-radius: 4px; "
             "  font-size: 12px; "
             "  selection-background-color: #EFF6FF; "
-            "  selection-color: #0F172A; "
+            "  selection-color: #16243A; "
             "} "
             "QTableWidget#SheetTable::item { "
             "  padding: 0px; "
@@ -365,7 +314,7 @@ class SheetSettingsPage(QWidget):
             "} "
             "QTableWidget#SheetTable QHeaderView::section { "
             "  background-color: #F1F5F9; "
-            "  color: #0F172A; "
+            "  color: #16243A; "
             "  font-weight: 700; "
             "  font-size: 11px; "
             "  border: none; "
@@ -381,20 +330,20 @@ class SheetSettingsPage(QWidget):
             "  padding: 2px 20px 2px 7px; "
             "  margin: 1px 2px; "
             "  font-size: 12px; "
-            "  color: #0F172A; "
+            "  color: #16243A; "
             "} "
             "QComboBox#SheetCellCombo:hover { "
-            "  border: 1.5px solid #1668DC; "
+            "  border: 1.5px solid #2563EB; "
             "  background-color: #F8FAFC; "
             "} "
             "QComboBox#SheetCellCombo:focus { "
-            "  border: 1.5px solid #1668DC; "
+            "  border: 1.5px solid #2563EB; "
             "  background-color: #FFFFFF; "
             "} "
             "QComboBox#SheetCellCombo:disabled { "
             "  background-color: #F8FAFC; "
             "  color: #94A3B8; "
-            "  border-color: #E2E8F0; "
+            "  border-color: #DDE4ED; "
             "} "
             "QComboBox#SheetCellCombo QLineEdit { "
             "  border: none; "
@@ -402,7 +351,7 @@ class SheetSettingsPage(QWidget):
             "  padding: 0px; "
             "  margin: 0px; "
             "  font-size: 12px; "
-            "  color: #0F172A; "
+            "  color: #16243A; "
             "} "
             "QComboBox#SheetCellCombo:disabled QLineEdit { "
             "  color: #94A3B8; "
@@ -428,14 +377,14 @@ class SheetSettingsPage(QWidget):
             "  padding: 2px 6px; "
             "  margin: 1px; "
             "  font-size: 12px; "
-            "  color: #0F172A; "
+            "  color: #16243A; "
             "} "
             "QLineEdit#SheetCellInput:hover { "
             "  border: 1px solid #94A3B8; "
             "  background-color: #FFFFFF; "
             "} "
             "QLineEdit#SheetCellInput:focus { "
-            "  border: 1.5px solid #1668DC; "
+            "  border: 1.5px solid #2563EB; "
             "  background-color: #FFFFFF; "
             "} "
             "QLineEdit#SheetCellInput:disabled { "
@@ -455,9 +404,9 @@ class SheetSettingsPage(QWidget):
             "  color: #1E293B; "
             "} "
             "QPushButton#SheetCellGear:hover { "
-            "  background-color: #E2E8F0; "
+            "  background-color: #DDE4ED; "
             "  border-color: #94A3B8; "
-            "  color: #0F172A; "
+            "  color: #16243A; "
             "} "
             "QPushButton#SheetCellDelete { "
             "  background-color: transparent; "
@@ -474,20 +423,21 @@ class SheetSettingsPage(QWidget):
         return table
 
     def _build_status_bar(self) -> QHBoxLayout:
-        bar = QHBoxLayout()
-        bar.setSpacing(16)
+        bar = QVBoxLayout()
+        bar.setSpacing(6)
 
         self.lbl_row_stats = QLabel("Total Rows: 0  |  Enabled: 0  |  Workspaces: 0")
         self.lbl_row_stats.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
         bar.addWidget(self.lbl_row_stats)
 
-        self.lbl_auto_save = QLabel("✓ Auto-save active (1 min)")
+        self.lbl_auto_save = QLabel("Saved locally · Autosave every minute")
         self.lbl_auto_save.setStyleSheet("font-size: 11px; font-weight: 600; color: #059669; margin-left: 8px;")
         bar.addWidget(self.lbl_auto_save)
 
         bar.addStretch(1)
 
-        hint = QLabel("💡 Tip: Click the ⚙️ gear button to customize allowed blanks, freshness SLA, deviation %, or baselines.")
+        hint = QLabel("Select a condition to configure it. Use Show filters for advanced query context.")
+        hint.setWordWrap(True)
         hint.setStyleSheet("font-size: 11px; color: #64748B; font-style: italic;")
         bar.addWidget(hint)
 
@@ -543,14 +493,32 @@ class SheetSettingsPage(QWidget):
         chk_layout.addWidget(chk)
         self.sheet_table.setCellWidget(row_idx, 1, chk_widget)
 
-        # Col 2: Workspace Dropdown
+        # Col 2: Check Name Input
+        auto_name = generate_rule_name(
+            dto.validation_type,
+            dto.table_name,
+            dto.column_name,
+            dto.measure_name,
+            dto.report_name,
+        )
+        name_edit = QLineEdit(dto.rule_name or "")
+        name_edit.setObjectName("SheetCellInput")
+        name_edit.setPlaceholderText(f"Auto: {auto_name}")
+        name_edit.setToolTip(
+            "Enter a custom name for this check (shown in Overview, History, and Alerts). "
+            "Leave blank to use the auto-generated name."
+        )
+        name_edit.textChanged.connect(lambda txt, r=dto: self._on_row_rule_name_changed(txt, r))
+        self.sheet_table.setCellWidget(row_idx, 2, name_edit)
+
+        # Col 3: Workspace Dropdown
         ws_combo = AnimatedComboBox()
         ws_combo.setObjectName("SheetCellCombo")
         ws_combo.setToolTip("Select the Power BI workspace containing your dataset.")
         self._populate_workspace_combo(ws_combo, selected_id=dto.workspace_id, selected_name=dto.workspace_name)
-        self.sheet_table.setCellWidget(row_idx, 2, ws_combo)
+        self.sheet_table.setCellWidget(row_idx, 3, ws_combo)
 
-        # Col 3: Report / Dataset Dropdown
+        # Col 4: Report / Dataset Dropdown
         ds_combo = AnimatedComboBox()
         ds_combo.setObjectName("SheetCellCombo")
         ds_combo.setToolTip("Select the Power BI semantic model / dataset to test.")
@@ -560,9 +528,9 @@ class SheetSettingsPage(QWidget):
             selected_ds_id=dto.dataset_id,
             selected_report_name=dto.report_name,
         )
-        self.sheet_table.setCellWidget(row_idx, 3, ds_combo)
+        self.sheet_table.setCellWidget(row_idx, 4, ds_combo)
 
-        # Col 4: Test to Do Dropdown
+        # Col 5: Check type Dropdown
         test_combo = AnimatedComboBox()
         test_combo.setObjectName("SheetCellCombo")
         for key, friendly in FRIENDLY_TEST_NAMES.items():
@@ -582,9 +550,9 @@ class SheetSettingsPage(QWidget):
         test_combo.currentIndexChanged.connect(
             lambda idx, tc=test_combo: tc.setToolTip(tc.itemData(idx, Qt.ItemDataRole.ToolTipRole) or "")
         )
-        self.sheet_table.setCellWidget(row_idx, 4, test_combo)
+        self.sheet_table.setCellWidget(row_idx, 5, test_combo)
 
-        # Col 5: Table Name Dropdown
+        # Col 6: Table Name Dropdown
         tbl_combo = EditableCellCombo()
         tbl_combo.setObjectName("SheetCellCombo")
         tbl_combo.setToolTip("Select or enter the table name to validate.")
@@ -594,9 +562,9 @@ class SheetSettingsPage(QWidget):
             dataset_id=dto.dataset_id,
             selected_tbl=dto.table_name,
         )
-        self.sheet_table.setCellWidget(row_idx, 5, tbl_combo)
+        self.sheet_table.setCellWidget(row_idx, 6, tbl_combo)
 
-        # Col 6: Column or Measure Dropdown
+        # Col 7: Column or Measure Dropdown
         col_combo = EditableCellCombo()
         col_combo.setObjectName("SheetCellCombo")
         col_combo.setToolTip("Select or enter the column name or [Measure] to evaluate.")
@@ -609,11 +577,11 @@ class SheetSettingsPage(QWidget):
             selected_val=selected_target,
             validation_type=dto.validation_type,
         )
-        self.sheet_table.setCellWidget(row_idx, 6, col_combo)
+        self.sheet_table.setCellWidget(row_idx, 7, col_combo)
 
-        # Cols 7-10: Filter 1, Filter 2, Filter 3, Filter 4
+        # Cols 8-11: Filter 1, Filter 2, Filter 3, Filter 4
         filter_edits: list[FilterCellWidget] = []
-        for f_idx, col_num in enumerate(range(7, 11), start=1):
+        for f_idx, col_num in enumerate(range(8, 12), start=1):
             prop_name = f"filter_{f_idx}"
             cur_val = getattr(dto, prop_name, "") or dto.config.get(prop_name, "") or ""
             f_edit = FilterCellWidget(
@@ -632,23 +600,25 @@ class SheetSettingsPage(QWidget):
             self.sheet_table.setCellWidget(row_idx, col_num, f_edit)
             filter_edits.append(f_edit)
 
-        # Col 11: ⚙️ Gear Rule Configuration Button
-        btn_gear = QPushButton(f"⚙️  {dto.conditions_summary}")
+        # Col 12: ⚙️ Gear Rule Configuration Button
+        btn_gear = QPushButton(dto.conditions_summary)
+        btn_gear.setIcon(make_nav_icon("settings", "#2563EB", 16))
         btn_gear.setObjectName("SheetCellGear")
         btn_gear.setToolTip("Configure thresholds, tolerances, and expected values for this check.")
         btn_gear.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_gear.clicked.connect(
             lambda _, b=btn_gear, r=dto: self._open_gear_dialog(b, r)
         )
-        self.sheet_table.setCellWidget(row_idx, 11, btn_gear)
+        self.sheet_table.setCellWidget(row_idx, 12, btn_gear)
 
-        # Col 12: Action Delete Button
-        btn_del = QPushButton("🗑️")
+        # Col 13: Action Delete Button
+        btn_del = action_button("", "delete", danger=True)
+        btn_del.setAccessibleName("Delete this check")
         btn_del.setObjectName("SheetCellDelete")
         btn_del.setToolTip("Delete this validation rule row from the sheet.")
         btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_del.clicked.connect(lambda _, r=dto, idx=row_idx: self._handle_delete_row(r, idx))
-        self.sheet_table.setCellWidget(row_idx, 12, btn_del)
+        self.sheet_table.setCellWidget(row_idx, 13, btn_del)
 
         self.sheet_table.setRowHeight(row_idx, 32)
 
@@ -700,8 +670,8 @@ class SheetSettingsPage(QWidget):
                     or dto.dataset_id.lower() == metadata.dataset_id.lower()
                 )
                 if ws_match and ds_match:
-                    tbl_combo = self.sheet_table.cellWidget(row_idx, 5)
-                    col_combo = self.sheet_table.cellWidget(row_idx, 6)
+                    tbl_combo = self.sheet_table.cellWidget(row_idx, 6)
+                    col_combo = self.sheet_table.cellWidget(row_idx, 7)
                     if isinstance(tbl_combo, EditableCellCombo):
                         self._populate_table_combo(
                             tbl_combo,
@@ -878,8 +848,9 @@ class SheetSettingsPage(QWidget):
 
         select_idx = 0
         for idx, (name, ws_id) in enumerate(options):
-            label = f"{name} ({ws_id[:8]}...)" if ws_id else name
-            combo.addItem(label, ws_id)
+            combo.addItem(name, ws_id)
+            combo.setItemData(idx, ws_id, Qt.ItemDataRole.ToolTipRole)
+            combo.setItemData(idx, name, Qt.ItemDataRole.UserRole + 1)
             if selected_id and ws_id.lower() == selected_id.lower():
                 select_idx = idx
 
@@ -935,8 +906,8 @@ class SheetSettingsPage(QWidget):
 
         select_idx = 0
         for idx, (rpt_name, ds_id, rpt_id) in enumerate(options):
-            label = f"{rpt_name} ({ds_id[:8]}...)" if ds_id else rpt_name
-            combo.addItem(label, (ds_id, rpt_name, rpt_id))
+            combo.addItem(rpt_name, (ds_id, rpt_name, rpt_id))
+            combo.setItemData(idx, f"Dataset: {ds_id}\nReport: {rpt_id or 'Not specified'}", Qt.ItemDataRole.ToolTipRole)
             if selected_ds_id and ds_id.lower() == selected_ds_id.lower():
                 select_idx = idx
 
@@ -952,7 +923,7 @@ class SheetSettingsPage(QWidget):
         dto: SheetRowDTO,
     ) -> None:
         ws_id = str(ws_combo.currentData() or "")
-        ws_name = ws_combo.currentText().split(" (")[0]
+        ws_name = str(ws_combo.currentData(Qt.ItemDataRole.UserRole + 1) or ws_combo.currentText())
         if dto.workspace_id != ws_id:
             dto.workspace_id = ws_id
             dto.workspace_name = ws_name
@@ -982,6 +953,7 @@ class SheetSettingsPage(QWidget):
                 dto.report_name = rpt_name
                 dto.dataset_name = rpt_name
                 dto.report_id = rpt_id or None
+                self._refresh_row_name_placeholder(dto)
                 self._mark_dirty()
 
                 # Refresh table & column combos for this row if provided
@@ -1017,6 +989,7 @@ class SheetSettingsPage(QWidget):
         tbl_name = txt.strip() or None
         if dto.table_name != tbl_name:
             dto.table_name = tbl_name
+            self._refresh_row_name_placeholder(dto)
             self._mark_dirty()
             # Cascade into column combo
             self._populate_column_measure_combo(
@@ -1028,11 +1001,35 @@ class SheetSettingsPage(QWidget):
                 validation_type=dto.validation_type,
             )
 
+    def _on_row_rule_name_changed(self, txt: str, dto: SheetRowDTO) -> None:
+        clean = txt.strip()
+        new_name = clean or None
+        if dto.rule_name != new_name:
+            dto.rule_name = new_name
+            self._mark_dirty()
+
+    def _refresh_row_name_placeholder(self, dto: SheetRowDTO) -> None:
+        try:
+            row_idx = self._rows.index(dto)
+        except ValueError:
+            return
+        name_edit = self.sheet_table.cellWidget(row_idx, 2)
+        if isinstance(name_edit, QLineEdit):
+            auto_name = generate_rule_name(
+                dto.validation_type,
+                dto.table_name,
+                dto.column_name,
+                dto.measure_name,
+                dto.report_name,
+            )
+            name_edit.setPlaceholderText(f"Auto: {auto_name}")
+
     def _on_row_column_measure_changed(self, txt: str, dto: SheetRowDTO) -> None:
         old_col = dto.column_name
         old_meas = dto.measure_name
         self._on_col_measure_changed(txt, dto)
         if dto.column_name != old_col or dto.measure_name != old_meas:
+            self._refresh_row_name_placeholder(dto)
             self._mark_dirty()
 
     def _on_row_filter_changed(self, txt: str, dto: SheetRowDTO, prop_name: str) -> None:
@@ -1065,6 +1062,7 @@ class SheetSettingsPage(QWidget):
         new_vtype = str(test_combo.currentData() or VALIDATION_TYPE_NULL)
         if dto.validation_type != new_vtype:
             dto.validation_type = new_vtype
+            self._refresh_row_name_placeholder(dto)
             self._mark_dirty()
 
             self._apply_test_type_rules(new_vtype, tbl_combo, col_combo, filter_edits)
@@ -1087,7 +1085,7 @@ class SheetSettingsPage(QWidget):
             elif new_vtype == VALIDATION_TYPE_DUPLICATE and "allowed_duplicate_count" not in dto.config:
                 dto.config = {"allowed_duplicate_count": 0}
 
-            btn_gear.setText(f"⚙️  {dto.conditions_summary}")
+            btn_gear.setText(dto.conditions_summary)
 
     def _apply_test_type_rules(
         self,
@@ -1141,17 +1139,54 @@ class SheetSettingsPage(QWidget):
             table_name=dto.table_name,
             parent=self,
         )
-        if dialog.exec():
+        def apply_settings():
             dto.config = dialog.config
-            if dialog.rule_name:
-                dto.rule_name = dialog.rule_name
-            btn_gear.setText(f"⚙️  {dto.conditions_summary}")
+            dto.rule_name = dialog.rule_name.strip() or None if hasattr(dialog, "rule_name") else dto.rule_name
+            try:
+                r_idx = self._rows.index(dto)
+                name_edit = self.sheet_table.cellWidget(r_idx, 2)
+                if isinstance(name_edit, QLineEdit):
+                    name_edit.blockSignals(True)
+                    name_edit.setText(dto.rule_name or "")
+                    name_edit.blockSignals(False)
+            except ValueError:
+                pass
+            btn_gear.setText(dto.conditions_summary)
             self._mark_dirty()
             self.banner.show_message(
                 f"Updated conditions for row #{dto.sr_no}: {dto.conditions_summary}",
                 level=NotificationLevel.INFO,
                 title="Condition Configured",
             )
+
+        if self.width() >= 1150:
+            old_editor = getattr(self, "_inline_check_editor", None)
+            if old_editor is not None:
+                old_editor.reject()
+                self.check_editor_layout.removeWidget(old_editor)
+                old_editor.deleteLater()
+            self._inline_check_editor = dialog
+            dialog.setWindowFlags(Qt.WindowType.Widget)
+            dialog.setModal(False)
+            dialog.setMinimumSize(0, 0)
+            self.check_editor_layout.addWidget(dialog)
+            dialog.accepted.connect(apply_settings)
+            dialog.finished.connect(self._finish_inline_editor)
+            self.sheet_table.setEnabled(False)
+            for button in (self.btn_add_row, self.btn_delete_row, self.btn_save_sheet, self.btn_import):
+                button.setEnabled(False)
+            self.check_editor_panel.show()
+            self.sheet_splitter.setSizes([max(400, self.width() - 510), 480])
+            dialog.show()
+            dialog.setFocus(Qt.FocusReason.OtherFocusReason)
+        elif dialog.exec():
+            apply_settings()
+
+    def _finish_inline_editor(self, _result: int) -> None:
+        self.check_editor_panel.hide()
+        self.sheet_table.setEnabled(True)
+        for button in (self.btn_add_row, self.btn_delete_row, self.btn_save_sheet, self.btn_import):
+            button.setEnabled(True)
 
     # =========================================================================
     # Ribbon Actions: Add, Delete, Save, Sync, Import, Export
@@ -1273,14 +1308,18 @@ class SheetSettingsPage(QWidget):
         for idx in range(self.sheet_table.rowCount()):
             if idx < len(self._rows):
                 r = self._rows[idx]
-                ws_combo = self.sheet_table.cellWidget(idx, 2)
-                ds_combo = self.sheet_table.cellWidget(idx, 3)
-                tbl_input = self.sheet_table.cellWidget(idx, 5)
-                col_input = self.sheet_table.cellWidget(idx, 6)
+                name_edit = self.sheet_table.cellWidget(idx, 2)
+                ws_combo = self.sheet_table.cellWidget(idx, 3)
+                ds_combo = self.sheet_table.cellWidget(idx, 4)
+                tbl_input = self.sheet_table.cellWidget(idx, 6)
+                col_input = self.sheet_table.cellWidget(idx, 7)
+
+                if isinstance(name_edit, QLineEdit) and name_edit.isModified():
+                    r.rule_name = name_edit.text().strip() or None
 
                 if isinstance(ws_combo, QComboBox) and ws_combo.currentData():
                     r.workspace_id = str(ws_combo.currentData())
-                    r.workspace_name = ws_combo.currentText().split(" (")[0]
+                    r.workspace_name = str(ws_combo.currentData(Qt.ItemDataRole.UserRole + 1) or ws_combo.currentText())
                 if isinstance(ds_combo, QComboBox) and ds_combo.currentData():
                     d_data = ds_combo.currentData()
                     if isinstance(d_data, tuple) and len(d_data) >= 3:
@@ -1305,6 +1344,8 @@ class SheetSettingsPage(QWidget):
 
     def _handle_auto_save(self) -> None:
         """Periodic background auto-save (runs every 1 minute) to persist changes safely."""
+        if not self.check_editor_panel.isHidden():
+            return
         if not self._is_dirty or not self._rows or self._sheet_service is None:
             return
 
@@ -1330,6 +1371,8 @@ class SheetSettingsPage(QWidget):
             self._mark_clean(f"✓ Auto-saved at {datetime.now().strftime('%H:%M:%S')}")
             logger.info("Auto-saved %d sheet row(s) successfully.", len(saved_rows))
         except Exception as exc:
+            self.lbl_auto_save.setText("Save failed · Your edits are retained. Try Save sheet.")
+            self.lbl_auto_save.setStyleSheet("color: #B91C1C; font-size: 12px;")
             logger.warning("Auto-save attempt skipped due to error: %s", exc)
 
     def _handle_save_sheet(self) -> None:
@@ -1397,6 +1440,9 @@ class SheetSettingsPage(QWidget):
                 title="Sheet Saved",
             )
         except Exception as exc:
+            self._is_dirty = True
+            self.lbl_auto_save.setText("Save failed · Your edits are retained. Try again.")
+            self.lbl_auto_save.setStyleSheet("color: #B91C1C; font-size: 12px;")
             logger.exception("Failed to save validation sheet: %s", exc)
             self.banner.show_message(
                 f"Failed to save sheet: {format_safe_user_error(exc)}",
@@ -1405,7 +1451,7 @@ class SheetSettingsPage(QWidget):
             )
         finally:
             self.btn_save_sheet.setEnabled(True)
-            self.btn_save_sheet.setText("💾  Save Sheet")
+            self.btn_save_sheet.setText("Save sheet")
 
     def _handle_sync_powerbi(self) -> None:
         self.sync_workspaces_requested.emit()
@@ -1434,12 +1480,12 @@ class SheetSettingsPage(QWidget):
 
     def _on_workspaces_loaded(self, workspaces: list[PowerBIWorkspace]) -> None:
         self.btn_sync_pbi.setEnabled(True)
-        self.btn_sync_pbi.setText("🔄 Sync PBI")
+        self.btn_sync_pbi.setText("Sync from Power BI")
         self._cached_workspaces = list(workspaces)
 
         # Refresh all workspace combos across existing rows
         for row_idx in range(self.sheet_table.rowCount()):
-            ws_combo = self.sheet_table.cellWidget(row_idx, 2)
+            ws_combo = self.sheet_table.cellWidget(row_idx, 3)
             if isinstance(ws_combo, QComboBox) and row_idx < len(self._rows):
                 dto = self._rows[row_idx]
                 self._populate_workspace_combo(ws_combo, selected_id=dto.workspace_id, selected_name=dto.workspace_name)
@@ -1461,7 +1507,7 @@ class SheetSettingsPage(QWidget):
         # Update dataset combos for rows targeting this workspace
         for row_idx in range(self.sheet_table.rowCount()):
             if row_idx < len(self._rows) and self._rows[row_idx].workspace_id.lower() == workspace_id.lower():
-                ds_combo = self.sheet_table.cellWidget(row_idx, 3)
+                ds_combo = self.sheet_table.cellWidget(row_idx, 4)
                 if isinstance(ds_combo, QComboBox):
                     self._populate_dataset_combo(
                         ds_combo,
@@ -1472,7 +1518,7 @@ class SheetSettingsPage(QWidget):
 
     def _on_powerbi_error(self, err_msg: str) -> None:
         self.btn_sync_pbi.setEnabled(True)
-        self.btn_sync_pbi.setText("🔄 Sync PBI")
+        self.btn_sync_pbi.setText("Sync from Power BI")
         self.banner.show_message(
             f"Power BI sync encountered an issue: {err_msg}",
             level=NotificationLevel.WARNING,
@@ -1507,9 +1553,9 @@ class SheetSettingsPage(QWidget):
             else:
                 self._export_to_xlsx(Path(file_path))
 
-            self.banner.show_message(
+            self.banner.show_export_success(
                 f"Exported {len(self._rows)} validation test row(s) to: {file_path}",
-                level=NotificationLevel.SUCCESS,
+                file_path,
                 title="Export Complete",
             )
         except Exception as exc:
@@ -1526,6 +1572,7 @@ class SheetSettingsPage(QWidget):
             writer.writerow([
                 "Sr",
                 "Enabled",
+                "Check Name",
                 "Workspace Name",
                 "Workspace ID",
                 "Report Name",
@@ -1543,6 +1590,7 @@ class SheetSettingsPage(QWidget):
                 writer.writerow([
                     r.sr_no,
                     "TRUE" if r.enabled else "FALSE",
+                    r.effective_rule_name(),
                     r.workspace_name,
                     r.workspace_id,
                     r.report_name,
@@ -1571,6 +1619,7 @@ class SheetSettingsPage(QWidget):
         headers = [
             "Sr",
             "Enabled",
+            "Check Name",
             "Workspace Name",
             "Workspace ID",
             "Report Name",
@@ -1594,6 +1643,7 @@ class SheetSettingsPage(QWidget):
             ws.append([
                 r.sr_no,
                 "TRUE" if r.enabled else "FALSE",
+                r.effective_rule_name(),
                 r.workspace_name,
                 r.workspace_id,
                 r.report_name,
@@ -1720,7 +1770,7 @@ class SheetSettingsPage(QWidget):
                 continue
 
             r = self._rows[row_idx]
-            blob = f"{r.workspace_name} {r.report_name} {r.validation_type_display} {r.table_name} {r.column_name} {r.measure_name} {r.filter_1} {r.filter_2} {r.filter_3} {r.filter_4} {r.conditions_summary}".lower()
+            blob = f"{r.rule_name or ''} {r.effective_rule_name()} {r.workspace_name} {r.report_name} {r.validation_type_display} {r.table_name} {r.column_name} {r.measure_name} {r.filter_1} {r.filter_2} {r.filter_3} {r.filter_4} {r.conditions_summary}".lower()
             self.sheet_table.setRowHidden(row_idx, q not in blob)
 
     def _update_stats_label(self) -> None:

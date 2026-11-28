@@ -2,10 +2,31 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from pathlib import Path
+import subprocess
+import sys
+from typing import Callable
+
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
 
 from app.core.status import NotificationLevel
+
+
+def open_exported_file(path: Path | str) -> None:
+    """Open the exported file with the OS default application."""
+    resolved = Path(path).resolve()
+    QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved)))
+
+
+def open_file_location(path: Path | str) -> None:
+    """Open the containing folder and highlight the exported file when supported."""
+    resolved = Path(path).resolve()
+    if sys.platform == "win32" and resolved.exists():
+        subprocess.Popen(["explorer", "/select,", str(resolved)])
+    else:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(resolved.parent)))
 
 _LEVEL_STYLES: dict[NotificationLevel, dict[str, str]] = {
     NotificationLevel.INFO: {
@@ -62,6 +83,11 @@ class NotificationBanner(QFrame):
         self._message_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self._message_label, stretch=1)
 
+        self._actions_layout = QHBoxLayout()
+        self._actions_layout.setContentsMargins(0, 0, 0, 0)
+        self._actions_layout.setSpacing(6)
+        layout.addLayout(self._actions_layout)
+
         self._dismiss_button = QPushButton("Dismiss")
         self._dismiss_button.setObjectName("BannerDismissButton")
         self._dismiss_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -98,19 +124,55 @@ class NotificationBanner(QFrame):
             level = NotificationLevel.INFO
         self.show_message(message, level=level, title=title or None)
 
+    def _clear_actions(self) -> None:
+        while self._actions_layout.count() > 0:
+            item = self._actions_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+
+    def show_export_success(
+        self,
+        message: str,
+        file_path: Path | str,
+        *,
+        title: str = "Export Complete",
+    ) -> None:
+        """Display a success banner with Open File and Open File Location buttons."""
+        target = Path(file_path).resolve()
+        self.show_message(
+            message,
+            level=NotificationLevel.SUCCESS,
+            title=title,
+            actions=[
+                ("Open File", lambda p=target: open_exported_file(p)),
+                ("Open File Location", lambda p=target: open_file_location(p)),
+            ],
+        )
+
     def show_message(
         self,
         message: str,
         level: NotificationLevel = NotificationLevel.INFO,
         title: str | None = None,
+        actions: list[tuple[str, Callable[[], None]]] | None = None,
     ) -> None:
-        """Display the banner with the given severity level and message."""
+        """Display the banner with the given severity level, message, and optional action buttons."""
         palette = _LEVEL_STYLES[level]
         self._current_level = level
         self._current_message = message
 
         self._level_label.setText(title.upper() if title else palette["badge"])
         self._message_label.setText(message)
+        self._clear_actions()
+        for label, callback in actions or []:
+            btn = QPushButton(label)
+            btn.setObjectName("BannerActionButton")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _=False, cb=callback: cb())
+            self._actions_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignTop)
 
         self.setStyleSheet(
             f"""
@@ -132,6 +194,18 @@ class NotificationBanner(QFrame):
                 color: {palette['fg']};
                 font-size: 13px;
             }}
+            QPushButton#BannerActionButton {{
+                background-color: #FFFFFF;
+                color: {palette['fg']};
+                border: 1px solid {palette['border']};
+                border-radius: 5px;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 4px 10px;
+            }}
+            QPushButton#BannerActionButton:hover {{
+                background-color: #F8FAFC;
+            }}
             QPushButton#BannerDismissButton {{
                 background-color: transparent;
                 color: {palette['fg']};
@@ -149,6 +223,7 @@ class NotificationBanner(QFrame):
 
     def clear_message(self) -> None:
         """Hide the banner and emit the dismissed signal."""
+        self._clear_actions()
         self._current_message = ""
         self.hide()
         self.dismissed.emit()

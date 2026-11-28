@@ -72,7 +72,7 @@ class ValidationRulesTableWidget(QFrame):
         self.add_button = QPushButton("+ Add Rule")
         self.add_button.setObjectName("PrimaryButton")
         self.add_button.setStyleSheet(
-            "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 7px 14px; border-radius: 6px;"
+            "background-color: #2563EB; color: #FFFFFF; font-weight: 600; padding: 7px 14px; border-radius: 6px;"
         )
         self.add_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add_button.clicked.connect(self._handle_add_rule)
@@ -236,7 +236,7 @@ class ValidationRulesTableWidget(QFrame):
             adv_btn = QPushButton("⚙ Config")
             adv_btn.setObjectName("SecondaryButton")
             adv_btn.setStyleSheet(
-                "background-color: #FFFFFF; color: #1668DC; border: 1px solid #CBD5E1; "
+                "background-color: #FFFFFF; color: #2563EB; border: 1px solid #CBD5E1; "
                 "font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px;"
             )
             adv_btn.setCursor(Qt.CursorShape.PointingHandCursor)

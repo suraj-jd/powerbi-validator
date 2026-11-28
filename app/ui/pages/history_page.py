@@ -14,6 +14,9 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QGridLayout,
+    QMenu,
+    QSizePolicy,
     QHeaderView,
     QLabel,
     QLineEdit,
@@ -45,6 +48,7 @@ from app.ui.dialogs.result_details_dialog import (
 )
 from app.ui.widgets.smooth_scroller import apply_smooth_scrolling
 from app.ui.dialogs.run_comparison_dialog import RunComparisonDialog
+from app.ui.widgets.enterprise import PageHeader, ResultsTable, action_button, status_presentation
 from app.ui.widgets.notification_banner import NotificationBanner
 
 if TYPE_CHECKING:
@@ -101,6 +105,10 @@ def make_status_table_item(status: ValidationStatus | str | None) -> NumericTabl
     else:
         item.setForeground(QColor("#475569"))
         item.setBackground(QColor("#F1F5F9"))
+    _, icon, color, _, explanation = status_presentation(status)
+    from app.ui.theme import make_nav_icon
+    item.setIcon(make_nav_icon(icon, color, 16))
+    item.setToolTip(explanation)
     return item
 
 
@@ -123,347 +131,187 @@ class HistoryPage(QWidget):
         self._logs_dir = logs_dir
         self._runs: list[ValidationRunSummaryDTO] = []
         self._active_run: ValidationRunSummaryDTO | None = None
+        self._registration_labels = {}
         self._build_ui()
         self.refresh_history()
 
     def _build_ui(self) -> None:
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-
-        scroll_area = QScrollArea(self)
-        scroll_area.setObjectName("PageScrollArea")
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-
-        container = QWidget(scroll_area)
-        container.setObjectName("PageContainer")
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(28, 20, 28, 24)
-        layout.setSpacing(16)
-
-        # Header row
-        header_row = QHBoxLayout()
-        header_row.setSpacing(12)
-
-        title_block = QVBoxLayout()
-        title_block.setSpacing(4)
-        title_label = QLabel("Validation History & Audit Log")
-        title_label.setObjectName("PageTitle")
-        title_block.addWidget(title_label)
-
-        subtitle_label = QLabel(
-            "Review past execution runs, compare changes over time, export reports, and maintain backups."
-        )
-        subtitle_label.setObjectName("PageSubtitle")
-        title_block.addWidget(subtitle_label)
-        header_row.addLayout(title_block, stretch=1)
-
-        badge = QLabel("Stage 14: History and Export Active", container)
-        badge.setObjectName("StageBadge")
-        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header_row.addWidget(badge, alignment=Qt.AlignmentFlag.AlignTop)
-        layout.addLayout(header_row)
-
-        self.banner = NotificationBanner(container)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(8)
+        layout.addWidget(PageHeader("Run History", "Review saved results and compare changes. All timestamps are UTC."))
+        self.banner = NotificationBanner(self)
         layout.addWidget(self.banner)
 
-        # Actions Toolbar Card
-        action_card = QFrame()
-        action_card.setObjectName("Card")
-        action_layout = QHBoxLayout(action_card)
-        action_layout.setContentsMargins(14, 10, 14, 10)
-        action_layout.setSpacing(10)
-
-        self.btn_refresh = QPushButton("↻  Refresh History")
-        self.btn_refresh.setObjectName("SecondaryButton")
-        self.btn_refresh.setToolTip("Reload execution runs and audit history from the database.")
-        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_refresh.clicked.connect(self.refresh_history)
-        action_layout.addWidget(self.btn_refresh)
-
-        self.btn_compare = QPushButton("⚖  Compare Runs...")
-        self.btn_compare.setObjectName("SecondaryButton")
-        self.btn_compare.setToolTip("Compare up to 4 validation runs side-by-side to highlight changes and regressions.")
-        self.btn_compare.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_compare.clicked.connect(self._handle_compare_runs)
-        action_layout.addWidget(self.btn_compare)
-
-        action_layout.addStretch(1)
-
-        self.btn_export_csv = QPushButton("Export CSV...")
-        self.btn_export_csv.setObjectName("SecondaryButton")
-        self.btn_export_csv.setToolTip("Export the execution history list to a CSV spreadsheet.")
-        self.btn_export_csv.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export_csv.clicked.connect(self._handle_export_csv)
-        action_layout.addWidget(self.btn_export_csv)
-
-        self.btn_export_xlsx = QPushButton("Export Excel...")
-        self.btn_export_xlsx.setObjectName("SecondaryButton")
-        self.btn_export_xlsx.setToolTip("Export execution history to an Excel (.xlsx) file.")
-        self.btn_export_xlsx.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export_xlsx.clicked.connect(self._handle_export_xlsx)
-        action_layout.addWidget(self.btn_export_xlsx)
-
-        self.btn_export_logs = QPushButton("Diagnostic Logs...")
-        self.btn_export_logs.setObjectName("SecondaryButton")
-        self.btn_export_logs.setToolTip("Open diagnostic execution logs for debugging and review.")
-        self.btn_export_logs.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export_logs.clicked.connect(self._handle_export_logs)
-        action_layout.addWidget(self.btn_export_logs)
-
-        if self._db is not None:
-            self.btn_backup = QPushButton("Database Maintenance...")
-            self.btn_backup.setObjectName("PrimaryButton")
-            self.btn_backup.setToolTip("Open database backup, retention policy, and maintenance options.")
-            self.btn_backup.setStyleSheet(
-                "background-color: #1668DC; color: #FFFFFF; font-weight: 600; padding: 6px 12px; border-radius: 6px;"
-            )
-            self.btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_backup.clicked.connect(self._handle_backup_maintenance)
-            action_layout.addWidget(self.btn_backup)
-
-        layout.addWidget(action_card)
-
-        # Excel-Style Filters Toolbar Card
-        filter_card = QFrame()
-        filter_card.setObjectName("Card")
-        filter_card_layout = QVBoxLayout(filter_card)
-        filter_card_layout.setContentsMargins(14, 10, 14, 10)
-        filter_card_layout.setSpacing(6)
-
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(10)
-
-        lbl_filter_icon = QLabel("🔍")
-        lbl_filter_icon.setStyleSheet("font-size: 13px;")
-        filter_row.addWidget(lbl_filter_icon)
-
+        self.toolbar = QFrame()
+        self.toolbar.setObjectName("Card")
+        self._toolbar_grid = QGridLayout(self.toolbar)
+        self._toolbar_grid.setContentsMargins(10, 8, 10, 8)
+        self._toolbar_grid.setSpacing(6)
         self.search_input = QLineEdit()
-        self.search_input.setObjectName("SearchInput")
-        self.search_input.setPlaceholderText("Search runs by ID, date, status, duration, version...")
-        self.search_input.setToolTip("Search runs by run ID, execution date, status, duration, or app version.")
+        self.search_input.setPlaceholderText("Search saved runs…")
         self.search_input.setClearButtonEnabled(True)
-        self.search_input.textChanged.connect(lambda _: self._apply_filters())
-        filter_row.addWidget(self.search_input, stretch=2)
-
-        lbl_status = QLabel("Status:")
-        lbl_status.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
-        filter_row.addWidget(lbl_status)
-
-        self.status_filter_combo = QComboBox()
-        self.status_filter_combo.setObjectName("FilterCombo")
-        status_opts = [
-            ("All Run Statuses", "Show all execution runs regardless of status."),
-            ("Failed Runs Only", "Show only runs containing failed validation checks."),
-            ("Passed Runs Only", "Show only runs where every validation check passed."),
-            ("Warning Runs Only", "Show only runs containing warnings."),
-            ("Error Runs Only", "Show only runs that encountered execution or connection errors."),
-        ]
-        for text, tip in status_opts:
-            self.status_filter_combo.addItem(text)
-            self.status_filter_combo.setItemData(self.status_filter_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
-        self.status_filter_combo.setToolTip("Filter execution runs by outcome.")
-        self.status_filter_combo.currentIndexChanged.connect(lambda _: self._apply_filters())
-        filter_row.addWidget(self.status_filter_combo, stretch=1)
-
-        lbl_date = QLabel("Date Range:")
-        lbl_date.setStyleSheet("font-size: 12px; font-weight: 600; color: #475569;")
-        filter_row.addWidget(lbl_date)
-
+        self.search_input.setMinimumWidth(100)
+        self.search_input.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.search_input.textChanged.connect(self._apply_filters)
         self.date_filter_combo = QComboBox()
-        self.date_filter_combo.setObjectName("FilterCombo")
-        date_opts = [
-            ("All Time", "Show execution runs from all recorded dates."),
-            ("Today (Last 24h)", "Show only execution runs completed within the last 24 hours."),
-            ("Last 7 Days", "Show execution runs completed in the past 7 days."),
-            ("Last 30 Days", "Show execution runs completed in the past 30 days."),
-        ]
-        for text, tip in date_opts:
-            self.date_filter_combo.addItem(text)
-            self.date_filter_combo.setItemData(self.date_filter_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole)
-        self.date_filter_combo.setToolTip("Filter execution runs by date range.")
-        self.date_filter_combo.currentIndexChanged.connect(lambda _: self._apply_filters())
-        filter_row.addWidget(self.date_filter_combo, stretch=1)
+        self.date_filter_combo.addItems(["All time", "Last 24 hours", "Last 7 days", "Last 30 days"])
+        self.date_filter_combo.setAccessibleName("Date range")
+        self.date_filter_combo.currentIndexChanged.connect(self._apply_filters)
+        self.status_filter_combo = QComboBox()
+        self.status_filter_combo.addItems(["All outcomes", "Failed", "Passed", "Warnings", "Execution errors"])
+        self.status_filter_combo.setAccessibleName("Run outcome")
+        self.status_filter_combo.currentIndexChanged.connect(self._apply_filters)
+        self.btn_refresh = action_button("", "refresh")
+        self.btn_refresh.setAccessibleName("Refresh history")
+        self.btn_refresh.setToolTip("Refresh saved history")
+        self.btn_refresh.clicked.connect(self.refresh_history)
+        self.btn_compare = action_button("Compare runs", "history")
+        self.btn_compare.setToolTip("Compare up to four selected runs")
+        self.btn_compare.clicked.connect(self._handle_compare_runs)
+        export = action_button("Export", "export")
+        export_menu = QMenu(export)
+        export_menu.addAction("Selected run as CSV", self._handle_export_csv)
+        export_menu.addAction("Selected run as Excel", self._handle_export_xlsx)
+        export.setMenu(export_menu)
+        self.btn_export_csv = action_button("Export selected run CSV")
+        self.btn_export_csv.clicked.connect(self._handle_export_csv)
+        self.btn_export_csv.hide()
+        self.btn_export_xlsx = action_button("Export selected run Excel")
+        self.btn_export_xlsx.clicked.connect(self._handle_export_xlsx)
+        self.btn_export_xlsx.hide()
+        self.more_filters_button = action_button("Filters", "settings")
+        self.more_filters_button.setCheckable(True)
+        more = action_button("More")
+        more_menu = QMenu(more)
+        more_menu.addAction("Export diagnostic logs", self._handle_export_logs)
+        self.btn_export_logs = action_button("Export diagnostic logs")
+        self.btn_export_logs.clicked.connect(self._handle_export_logs)
+        self.btn_export_logs.hide()
+        if self._db is not None:
+            more_menu.addAction("Backup & maintenance", self._handle_backup_maintenance)
+            self.btn_backup = action_button("Backup & maintenance")
+            self.btn_backup.clicked.connect(self._handle_backup_maintenance)
+            self.btn_backup.hide()
+        more.setMenu(more_menu)
+        self._toolbar_widgets = [self.search_input, self.date_filter_combo, self.status_filter_combo,
+                                 self.btn_refresh, self.btn_compare, export, self.more_filters_button, more]
+        self._toolbar_wide = None
+        self._reflow_history_tools()
+        layout.addWidget(self.toolbar)
 
-        self.btn_clear_filters = QPushButton("✕ Clear Filters")
-        self.btn_clear_filters.setObjectName("SecondaryButton")
-        self.btn_clear_filters.setToolTip("Clear search query and reset status and date filters.")
-        self.btn_clear_filters.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clear_filters.setStyleSheet("padding: 5px 12px; font-size: 12px;")
+        self.advanced_filters = QFrame()
+        advanced = QHBoxLayout(self.advanced_filters)
+        advanced.setContentsMargins(0, 0, 0, 0)
+        advanced.addWidget(QLabel("Report / model:"))
+        self.report_filter_combo = QComboBox()
+        self.report_filter_combo.addItem("All reports", None)
+        self.report_filter_combo.setMinimumContentsLength(6)
+        self.report_filter_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.report_filter_combo.currentIndexChanged.connect(self._apply_filters)
+        advanced.addWidget(self.report_filter_combo, 1)
+        self.btn_clear_filters = action_button("Clear filters", "close")
         self.btn_clear_filters.clicked.connect(self._handle_clear_filters)
-        filter_row.addWidget(self.btn_clear_filters)
-
-        filter_card_layout.addLayout(filter_row)
-
-        status_row = QHBoxLayout()
+        advanced.addWidget(self.btn_clear_filters)
+        self.advanced_filters.hide()
+        self.more_filters_button.toggled.connect(self.advanced_filters.setVisible)
+        layout.addWidget(self.advanced_filters)
         self.lbl_filtered_count = QLabel("")
-        self.lbl_filtered_count.setStyleSheet("font-size: 11px; color: #64748B; font-weight: 500;")
-        status_row.addWidget(self.lbl_filtered_count)
+        self.lbl_filtered_count.setObjectName("MutedText")
+        layout.addWidget(self.lbl_filtered_count)
 
-        lbl_sort_tip = QLabel("💡 Tip: Click any column header to sort ascending / descending like Excel. Drag column dividers to resize.")
-        lbl_sort_tip.setStyleSheet("font-size: 11px; color: #94A3B8; font-style: italic;")
-        lbl_sort_tip.setAlignment(Qt.AlignmentFlag.AlignRight)
-        status_row.addWidget(lbl_sort_tip)
-
-        filter_card_layout.addLayout(status_row)
-        layout.addWidget(filter_card)
-
-        # Splitter housing Runs Table (top) and Results Drawer (bottom)
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        splitter.setChildrenCollapsible(False)
-
-        # Upper Card: Runs Table
+        self.tables_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.tables_splitter.setChildrenCollapsible(False)
         runs_card = QFrame()
         runs_card.setObjectName("Card")
-        runs_lay = QVBoxLayout(runs_card)
-        runs_lay.setContentsMargins(14, 12, 14, 12)
-        runs_lay.setSpacing(8)
-
-        lbl_runs = QLabel("Execution Runs Log (Select to inspect details)")
-        lbl_runs.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
-        runs_lay.addWidget(lbl_runs)
-
+        runs_layout = QVBoxLayout(runs_card)
+        runs_layout.setContentsMargins(10, 8, 10, 8)
         self.runs_table = QTableWidget()
         self.runs_table.setObjectName("DataTable")
-        self.runs_table.setColumnCount(9)
-        self.runs_table.setHorizontalHeaderLabels([
-            "Run ID",
-            "Started At",
-            "Duration",
-            "Overall Health",
-            "Passed",
-            "Failed",
-            "Warnings",
-            "Errors",
-            "Total Rules",
-        ])
-
-        header = self.runs_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        header.setMinimumSectionSize(65)
-        header.setSortIndicatorShown(True)
-        self.runs_table.verticalHeader().setDefaultSectionSize(34)
-        self.runs_table.verticalHeader().setVisible(False)
-
-        # Generous default widths so columns are never squished
-        self.runs_table.setColumnWidth(0, 85)    # Run ID
-        self.runs_table.setColumnWidth(1, 200)   # Started At
-        self.runs_table.setColumnWidth(2, 105)   # Duration
-        self.runs_table.setColumnWidth(3, 145)   # Overall Health
-        self.runs_table.setColumnWidth(4, 80)    # Passed
-        self.runs_table.setColumnWidth(5, 80)    # Failed
-        self.runs_table.setColumnWidth(6, 90)    # Warnings
-        self.runs_table.setColumnWidth(7, 80)    # Errors
-        self.runs_table.setColumnWidth(8, 105)   # Total Rules
-
+        self.runs_table.setColumnCount(10)
+        self.runs_table.setHorizontalHeaderLabels(["Run", "Started at (UTC)", "Duration", "Outcome", "Passed", "Failed", "Warnings", "Errors", "Checks", "Report / model"])
+        self.runs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.runs_table.horizontalHeader().setMinimumSectionSize(65)
+        for col, width in enumerate([70, 210, 85, 130, 70, 70, 85, 70, 75, 220]):
+            self.runs_table.setColumnWidth(col, width)
+        self.runs_table.verticalHeader().hide()
+        self.runs_table.verticalHeader().setDefaultSectionSize(36)
+        self.runs_table.setMinimumHeight(100)
+        self.runs_table.setShowGrid(False)
         self.runs_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.runs_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.runs_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.runs_table.setAlternatingRowColors(True)
         self.runs_table.setSortingEnabled(True)
-        apply_smooth_scrolling(self.runs_table)
         self.runs_table.itemSelectionChanged.connect(self._on_run_selection_changed)
-        runs_lay.addWidget(self.runs_table)
+        apply_smooth_scrolling(self.runs_table)
+        runs_layout.addWidget(self.runs_table)
+        self.empty_runs_label = QLabel("No saved runs yet. Run validation from Overview to record results.")
+        self.empty_runs_label.setWordWrap(True)
+        runs_layout.addWidget(self.empty_runs_label)
+        self.tables_splitter.addWidget(runs_card)
 
-        self.empty_runs_label = QLabel("No historical validation runs recorded yet.")
-        self.empty_runs_label.setStyleSheet("color: #64748B; font-style: italic; padding: 20px 0; qproperty-alignment: AlignCenter;")
-        runs_lay.addWidget(self.empty_runs_label)
-
-        splitter.addWidget(runs_card)
-
-        # Lower Card: Rule Results Drawer
-        drawer_card = QFrame()
-        drawer_card.setObjectName("Card")
-        drawer_lay = QVBoxLayout(drawer_card)
-        drawer_lay.setContentsMargins(14, 12, 14, 12)
-        drawer_lay.setSpacing(8)
-
-        # Drawer Header with Search & Filter
-        drawer_header = QHBoxLayout()
-        drawer_header.setSpacing(10)
-
-        self.drawer_title = QLabel("Selected Run Details: (None Selected)")
-        self.drawer_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
-        drawer_header.addWidget(self.drawer_title, stretch=1)
-
+        results_card = QFrame()
+        results_card.setObjectName("Card")
+        results_layout = QVBoxLayout(results_card)
+        results_layout.setContentsMargins(10, 8, 10, 8)
+        results_layout.setSpacing(6)
+        self.drawer_title = QLabel("Select a saved run")
+        self.drawer_title.setObjectName("SectionTitle")
+        self.drawer_title.setWordWrap(True)
+        results_layout.addWidget(self.drawer_title)
+        result_tools = QHBoxLayout()
         self.results_search_input = QLineEdit()
-        self.results_search_input.setObjectName("SearchInput")
-        self.results_search_input.setPlaceholderText("Filter rules by name, target...")
-        self.results_search_input.setFixedWidth(200)
+        self.results_search_input.setPlaceholderText("Search selected run's checks…")
         self.results_search_input.setClearButtonEnabled(True)
-        self.results_search_input.textChanged.connect(lambda _: self._apply_results_filters())
-        drawer_header.addWidget(self.results_search_input)
-
+        self.results_search_input.textChanged.connect(self._apply_results_filters)
+        result_tools.addWidget(self.results_search_input, 1)
         self.results_status_combo = QComboBox()
-        self.results_status_combo.setObjectName("FilterCombo")
-        self.results_status_combo.addItems([
-            "All Outcomes",
-            "Failed Only",
-            "Warning Only",
-            "Passed Only",
-            "Error Only",
-        ])
-        self.results_status_combo.currentIndexChanged.connect(lambda _: self._apply_results_filters())
-        drawer_header.addWidget(self.results_status_combo)
-
+        self.results_status_combo.addItems(["All outcomes", "Failed", "Warnings", "Passed", "Execution errors"])
+        self.results_status_combo.currentIndexChanged.connect(self._apply_results_filters)
+        result_tools.addWidget(self.results_status_combo)
         self.lbl_results_count = QLabel("")
-        self.lbl_results_count.setStyleSheet("font-size: 12px; color: #64748B; font-weight: 500;")
-        drawer_header.addWidget(self.lbl_results_count)
-
-        drawer_lay.addLayout(drawer_header)
-
-        self.results_table = QTableWidget()
-        self.results_table.setObjectName("DataTable")
-        self.results_table.setColumnCount(9)
-        self.results_table.setHorizontalHeaderLabels([
-            "Status",
-            "Rule Name",
-            "Target",
-            "Check Type",
-            "Actual Value",
-            "Expected Value",
-            "Deviation",
-            "Duration",
-            "Action",
-        ])
-
-        r_header = self.results_table.horizontalHeader()
-        r_header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        r_header.setMinimumSectionSize(65)
-        r_header.setSortIndicatorShown(True)
-        self.results_table.verticalHeader().setDefaultSectionSize(32)
-        self.results_table.verticalHeader().setVisible(False)
-
-        self.results_table.setColumnWidth(0, 110)   # Status (pill)
-        self.results_table.setColumnWidth(1, 230)   # Rule Name
-        self.results_table.setColumnWidth(2, 180)   # Target
-        self.results_table.setColumnWidth(3, 140)   # Check Type
-        self.results_table.setColumnWidth(4, 120)   # Actual Value
-        self.results_table.setColumnWidth(5, 120)   # Expected Value
-        self.results_table.setColumnWidth(6, 100)   # Deviation
-        self.results_table.setColumnWidth(7, 90)    # Duration
-        self.results_table.setColumnWidth(8, 90)    # Action
-
-        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.results_table.setAlternatingRowColors(True)
-        self.results_table.setSortingEnabled(True)
-        apply_smooth_scrolling(self.results_table)
-        self.results_table.cellDoubleClicked.connect(self._handle_result_double_clicked)
+        self.lbl_results_count.setObjectName("MutedText")
+        result_tools.addWidget(self.lbl_results_count)
+        results_layout.addLayout(result_tools)
+        self.results_table = ResultsTable()
+        self.results_table.setMinimumHeight(100)
         self.results_table.cellClicked.connect(self._handle_result_clicked)
-        drawer_lay.addWidget(self.results_table)
+        self.results_table.cellDoubleClicked.connect(self._handle_result_double_clicked)
+        self.results_table.model().layoutChanged.connect(self._apply_results_filters)
+        results_layout.addWidget(self.results_table)
+        self.empty_results_label = QLabel("Select a saved run above to inspect its recorded checks.")
+        self.empty_results_label.setWordWrap(True)
+        results_layout.addWidget(self.empty_results_label)
+        self.tables_splitter.addWidget(results_card)
+        self.tables_splitter.setSizes([280, 360])
+        self.tables_splitter.setStretchFactor(0, 1)
+        self.tables_splitter.setStretchFactor(1, 1)
+        layout.addWidget(self.tables_splitter, 1)
 
-        self.empty_results_label = QLabel("Select a run above to inspect individual rule outcomes.")
-        self.empty_results_label.setStyleSheet("color: #64748B; font-style: italic; padding: 20px 0; qproperty-alignment: AlignCenter;")
-        drawer_lay.addWidget(self.empty_results_label)
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "_toolbar_widgets"):
+            self._reflow_history_tools()
 
-        splitter.addWidget(drawer_card)
-        splitter.setSizes([260, 260])
-        layout.addWidget(splitter)
-
-        scroll_area.setWidget(container)
-        outer_layout.addWidget(scroll_area)
+    def _reflow_history_tools(self) -> None:
+        wide = self.width() >= 1050
+        if wide == self._toolbar_wide:
+            return
+        self._toolbar_wide = wide
+        for widget in self._toolbar_widgets:
+            self._toolbar_grid.removeWidget(widget)
+        for column in range(8):
+            self._toolbar_grid.setColumnStretch(column, 0)
+        if wide:
+            for column, widget in enumerate(self._toolbar_widgets):
+                self._toolbar_grid.addWidget(widget, 0, column)
+        else:
+            self._toolbar_grid.addWidget(self.search_input, 0, 0, 1, 3)
+            self._toolbar_grid.addWidget(self.date_filter_combo, 0, 3, 1, 2)
+            self._toolbar_grid.addWidget(self.status_filter_combo, 0, 5, 1, 3)
+            for column, widget in enumerate(self._toolbar_widgets[3:]):
+                self._toolbar_grid.addWidget(widget, 1, column)
+        self._toolbar_grid.setColumnStretch(0, 1)
 
     def refresh_history(self) -> None:
         """Fetch and reload past validation runs from SQLite."""
@@ -481,6 +329,17 @@ class HistoryPage(QWidget):
         self._render_runs_table()
 
     def _render_runs_table(self) -> None:
+        registrations = self._registry.list_registrations(active_only=False) if self._registry else []
+        self._registration_labels = {r.id: f"{r.workspace_name} / {r.report_name}" for r in registrations}
+        selected_report = self.report_filter_combo.currentData()
+        self.report_filter_combo.blockSignals(True)
+        self.report_filter_combo.clear()
+        self.report_filter_combo.addItem("All reports", None)
+        for registration_id in sorted({r.workspace_registration_id for r in self._runs}):
+            self.report_filter_combo.addItem(self._registration_labels.get(registration_id, f"Saved model #{registration_id}"), registration_id)
+        index = self.report_filter_combo.findData(selected_report)
+        self.report_filter_combo.setCurrentIndex(max(0, index))
+        self.report_filter_combo.blockSignals(False)
         self.runs_table.setSortingEnabled(False)
         try:
             self.runs_table.setRowCount(len(self._runs))
@@ -500,6 +359,7 @@ class HistoryPage(QWidget):
                 item_id.setData(Qt.ItemDataRole.UserRole, int(run.id))
                 item_id.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.runs_table.setItem(row_idx, 0, item_id)
+                self.runs_table.setItem(row_idx, 9, QTableWidgetItem(self._registration_labels.get(run.workspace_registration_id, f"Saved model #{run.workspace_registration_id}")))
 
                 # Col 1: Started At
                 iso_str = run.started_at.isoformat() if run.started_at else ""
@@ -577,90 +437,27 @@ class HistoryPage(QWidget):
             self._clear_drawer()
 
     def _display_drawer_results(self, run: ValidationRunSummaryDTO) -> None:
-        self.drawer_title.setText(
-            f"Run #{run.id} Results - {run.overall_status.value} ({run.started_at_display}, duration: {run.duration_display})"
-        )
-        self.results_table.setSortingEnabled(False)
-        try:
-            self.results_table.setRowCount(len(run.results))
-
-            if not run.results:
-                self.results_table.hide()
-                self.empty_results_label.show()
-                self.lbl_results_count.setText("0 rules")
-                return
-
-            self.empty_results_label.hide()
-            self.results_table.show()
-
-            for r_idx, res in enumerate(run.results):
-                # Col 0: Status
-                item_st = make_status_table_item(res.status)
-                item_st.setData(Qt.ItemDataRole.UserRole, res.id)
-                self.results_table.setItem(r_idx, 0, item_st)
-
-                # Col 1: Rule Name
-                item_rn = QTableWidgetItem(res.rule_name)
-                item_rn.setData(Qt.ItemDataRole.EditRole, res.rule_name)
-                self.results_table.setItem(r_idx, 1, item_rn)
-
-                # Col 2: Target
-                item_tg = QTableWidgetItem(res.target_display)
-                item_tg.setData(Qt.ItemDataRole.EditRole, res.target_display)
-                self.results_table.setItem(r_idx, 2, item_tg)
-
-                # Col 3: Check Type
-                item_ct = QTableWidgetItem(res.validation_type)
-                item_ct.setData(Qt.ItemDataRole.EditRole, res.validation_type)
-                self.results_table.setItem(r_idx, 3, item_ct)
-
-                # Col 4: Actual
-                item_act = QTableWidgetItem(res.actual_value or "-")
-                item_act.setData(Qt.ItemDataRole.EditRole, res.actual_value or "")
-                self.results_table.setItem(r_idx, 4, item_act)
-
-                # Col 5: Expected
-                item_exp = QTableWidgetItem(res.expected_value or "-")
-                item_exp.setData(Qt.ItemDataRole.EditRole, res.expected_value or "")
-                self.results_table.setItem(r_idx, 5, item_exp)
-
-                # Col 6: Deviation
-                item_dev = QTableWidgetItem(res.deviation or "None")
-                item_dev.setData(Qt.ItemDataRole.EditRole, res.deviation or "")
-                self.results_table.setItem(r_idx, 6, item_dev)
-
-                # Col 7: Duration
-                item_dur = NumericTableWidgetItem(f"{res.duration_ms} ms")
-                item_dur.setData(Qt.ItemDataRole.UserRole, int(res.duration_ms))
-                item_dur.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.results_table.setItem(r_idx, 7, item_dur)
-
-                # Col 8: Action link item (crisp bold text, no floating widget glitch)
-                item_act_btn = QTableWidgetItem("Details ➔")
-                item_act_btn.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                font_act = item_act_btn.font()
-                font_act.setBold(True)
-                item_act_btn.setFont(font_act)
-                item_act_btn.setForeground(QColor("#1668DC"))
-                self.results_table.setItem(r_idx, 8, item_act_btn)
-        finally:
-            self.results_table.setSortingEnabled(True)
-
+        self.drawer_title.setText(f"Run #{run.id} · {self._registration_labels.get(run.workspace_registration_id, 'Saved model')} · Started {run.started_at_display} · {run.duration_display}")
+        self.results_table.set_results(run.results)
+        self.results_table.setVisible(bool(run.results))
+        self.empty_results_label.setVisible(not run.results)
         self._apply_results_filters()
 
     def _handle_result_clicked(self, row: int, col: int) -> None:
-        if col == 8:  # Clicked on Details column
+        if col == 9:  # Clicked on Details column
             self._handle_result_double_clicked(row, col)
 
     def _clear_drawer(self) -> None:
         self._active_run = None
-        self.drawer_title.setText("Selected Run Details: (None Selected)")
+        self.drawer_title.setText("Select a saved run")
         self.results_table.setRowCount(0)
         self.results_table.hide()
         self.empty_results_label.show()
         self.lbl_results_count.setText("")
 
     def _apply_filters(self) -> None:
+        if not hasattr(self, "runs_table"):
+            return
         query = self.search_input.text().strip().lower()
         filter_mode = self.status_filter_combo.currentIndex()
         date_mode = self.date_filter_combo.currentIndex()
@@ -710,7 +507,9 @@ class HistoryPage(QWidget):
                 blob = f"#{run.id} {run.started_at_display} {st_val} {run.duration_display} {run.app_version}".lower()
                 query_match = query in blob
 
-            show = status_match and date_match and query_match
+            report_id = self.report_filter_combo.currentData()
+            report_match = report_id is None or run.workspace_registration_id == report_id
+            show = status_match and date_match and query_match and report_match
             self.runs_table.setRowHidden(row_idx, not show)
             if show:
                 visible_count += 1
@@ -724,6 +523,8 @@ class HistoryPage(QWidget):
             self.lbl_filtered_count.setText("")
 
     def _apply_results_filters(self) -> None:
+        if not hasattr(self, "lbl_results_count"):
+            return
         if not self._active_run:
             self.lbl_results_count.setText("")
             return
@@ -776,6 +577,7 @@ class HistoryPage(QWidget):
         self.search_input.clear()
         self.status_filter_combo.setCurrentIndex(0)
         self.date_filter_combo.setCurrentIndex(0)
+        self.report_filter_combo.setCurrentIndex(0)
 
         self.search_input.blockSignals(False)
         self.status_filter_combo.blockSignals(False)
@@ -786,13 +588,7 @@ class HistoryPage(QWidget):
     def _handle_result_double_clicked(self, row: int, _col: int) -> None:
         if not self._active_run:
             return
-        item = self.results_table.item(row, 0)
-        target_res = None
-        if item is not None:
-            res_id = item.data(Qt.ItemDataRole.UserRole)
-            target_res = next((r for r in self._active_run.results if r.id == res_id), None)
-        if target_res is None and 0 <= row < len(self._active_run.results):
-            target_res = self._active_run.results[row]
+        target_res = self.results_table.result_at(row)
         if target_res is not None:
             self._open_result_details(target_res)
 
@@ -893,9 +689,9 @@ class HistoryPage(QWidget):
 
         try:
             dest = export_run_to_csv(self._active_run, filename)
-            self.banner.show_message(
+            self.banner.show_export_success(
                 f"Exported run #{self._active_run.id} to CSV: '{dest.name}'.",
-                level=NotificationLevel.SUCCESS,
+                dest,
                 title="CSV Export Complete",
             )
         except Exception as exc:
@@ -917,9 +713,9 @@ class HistoryPage(QWidget):
 
         try:
             dest = export_run_to_xlsx(self._active_run, filename)
-            self.banner.show_message(
+            self.banner.show_export_success(
                 f"Exported run #{self._active_run.id} to Excel: '{dest.name}'.",
-                level=NotificationLevel.SUCCESS,
+                dest,
                 title="Excel Export Complete",
             )
         except Exception as exc:
@@ -938,9 +734,9 @@ class HistoryPage(QWidget):
 
         try:
             dest = export_diagnostic_logs(log_dir, filename)
-            self.banner.show_message(
+            self.banner.show_export_success(
                 f"Exported sanitized diagnostic report to '{dest.name}'. No credentials or tokens were included.",
-                level=NotificationLevel.SUCCESS,
+                dest,
                 title="Diagnostics Exported",
             )
         except Exception as exc:

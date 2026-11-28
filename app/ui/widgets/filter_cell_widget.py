@@ -47,10 +47,10 @@ class FilterCellWidget(QLineEdit):
         )
 
         self.setStyleSheet(
-            "QLineEdit { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 3px; "
-            "padding: 2px 46px 2px 6px; font-size: 11px; font-family: Consolas, 'Courier New', monospace; color: #0F172A; } "
-            "QLineEdit:focus { border: 1px solid #1668DC; background: #F8FAFC; } "
-            "QLineEdit:disabled { background: #F1F5F9; color: #94A3B8; border-color: #E2E8F0; }"
+            "QLineEdit { background: #FFFFFF; border: 1px solid #DDE4ED; border-radius: 3px; "
+            "padding: 2px 46px 2px 6px; font-size: 11px; font-family: Consolas, 'Courier New', monospace; color: #16243A; } "
+            "QLineEdit:focus { border: 1px solid #2563EB; background: #F8FAFC; } "
+            "QLineEdit:disabled { background: #F1F5F9; color: #94A3B8; border-color: #DDE4ED; }"
         )
 
         # Embedded right-docked bold Add / Edit button
@@ -59,10 +59,10 @@ class FilterCellWidget(QLineEdit):
         self.btn_add.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add.setStyleSheet(
-            "QPushButton { font-weight: 700; color: #1668DC; background: #EFF6FF; "
+            "QPushButton { font-weight: 700; color: #2563EB; background: #EFF6FF; "
             "border: 1px solid #BFDBFE; border-radius: 3px; font-size: 10px; margin: 0; padding: 0 4px; } "
             "QPushButton:hover { background: #DBEAFE; color: #1D4ED8; border-color: #3B82F6; } "
-            "QPushButton:disabled { color: #94A3B8; background: #F1F5F9; border-color: #E2E8F0; }"
+            "QPushButton:disabled { color: #94A3B8; background: #F1F5F9; border-color: #DDE4ED; }"
         )
         self.btn_add.clicked.connect(self.open_filter_builder)
 

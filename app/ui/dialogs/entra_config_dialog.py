@@ -17,7 +17,9 @@ from PySide6.QtWidgets import (
 from app.auth.msal_auth import is_valid_guid, is_valid_tenant
 
 
-class EntraConfigDialog(QDialog):
+from app.ui.widgets.enterprise import EnterpriseDialog
+
+class EntraConfigDialog(EnterpriseDialog):
     """Modal form to configure Microsoft Entra Application (Client) ID and Tenant ID."""
 
     def __init__(

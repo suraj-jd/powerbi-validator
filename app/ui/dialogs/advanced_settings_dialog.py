@@ -37,10 +37,12 @@ from app.services.rule_service import (
     VALIDATION_TYPES,
 )
 
+from app.ui.widgets.enterprise import EnterpriseDialog
+
 logger = logging.getLogger(__name__)
 
 
-class AdvancedSettingsDialog(QDialog):
+class AdvancedSettingsDialog(EnterpriseDialog):
     """Row-specific advanced configuration modal (BRD 5.4)."""
 
     def __init__(
@@ -81,7 +83,7 @@ class AdvancedSettingsDialog(QDialog):
         card = QFrame()
         card.setObjectName("DialogCard")
         card.setStyleSheet(
-            "#DialogCard { background-color: #F8FAFC; border: 1px solid #E2E8F0; "
+            "#DialogCard { background-color: #F8FAFC; border: 1px solid #DDE4ED; "
             "border-radius: 8px; padding: 16px; }"
         )
         card_layout = QVBoxLayout(card)

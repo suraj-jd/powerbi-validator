@@ -129,7 +129,11 @@ def test_main_window_syncs_sidebar_account_and_persists_entra_config(qtbot, tmp_
     )
     assert window._avatar_label.text() == "JD"
     assert window._sidebar_user_name.text() == "John Doe"
+    assert window._sidebar_user_email.text() == "Email hidden"
+    window.hide_email_action.setChecked(False)
     assert window._sidebar_user_email.text() == "john.doe@contoso.com"
+    window.hide_email_action.setChecked(True)
+    assert window._sidebar_user_email.text() == "Email hidden"
     assert window._sign_out_button.isVisible()
 
 

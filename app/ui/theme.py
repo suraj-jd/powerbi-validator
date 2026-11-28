@@ -9,6 +9,11 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
+COLORS = {
+    "navy": "#12253D", "primary": "#2563EB", "canvas": "#F4F6F9",
+    "surface": "#FFFFFF", "text": "#16243A", "muted": "#526278", "border": "#DDE4ED",
+}
+CHEVRON_UP_PATH = (ASSETS_DIR / "chevron_up.svg").as_posix()
 CHEVRON_DOWN_PATH = (ASSETS_DIR / "chevron_down.svg").as_posix()
 CHEVRON_ACTIVE_PATH = (ASSETS_DIR / "chevron_down_active.svg").as_posix()
 
@@ -521,6 +526,109 @@ _NAV_SVGS: dict[str, str] = {
         "</svg>"
     ),
 }
+
+_ACTION_PATHS = {
+    "check": '<circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/>',
+    "failed": '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/>',
+    "warning": '<path d="M12 3 2 21h20L12 3zM12 9v5m0 3h.01"/>',
+    "error": '<path d="m13 2-9 12h7l-1 8 10-13h-7l1-7z"/>',
+    "run": '<path d="m7 3 14 9L7 21V3z"/>',
+    "add": '<path d="M12 4v16M4 12h16"/>',
+    "refresh": '<path d="M20 7A9 9 0 1 0 21 15M20 2v6h-6"/>',
+    "schedule": '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 11h18m-9 3v4h3"/>',
+    "export": '<path d="M12 3v12m-4-4 4 4 4-4M4 15v6h16v-6"/>',
+    "import": '<path d="M12 16V3m-4 4 4-4 4 4M4 15v6h16v-6"/>',
+    "delete": '<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',
+    "save": '<path d="M4 3h13l4 4v14H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',
+    "close": '<path d="m5 5 14 14M5 19 19 5"/>',
+    "alerts": '<path d="M6 8a6 6 0 0 1 12 0v7l3 3H3l3-3V8m3 13h6"/>',
+    "copy": '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+    "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 4 18 4 18 0V5M3 12c0 4 18 4 18 0"/>',
+}
+for _name, _paths in _ACTION_PATHS.items():
+    _NAV_SVGS[_name] = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+                         'fill="none" stroke="{color}" stroke-width="1.8" '
+                         'stroke-linecap="round" stroke-linejoin="round">' + _paths + '</svg>')
+
+# Theme tokens also replace the old palette in shared selectors.
+for _old, _new in {"#1668DC": COLORS["primary"], "#13294B": COLORS["navy"],
+                   "#F4F7FB": COLORS["canvas"], "#0F172A": COLORS["text"],
+                   "#E2E8F0": COLORS["border"]}.items():
+    APP_STYLESHEET = APP_STYLESHEET.replace(_old, _new)
+
+APP_STYLESHEET += """
+QDialog { background: #F4F6F9; }
+QFrame#Card { border-radius: 6px; }
+QFrame#ContextBar { background: white; border-bottom: 1px solid #DDE4ED; }
+QLabel#PageTitle { font-size: 24px; color: #16243A; }
+QLabel#SectionTitle { font-size: 16px; font-weight: 600; }
+QLabel#MutedText { color: #526278; font-size: 12px; }
+QLabel#ContextTitle { color: #16243A; font-size: 13px; font-weight: 600; }
+QLabel#ConnectionStatus { color: #64748B; font-size: 12px; padding: 6px 10px; border-radius: 5px; }
+QLabel#ConnectionStatus[connected="true"] { color: #15803D; background: #ECFDF3; }
+QPushButton#AccountButton { color: #1D4ED8; background: #EFF6FF; border: 1px solid #BFDBFE;
+    border-radius: 17px; padding: 7px 18px 7px 12px; min-height: 20px; font-weight: 700; }
+QPushButton#AccountButton:hover { background: #DBEAFE; }
+QLabel#RunContext { background: #EFF4FC; color: #334155; border: 1px solid #DDE4ED;
+    border-radius: 5px; padding: 10px 12px; font-size: 12px; }
+QFrame#Card QLabel#RunContext { background: #EFF4FC; border: 1px solid #DDE4ED; }
+QPushButton { min-height: 20px; }
+QPushButton:disabled { background: #F1F5F9; color: #94A3B8; border-color: #DDE4ED; }
+QPushButton#PrimaryButton:disabled, QPushButton#SecondaryButton:disabled, QPushButton#DangerButton:disabled {
+    background: #E8EDF3; color: #94A3B8; border: 1px solid #DDE4ED;
+}
+QPushButton:focus, QToolButton:focus { border: 2px solid #2563EB; }
+QPushButton#DangerButton { background: #FFFFFF; color: #B91C1C; border: 1px solid #FCA5A5; }
+QPushButton#DangerButton:hover { background: #FEF2F2; }
+QSpinBox, QDoubleSpinBox, QTimeEdit, QDateTimeEdit {
+    background: #FFFFFF; color: #16243A; border: 1px solid #CBD5E1;
+    border-radius: 6px; padding: 5px 26px 5px 10px; min-height: 22px;
+}
+QSpinBox:focus, QDoubleSpinBox:focus, QTimeEdit:focus, QDateTimeEdit:focus { border-color: #2563EB; }
+QSpinBox::up-button, QDoubleSpinBox::up-button, QTimeEdit::up-button, QDateTimeEdit::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 22px;
+    border-left: 1px solid #E2E8F0;
+    border-top-right-radius: 5px;
+    background: #F8FAFC;
+}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover, QTimeEdit::up-button:hover, QDateTimeEdit::up-button:hover {
+    background: #EFF6FF;
+}
+QSpinBox::down-button, QDoubleSpinBox::down-button, QTimeEdit::down-button, QDateTimeEdit::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 22px;
+    border-left: 1px solid #E2E8F0;
+    border-top: 1px solid #E2E8F0;
+    border-bottom-right-radius: 5px;
+    background: #F8FAFC;
+}
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover, QTimeEdit::down-button:hover, QDateTimeEdit::down-button:hover {
+    background: #EFF6FF;
+}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow, QTimeEdit::up-arrow, QDateTimeEdit::up-arrow {
+    image: url("__CHEVRON_UP__");
+    width: 9px;
+    height: 9px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow, QTimeEdit::down-arrow, QDateTimeEdit::down-arrow {
+    image: url("__CHEVRON_DOWN__");
+    width: 9px;
+    height: 9px;
+}
+QScrollArea { border: none; background: transparent; }
+QProgressBar { background: #E8EDF5; border: none; border-radius: 4px; min-height: 12px; text-align: center; }
+QProgressBar::chunk { background: #2563EB; border-radius: 4px; }
+QMenu { background: white; border: 1px solid #DDE4ED; padding: 6px; }
+QMenu::item { padding: 8px 20px; color: #16243A; }
+QMenu::item:selected { background: #EFF6FF; }
+QSplitter::handle { background: #DDE4ED; height: 4px; }
+QGroupBox { background: white; border: 1px solid #DDE4ED; border-radius: 6px; margin-top: 16px; padding-top: 12px; }
+QGroupBox::title { subcontrol-origin: margin; left: 12px; color: #16243A; font-weight: 600; }
+QToolButton { padding: 5px; border-radius: 5px; }
+""".replace("__CHEVRON_UP__", CHEVRON_UP_PATH).replace("__CHEVRON_DOWN__", CHEVRON_DOWN_PATH)
 
 
 def make_nav_icon(name: str, color: str = "#E2E8F0", size: int = 18) -> QIcon:

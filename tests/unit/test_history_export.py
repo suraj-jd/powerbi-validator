@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from dataclasses import replace
+import csv
 from pathlib import Path
 
 import openpyxl
@@ -90,6 +92,10 @@ def test_export_run_to_csv(tmp_path: Path):
     assert "# Run ID,1" in content
     assert "Rule 1,Table[Col1],COLUMN,null_check,PASS" in content
     assert "Rule 2,Table[Col2],COLUMN,null_check,FAIL" in content
+    rows = list(csv.reader(content.splitlines()))
+    header_index = next(i for i, row in enumerate(rows) if row and row[0] == "Result ID")
+    date_column = rows[header_index].index("Validated At (UTC)")
+    assert rows[header_index + 1][date_column] == "2026-11-19 12:00:00 UTC"
 
 
 def test_export_run_to_xlsx(tmp_path: Path):
@@ -105,6 +111,18 @@ def test_export_run_to_xlsx(tmp_path: Path):
     assert "Power BI Validation Tool" in ws["A1"].value
     # Status should be PASS
     assert ws["A8"].value == "Status" or ws["A10"].value == "Status" or any(cell.value == "Status" for cell in ws["A"])
+    date_header = next(cell for row in ws for cell in row if cell.value == "Validated At (UTC)")
+    assert ws.cell(date_header.row + 1, date_header.column).value == "2026-11-19 12:00:00 UTC"
+    wb.close()
+
+
+@pytest.mark.parametrize("tz", [None, timezone.utc, timezone(timedelta(hours=5, minutes=30))])
+def test_validated_date_uses_completion_time_and_normalizes_utc(tz):
+    result = _make_sample_run(1, ValidationStatus.PASS, [ValidationStatus.PASS]).results[0]
+    completed = datetime(2026, 11, 28, 15, 47, 22, tzinfo=tz)
+    result = replace(result, completed_at=completed)
+    expected = "2026-11-28 10:17:22 UTC" if tz not in (None, timezone.utc) else "2026-11-28 15:47:22 UTC"
+    assert result.validated_at_display == expected
 
 
 def test_export_diagnostic_logs(tmp_path: Path):

@@ -330,7 +330,7 @@ def test_sheet_settings_filter_cell_add_button_opens_dialog(
     qtbot.mouseClick(page.btn_add_row, Qt.MouseButton.LeftButton)
     assert page.sheet_table.rowCount() == 1
 
-    f1_cell = page.sheet_table.cellWidget(0, 7)
+    f1_cell = page.sheet_table.cellWidget(0, 8)
     assert isinstance(f1_cell, FilterCellWidget)
     assert f1_cell.btn_add.text() == "Add"
 
